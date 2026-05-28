@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Menu Matrix</title>
+    <link rel="stylesheet" href="styles.css?v=admin-media-theme" />
+  </head>
+  <body>
+    <main class="app-shell" aria-label="Restaurant menu matrix app">
+      <header class="top-bar">
+        <div>
+          <h1>Menu Matrix</h1>
+        </div>
+        <button id="drawerOpenButton" class="icon-button" type="button" aria-label="Open admin menu">
+          <span aria-hidden="true">≡</span>
+        </button>
+      </header>
+
+      <section class="hero logo-hero" aria-label="Mott 32 logo">
+        <img id="heroImage" src="https://www.nicepng.com/png/detail/809-8099031_mott32-las-vegas-mott-32-logo.png" alt="Mott 32 restaurant logo" />
+        <button id="editHeroButton" class="floating-edit-button" type="button" hidden>Edit image</button>
+      </section>
+
+      <section class="controls" aria-label="Menu filters">
+        <label class="search-box">
+          <span>Search</span>
+          <input id="searchInput" type="search" placeholder="ramen, salad, vegan..." autocomplete="off" />
+        </label>
+        <div class="tabs" role="tablist" aria-label="Menu categories">
+          <button class="tab is-active" type="button" data-category="all">All</button>
+          <button class="tab" type="button" data-category="starters">Start</button>
+          <button class="tab" type="button" data-category="mains">Mains</button>
+          <button class="tab" type="button" data-category="drinks">Drinks</button>
+        </div>
+      </section>
+
+      <section class="allergy-panel" aria-label="Allergy filters">
+        <div class="section-heading">
+          <p class="kicker">Allergy check</p>
+          <strong>Avoid ingredients</strong>
+        </div>
+        <div id="allergyChips" class="allergy-chips"></div>
+      </section>
+
+      <section class="matrix-card" aria-label="Menu matrix">
+        <div class="matrix-header" role="row">
+          <span role="columnheader">Item</span>
+          <span role="columnheader">Diet</span>
+          <span role="columnheader">Heat</span>
+          <span role="columnheader">Price</span>
+        </div>
+        <div id="menuGrid" class="menu-grid"></div>
+      </section>
+
+    </main>
+
+    <div id="drawerOverlay" class="drawer-overlay" hidden></div>
+    <aside id="adminDrawer" class="admin-drawer" aria-label="Admin menu" aria-hidden="true">
+      <div class="drawer-head">
+        <div>
+          <p class="kicker">Admin</p>
+          <h2>Menu controls</h2>
+        </div>
+        <button id="drawerCloseButton" class="icon-button" type="button" aria-label="Close admin menu">x</button>
+      </div>
+
+      <form id="adminLoginForm" class="admin-login">
+        <label>
+          Username
+          <input id="adminUsername" autocomplete="username" required />
+        </label>
+        <label>
+          Password
+          <input id="adminPassword" type="password" autocomplete="current-password" required />
+        </label>
+        <button class="save-button" type="submit">Log in</button>
+        <p id="loginMessage" class="login-message" role="status"></p>
+      </form>
+
+      <form id="passwordSetupForm" class="admin-login" hidden>
+        <p id="inviteIntro" class="admin-status">Create your password</p>
+        <label>
+          New password
+          <input id="setupPassword" type="password" autocomplete="new-password" required />
+        </label>
+        <button class="save-button" type="submit">Set password</button>
+        <p id="setupMessage" class="login-message" role="status"></p>
+      </form>
+
+      <section id="adminControls" class="admin-controls" hidden>
+        <p id="adminStatus" class="admin-status">Signed in</p>
+        <button id="editModeButton" class="action-button" type="button">Edit menu</button>
+        <button id="addItemButton" class="action-button add-button" type="button" hidden>Add item</button>
+        <button id="manageUsersButton" class="action-button" type="button" hidden>Manage Users</button>
+        <button id="designButton" class="action-button" type="button" hidden>Color Scheme</button>
+        <button id="logoutButton" class="danger-button" type="button">Log out</button>
+      </section>
+    </aside>
+
+    <main id="usersPage" class="app-shell users-page" aria-label="Manage users" hidden>
+      <header class="page-top-bar">
+        <button id="backToMenuButton" class="action-button" type="button">Back</button>
+        <div>
+          <p class="kicker">Admin</p>
+          <h1>Manage Users</h1>
+        </div>
+      </header>
+
+      <section class="user-manager">
+        <div class="section-heading">
+          <p class="kicker">Privileges</p>
+          <strong>Create user</strong>
+        </div>
+        <form id="userForm" class="user-form">
+          <label>
+            Username
+            <input id="newUsername" required />
+          </label>
+          <label>
+            Email
+            <input id="newEmail" type="email" placeholder="name@example.com" required />
+          </label>
+          <fieldset class="permission-group">
+            <legend>Can modify</legend>
+            <label><input type="checkbox" name="permissions" value="starters" /> Starters</label>
+            <label><input type="checkbox" name="permissions" value="mains" /> Mains</label>
+            <label><input type="checkbox" name="permissions" value="drinks" /> Drinks</label>
+          </fieldset>
+          <button class="save-button" type="submit">Send invite</button>
+          <p id="userMessage" class="login-message" role="status"></p>
+        </form>
+      </section>
+
+      <section class="user-manager">
+        <div class="section-heading">
+          <p class="kicker">Sorted by privileges</p>
+          <strong>Users</strong>
+        </div>
+        <div id="userList" class="user-list"></div>
+      </section>
+    </main>
+
+    <dialog id="itemDialog" class="item-dialog" aria-labelledby="dialogTitle">
+      <form id="itemForm" method="dialog" class="item-form">
+        <div class="dialog-head">
+          <div>
+            <p class="kicker">Menu editor</p>
+            <h2 id="dialogTitle">Edit item</h2>
+          </div>
+          <button class="icon-button" type="button" aria-label="Close editor" id="closeDialogButton">x</button>
+        </div>
+
+        <input id="itemId" type="hidden" />
+        <label>
+          Name
+          <input id="itemName" required />
+        </label>
+        <label>
+          Description
+          <textarea id="itemDescription" rows="3" required></textarea>
+        </label>
+        <label>
+          Learning notes
+          <textarea id="itemDetails" rows="4" placeholder="Flavor profile, ingredients, prep, pairings..."></textarea>
+        </label>
+        <label>
+          Photo URL
+          <input id="itemImage" placeholder="https://example.com/dish.jpg" />
+        </label>
+        <label>
+          Upload photo
+          <input id="itemImageFile" type="file" accept="image/*" />
+        </label>
+        <div class="form-grid">
+          <label>
+            Category
+            <select id="itemCategory">
+              <option value="starters">Starters</option>
+              <option value="mains">Mains</option>
+              <option value="drinks">Drinks</option>
+            </select>
+          </label>
+          <label>
+            Diet
+            <select id="itemDiet">
+              <option value="V">V</option>
+              <option value="VG">VG</option>
+              <option value="GF">GF</option>
+              <option value="NA">NA</option>
+            </select>
+          </label>
+        </div>
+        <div class="form-grid">
+          <label>
+            Heat
+            <input id="itemHeat" type="number" min="0" max="3" step="1" required />
+          </label>
+          <label>
+            Price
+            <input id="itemPrice" type="number" min="0" step="1" required />
+          </label>
+        </div>
+        <label>
+          Allergens
+          <input id="itemAllergens" placeholder="Soy, Wheat, Dairy" />
+        </label>
+
+        <div class="form-actions">
+          <button id="deleteItemButton" class="danger-button" type="button">Delete</button>
+          <button class="save-button" type="submit">Save item</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="designDialog" class="item-dialog" aria-labelledby="designTitle">
+      <form id="designForm" method="dialog" class="item-form">
+        <div class="dialog-head">
+          <div>
+            <p class="kicker">Admin design</p>
+            <h2 id="designTitle">Color Scheme</h2>
+          </div>
+          <button class="icon-button" type="button" aria-label="Close design editor" id="closeDesignButton">x</button>
+        </div>
+
+        <div class="color-grid">
+          <label>
+            Main text
+            <input id="colorInk" type="color" />
+          </label>
+          <label>
+            Accent
+            <input id="colorLeaf" type="color" />
+          </label>
+          <label>
+            Price
+            <input id="colorGold" type="color" />
+          </label>
+          <label>
+            Edit
+            <input id="colorAqua" type="color" />
+          </label>
+          <label>
+            Background
+            <input id="colorPage" type="color" />
+          </label>
+          <label>
+            Panels
+            <input id="colorPanel" type="color" />
+          </label>
+        </div>
+
+        <label>
+          Header image URL
+          <input id="heroImageUrl" placeholder="https://example.com/logo.png" />
+        </label>
+        <label>
+          Upload header image
+          <input id="heroImageFile" type="file" accept="image/*" />
+        </label>
+
+        <div class="form-actions">
+          <button id="resetDesignButton" class="danger-button" type="button">Reset</button>
+          <button class="save-button" type="submit">Save design</button>
+        </div>
+      </form>
+    </dialog>
+
+    <template id="menuRowTemplate">
+      <article class="menu-row">
+        <div class="item-cell">
+          <div class="item-title-line">
+            <button class="item-toggle" type="button" aria-expanded="false">
+              <h3></h3>
+            </button>
+            <button class="row-edit-button" type="button" hidden>Edit</button>
+          </div>
+          <p></p>
+          <div class="allergen-list"></div>
+        </div>
+        <span class="pill diet-pill"></span>
+        <span class="heat-meter" aria-label="Heat level"></span>
+        <button class="price-button" type="button"></button>
+        <div class="item-details" hidden>
+          <img alt="" />
+          <div>
+            <p class="kicker">Menu notes</p>
+            <p class="detail-copy"></p>
+          </div>
+        </div>
+      </article>
+    </template>
+
+    <script src="app.js?v=mott32-five"></script>
+  </body>
+</html>

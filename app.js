@@ -1,0 +1,996 @@
+const storageKey = "restaurant-menu-matrix-items";
+const menuSeedKey = "restaurant-menu-matrix-seed";
+const currentMenuSeed = "mott32-las-vegas-five";
+const usersStorageKey = "restaurant-menu-matrix-users";
+const currentUserKey = "restaurant-menu-matrix-current-user";
+const designStorageKey = "restaurant-menu-matrix-design";
+const defaultHeroImage = "https://www.nicepng.com/png/detail/809-8099031_mott32-las-vegas-mott-32-logo.png";
+const defaultDesign = {
+  ink: "#19211d",
+  leaf: "#2f7d56",
+  gold: "#d99d2b",
+  aqua: "#317c8e",
+  page: "#f8f2e8",
+  panel: "#fbfaf6",
+  heroImage: defaultHeroImage
+};
+const categories = ["starters", "mains", "drinks"];
+const defaultUsers = [
+  {
+    username: "admin",
+    password: "menu123",
+    role: "admin",
+    permissions: [...categories]
+  }
+];
+
+const defaultMenuItems = [
+  {
+    id: "peking-duck",
+    name: "Apple Wood Roasted 42 Days Peking Duck",
+    description: "Signature Mott 32 cut, carved for crisp skin and tender meat",
+    category: "mains",
+    diet: "NA",
+    style: "",
+    heat: 0,
+    allergens: ["Soy", "Wheat"],
+    details: "One of Mott 32's signature dishes. Teach the team to mention the apple wood roast, 42-day duck, crisp skin, and classic tableside-style presentation.",
+    image: "https://images.unsplash.com/photo-1518492104633-130d0cc84637?auto=format&fit=crop&w=800&q=80",
+    price: 108
+  },
+  {
+    id: "soup-dumplings",
+    name: "Traditional Iberico Pork Shanghainese Soup Dumplings",
+    description: "Four delicate xiao long bao with savory pork broth",
+    category: "starters",
+    diet: "NA",
+    style: "",
+    heat: 1,
+    allergens: ["Wheat", "Soy"],
+    details: "A dim sum staple. Coach staff to warn guests the dumplings contain hot broth and should be eaten carefully with the soup spoon.",
+    image: "https://images.unsplash.com/photo-1496116218417-1a781b1c416c?auto=format&fit=crop&w=800&q=80",
+    price: 13
+  },
+  {
+    id: "bbq-pork-bun",
+    name: "Crispy Sugar Coated BBQ Iberico Pork Bun",
+    description: "Three baked buns with sweet-savory barbecue pork filling",
+    category: "starters",
+    diet: "NA",
+    style: "",
+    heat: 0,
+    allergens: ["Wheat", "Soy"],
+    details: "This is a baked dim sum item with a crisp sugar-coated exterior and rich Iberico pork barbecue center. Good for guests who like sweet and savory.",
+    image: "https://images.unsplash.com/photo-1563245372-f21724e3856d?auto=format&fit=crop&w=800&q=80",
+    price: 13
+  },
+  {
+    id: "smoked-black-cod",
+    name: "Signature Smoked Black Cod",
+    description: "Smoky, silky black cod with a rich Cantonese-style glaze",
+    category: "mains",
+    diet: "NA",
+    style: "sea",
+    heat: 0,
+    allergens: ["Fish", "Soy"],
+    details: "A polished seafood signature. Describe it as delicate, smoky, slightly sweet, and very soft in texture.",
+    image: "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=800&q=80",
+    price: 42
+  },
+  {
+    id: "lobster-fried-rice",
+    name: "Signature Maine Lobster Fried Rice",
+    description: "King oyster mushrooms and edamame folded into lobster fried rice",
+    category: "mains",
+    diet: "NA",
+    style: "sea",
+    heat: 0,
+    allergens: ["Shellfish", "Egg", "Soy"],
+    details: "A premium rice and noodle section dish. Highlight the lobster, mushroom, and edamame; confirm shellfish allergy before recommending.",
+    image: "https://images.unsplash.com/photo-1603133872878-684f208fb84b?auto=format&fit=crop&w=800&q=80",
+    price: 68
+  }
+];
+
+const allergyOptions = ["Dairy", "Egg", "Fish", "Sesame", "Shellfish", "Soy", "Wheat"];
+
+let menuItems = loadMenuItems();
+let users = loadUsers();
+let designSettings = loadDesignSettings();
+
+const state = {
+  category: "all",
+  query: "",
+  allergies: new Set(),
+  openItems: new Set(),
+  currentUser: loadCurrentUser(),
+  editing: false
+};
+
+const formatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 0
+});
+
+const menuGrid = document.querySelector("#menuGrid");
+const template = document.querySelector("#menuRowTemplate");
+const searchInput = document.querySelector("#searchInput");
+const allergyChips = document.querySelector("#allergyChips");
+const tabs = [...document.querySelectorAll(".tab")];
+const drawerOpenButton = document.querySelector("#drawerOpenButton");
+const drawerCloseButton = document.querySelector("#drawerCloseButton");
+const drawerOverlay = document.querySelector("#drawerOverlay");
+const adminDrawer = document.querySelector("#adminDrawer");
+const adminLoginForm = document.querySelector("#adminLoginForm");
+const passwordSetupForm = document.querySelector("#passwordSetupForm");
+const adminControls = document.querySelector("#adminControls");
+const adminUsername = document.querySelector("#adminUsername");
+const adminPassword = document.querySelector("#adminPassword");
+const setupPassword = document.querySelector("#setupPassword");
+const setupMessage = document.querySelector("#setupMessage");
+const inviteIntro = document.querySelector("#inviteIntro");
+const loginMessage = document.querySelector("#loginMessage");
+const adminStatus = document.querySelector("#adminStatus");
+const editModeButton = document.querySelector("#editModeButton");
+const addItemButton = document.querySelector("#addItemButton");
+const manageUsersButton = document.querySelector("#manageUsersButton");
+const designButton = document.querySelector("#designButton");
+const logoutButton = document.querySelector("#logoutButton");
+const menuPage = document.querySelector("main[aria-label='Restaurant menu matrix app']");
+const usersPage = document.querySelector("#usersPage");
+const backToMenuButton = document.querySelector("#backToMenuButton");
+const userForm = document.querySelector("#userForm");
+const newUsername = document.querySelector("#newUsername");
+const newEmail = document.querySelector("#newEmail");
+const userMessage = document.querySelector("#userMessage");
+const userList = document.querySelector("#userList");
+const itemDialog = document.querySelector("#itemDialog");
+const itemForm = document.querySelector("#itemForm");
+const closeDialogButton = document.querySelector("#closeDialogButton");
+const deleteItemButton = document.querySelector("#deleteItemButton");
+const dialogTitle = document.querySelector("#dialogTitle");
+const itemId = document.querySelector("#itemId");
+const itemName = document.querySelector("#itemName");
+const itemDescription = document.querySelector("#itemDescription");
+const itemDetails = document.querySelector("#itemDetails");
+const itemImage = document.querySelector("#itemImage");
+const itemImageFile = document.querySelector("#itemImageFile");
+const itemCategory = document.querySelector("#itemCategory");
+const itemDiet = document.querySelector("#itemDiet");
+const itemHeat = document.querySelector("#itemHeat");
+const itemPrice = document.querySelector("#itemPrice");
+const itemAllergens = document.querySelector("#itemAllergens");
+const heroImage = document.querySelector("#heroImage");
+const editHeroButton = document.querySelector("#editHeroButton");
+const designDialog = document.querySelector("#designDialog");
+const designForm = document.querySelector("#designForm");
+const closeDesignButton = document.querySelector("#closeDesignButton");
+const resetDesignButton = document.querySelector("#resetDesignButton");
+const colorInk = document.querySelector("#colorInk");
+const colorLeaf = document.querySelector("#colorLeaf");
+const colorGold = document.querySelector("#colorGold");
+const colorAqua = document.querySelector("#colorAqua");
+const colorPage = document.querySelector("#colorPage");
+const colorPanel = document.querySelector("#colorPanel");
+const heroImageUrl = document.querySelector("#heroImageUrl");
+const heroImageFile = document.querySelector("#heroImageFile");
+
+function loadMenuItems() {
+  if (localStorage.getItem(menuSeedKey) !== currentMenuSeed) {
+    localStorage.setItem(menuSeedKey, currentMenuSeed);
+    localStorage.setItem(storageKey, JSON.stringify(defaultMenuItems));
+    return defaultMenuItems.map(normalizeMenuItem);
+  }
+
+  const savedItems = localStorage.getItem(storageKey);
+  if (!savedItems) return defaultMenuItems.map(normalizeMenuItem);
+
+  try {
+    const parsed = JSON.parse(savedItems);
+    return Array.isArray(parsed) ? parsed.map(normalizeMenuItem) : defaultMenuItems.map(normalizeMenuItem);
+  } catch {
+    return defaultMenuItems.map(normalizeMenuItem);
+  }
+}
+
+function normalizeMenuItem(item) {
+  const defaultMatch = defaultMenuItems.find((defaultItem) => defaultItem.id === item.id);
+
+  return {
+    ...item,
+    details: item.details || defaultMatch?.details || "Key ingredients, flavor notes, and service talking points can go here.",
+    image: item.image || defaultMatch?.image || "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80"
+  };
+}
+
+function saveMenuItems() {
+  localStorage.setItem(storageKey, JSON.stringify(menuItems));
+}
+
+function loadDesignSettings() {
+  const savedDesign = localStorage.getItem(designStorageKey);
+  if (!savedDesign) return { ...defaultDesign };
+
+  try {
+    return { ...defaultDesign, ...JSON.parse(savedDesign) };
+  } catch {
+    return { ...defaultDesign };
+  }
+}
+
+function saveDesignSettings() {
+  localStorage.setItem(designStorageKey, JSON.stringify(designSettings));
+}
+
+function applyDesignSettings() {
+  document.documentElement.style.setProperty("--ink", designSettings.ink);
+  document.documentElement.style.setProperty("--leaf", designSettings.leaf);
+  document.documentElement.style.setProperty("--gold", designSettings.gold);
+  document.documentElement.style.setProperty("--aqua", designSettings.aqua);
+  document.documentElement.style.setProperty("--page-bg", designSettings.page);
+  document.documentElement.style.setProperty("--panel-bg", designSettings.panel);
+  heroImage.src = designSettings.heroImage;
+}
+
+function syncDesignForm() {
+  colorInk.value = designSettings.ink;
+  colorLeaf.value = designSettings.leaf;
+  colorGold.value = designSettings.gold;
+  colorAqua.value = designSettings.aqua;
+  colorPage.value = designSettings.page;
+  colorPanel.value = designSettings.panel;
+  heroImageUrl.value = designSettings.heroImage;
+}
+
+function loadUsers() {
+  const savedUsers = localStorage.getItem(usersStorageKey);
+  if (!savedUsers) return [...defaultUsers];
+
+  try {
+    const parsed = JSON.parse(savedUsers);
+    if (!Array.isArray(parsed) || !parsed.length) return [...defaultUsers];
+
+    const hasAdmin = parsed.some((user) => user.username === "admin" && user.role === "admin");
+    return hasAdmin ? parsed : [...defaultUsers, ...parsed];
+  } catch {
+    return [...defaultUsers];
+  }
+}
+
+function saveUsers() {
+  localStorage.setItem(usersStorageKey, JSON.stringify(users));
+}
+
+function loadCurrentUser() {
+  const username = localStorage.getItem(currentUserKey);
+  if (!username) return null;
+  return users.find((user) => user.username === username) ? username : null;
+}
+
+function getInviteUsername() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("invite");
+}
+
+function getInvitedUser() {
+  const username = getInviteUsername();
+  if (!username) return null;
+  return users.find((user) => user.username === username && user.status === "pending") || null;
+}
+
+function getActiveUser() {
+  return users.find((user) => user.username === state.currentUser) || null;
+}
+
+function isAdmin() {
+  return getActiveUser()?.role === "admin";
+}
+
+function getEditableCategories() {
+  const user = getActiveUser();
+  if (!user) return [];
+  return isAdmin() ? [...categories] : user.permissions || [];
+}
+
+function canEditCategory(category) {
+  return getEditableCategories().includes(category);
+}
+
+function canEditAnyCategory() {
+  return getEditableCategories().length > 0;
+}
+
+function getVisibleItems() {
+  const query = state.query.trim().toLowerCase();
+
+  return menuItems.filter((item) => {
+    const matchesCategory = state.category === "all" || item.category === state.category;
+    const matchesQuery = [item.name, item.description, item.diet, item.category, ...item.allergens]
+      .join(" ")
+      .toLowerCase()
+      .includes(query);
+    const avoidsAllergies = !item.allergens.some((allergen) => state.allergies.has(allergen));
+
+    return matchesCategory && matchesQuery && avoidsAllergies;
+  });
+}
+
+function renderHeat(level) {
+  if (level === 0) return "Mild";
+  return ["Mild", "Low", "Med", "Hot"][level] || "Hot";
+}
+
+function renderMenu() {
+  const items = getVisibleItems();
+  menuGrid.replaceChildren();
+
+  if (items.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = "No matching dishes.";
+    menuGrid.append(empty);
+    return;
+  }
+
+  items.forEach((item) => {
+    const row = template.content.firstElementChild.cloneNode(true);
+    row.classList.toggle("is-open", state.openItems.has(item.id));
+    row.querySelector("h3").textContent = item.name;
+    row.querySelector(".item-cell > p").textContent = item.description;
+
+    const itemToggle = row.querySelector(".item-toggle");
+    itemToggle.setAttribute("aria-expanded", String(state.openItems.has(item.id)));
+    itemToggle.addEventListener("click", () => toggleItemDetails(item.id));
+
+    const rowEditButton = row.querySelector(".row-edit-button");
+    const canEditItem = state.editing && canEditCategory(item.category);
+    rowEditButton.hidden = !canEditItem;
+    rowEditButton.addEventListener("click", () => openItemDialog(item.id));
+
+    const allergenList = row.querySelector(".allergen-list");
+    const allergens = item.allergens.length ? item.allergens : ["No major allergens"];
+    allergens.forEach((allergen) => {
+      const tag = document.createElement("span");
+      tag.className = `allergen-tag${item.allergens.length ? "" : " none"}`;
+      tag.textContent = allergen;
+      allergenList.append(tag);
+    });
+
+    const pill = row.querySelector(".diet-pill");
+    pill.textContent = item.diet;
+    if (item.style) pill.classList.add(item.style);
+
+    const heat = row.querySelector(".heat-meter");
+    heat.textContent = renderHeat(item.heat);
+    heat.setAttribute("aria-label", `${item.heat} out of 3 heat level`);
+
+    const button = row.querySelector(".price-button");
+    button.textContent = formatter.format(item.price);
+    button.classList.toggle("editing", canEditItem);
+    button.classList.toggle("locked", state.editing && !canEditItem);
+    button.setAttribute("aria-label", canEditItem ? `Edit ${item.name}` : `${item.name} costs ${formatter.format(item.price)}`);
+    button.addEventListener("click", () => {
+      if (canEditItem) {
+        openItemDialog(item.id);
+      }
+    });
+
+    const itemDetails = row.querySelector(".item-details");
+    const image = itemDetails.querySelector("img");
+    itemDetails.hidden = !state.openItems.has(item.id);
+    image.src = item.image;
+    image.alt = item.name;
+    itemDetails.querySelector(".detail-copy").textContent = item.details;
+
+    menuGrid.append(row);
+  });
+}
+
+function toggleItemDetails(id) {
+  if (state.openItems.has(id)) {
+    state.openItems.delete(id);
+  } else {
+    state.openItems.add(id);
+  }
+
+  renderMenu();
+}
+
+function renderAllergyChips() {
+  allergyChips.replaceChildren();
+
+  allergyOptions.forEach((allergen) => {
+    const chip = document.createElement("button");
+    chip.className = "allergy-chip";
+    chip.type = "button";
+    chip.textContent = allergen;
+    chip.classList.toggle("is-active", state.allergies.has(allergen));
+    chip.setAttribute("aria-pressed", String(state.allergies.has(allergen)));
+    chip.addEventListener("click", () => toggleAllergy(allergen));
+    allergyChips.append(chip);
+  });
+}
+
+function toggleAllergy(allergen) {
+  if (state.allergies.has(allergen)) {
+    state.allergies.delete(allergen);
+  } else {
+    state.allergies.add(allergen);
+  }
+
+  renderAllergyChips();
+  renderMenu();
+}
+
+function setEditMode(isEditing) {
+  if (!canEditAnyCategory()) return;
+
+  state.editing = isEditing;
+  editModeButton.textContent = isEditing ? "Done" : "Edit";
+  editModeButton.classList.toggle("is-active", isEditing);
+  addItemButton.hidden = !isEditing || !canEditAnyCategory();
+  renderMenu();
+}
+
+function openItemDialog(id) {
+  const item = menuItems.find((menuItem) => menuItem.id === id);
+  const isNew = !item;
+  const editableCategories = getEditableCategories();
+  if (!editableCategories.length) return;
+  if (item && !canEditCategory(item.category)) return;
+
+  const currentItem =
+    item ||
+    {
+      id: `item-${Date.now()}`,
+      name: "",
+      description: "",
+      category: editableCategories[0],
+      diet: "V",
+      style: "",
+      heat: 0,
+      allergens: [],
+      details: "",
+      image: "",
+      price: 0
+    };
+
+  dialogTitle.textContent = isNew ? "Add item" : "Edit item";
+  itemId.value = currentItem.id;
+  itemName.value = currentItem.name;
+  itemDescription.value = currentItem.description;
+  itemDetails.value = currentItem.details;
+  itemImage.value = currentItem.image;
+  itemImageFile.value = "";
+  itemCategory.value = currentItem.category;
+  [...itemCategory.options].forEach((option) => {
+    option.disabled = !canEditCategory(option.value);
+  });
+  itemDiet.value = currentItem.diet;
+  itemHeat.value = currentItem.heat;
+  itemPrice.value = currentItem.price;
+  itemAllergens.value = currentItem.allergens.join(", ");
+  deleteItemButton.hidden = isNew;
+  itemDialog.showModal();
+}
+
+function openDrawer() {
+  drawerOverlay.hidden = false;
+  adminDrawer.classList.add("is-open");
+  adminDrawer.setAttribute("aria-hidden", "false");
+  if (getInvitedUser()) {
+    setupPassword.focus();
+  } else if (!state.currentUser) {
+    adminUsername.focus();
+  }
+}
+
+function closeDrawer() {
+  drawerOverlay.hidden = true;
+  adminDrawer.classList.remove("is-open");
+  adminDrawer.setAttribute("aria-hidden", "true");
+}
+
+function openUsersPage() {
+  if (!isAdmin()) return;
+
+  closeDrawer();
+  menuPage.hidden = true;
+  usersPage.hidden = false;
+  renderUserList();
+}
+
+function closeUsersPage() {
+  usersPage.hidden = true;
+  menuPage.hidden = false;
+}
+
+function openDesignDialog() {
+  if (!isAdmin()) return;
+  syncDesignForm();
+  designDialog.showModal();
+}
+
+function closeDesignDialog() {
+  designDialog.close();
+}
+
+function saveDesign(event) {
+  event.preventDefault();
+  if (!isAdmin()) return;
+
+  designSettings = {
+    ...designSettings,
+    ink: colorInk.value,
+    leaf: colorLeaf.value,
+    gold: colorGold.value,
+    aqua: colorAqua.value,
+    page: colorPage.value,
+    panel: colorPanel.value,
+    heroImage: heroImageUrl.value.trim() || defaultHeroImage
+  };
+
+  saveDesignSettings();
+  applyDesignSettings();
+  closeDesignDialog();
+}
+
+function resetDesign() {
+  if (!isAdmin()) return;
+  designSettings = { ...defaultDesign };
+  saveDesignSettings();
+  applyDesignSettings();
+  syncDesignForm();
+}
+
+function renderAdminState() {
+  const activeUser = getActiveUser();
+  const invitedUser = getInvitedUser();
+
+  adminLoginForm.hidden = Boolean(activeUser) || Boolean(invitedUser);
+  passwordSetupForm.hidden = !invitedUser || Boolean(activeUser);
+  adminControls.hidden = !activeUser;
+  manageUsersButton.hidden = !isAdmin();
+  designButton.hidden = !isAdmin();
+  editHeroButton.hidden = !isAdmin();
+  loginMessage.textContent = "";
+  setupMessage.textContent = "";
+  if (invitedUser) {
+    inviteIntro.textContent = `Create a password for ${invitedUser.username}`;
+  }
+  adminStatus.textContent = activeUser
+    ? `Signed in as ${activeUser.username}${isAdmin() ? " (admin)" : ""}`
+    : "Signed out";
+
+  editModeButton.hidden = !canEditAnyCategory();
+  addItemButton.hidden = !state.editing || !canEditAnyCategory();
+
+  if (!activeUser || !canEditAnyCategory()) {
+    state.editing = false;
+    editModeButton.textContent = "Edit menu";
+    editModeButton.classList.remove("is-active");
+    addItemButton.hidden = true;
+  }
+
+  if (!isAdmin() && !usersPage.hidden) {
+    closeUsersPage();
+  }
+
+  renderUserList();
+  renderMenu();
+}
+
+function loginAdmin(event) {
+  event.preventDefault();
+
+  const username = adminUsername.value.trim();
+  const password = adminPassword.value;
+  const user = users.find((savedUser) => savedUser.username === username && savedUser.password === password && savedUser.status !== "pending");
+
+  if (!user) {
+    loginMessage.textContent = "Invalid login.";
+    return;
+  }
+
+  state.currentUser = user.username;
+  localStorage.setItem(currentUserKey, user.username);
+  adminLoginForm.reset();
+  renderAdminState();
+}
+
+function setupInvitedPassword(event) {
+  event.preventDefault();
+
+  const invitedUser = getInvitedUser();
+  if (!invitedUser) {
+    setupMessage.textContent = "Invite not found.";
+    return;
+  }
+
+  const userIndex = users.findIndex((user) => user.username === invitedUser.username);
+  users[userIndex] = {
+    ...users[userIndex],
+    password: setupPassword.value,
+    status: "active"
+  };
+
+  saveUsers();
+  state.currentUser = users[userIndex].username;
+  localStorage.setItem(currentUserKey, users[userIndex].username);
+  passwordSetupForm.reset();
+  window.history.replaceState({}, "", window.location.pathname);
+  renderAdminState();
+}
+
+function logoutAdmin() {
+  state.currentUser = null;
+  localStorage.removeItem(currentUserKey);
+  setEditMode(false);
+  renderAdminState();
+}
+
+function renderUserList() {
+  userList.replaceChildren();
+
+  [...users].sort(sortUsersByPrivileges).forEach((user) => {
+    const row = document.createElement("div");
+    row.className = "user-row";
+
+    const summary = document.createElement("button");
+    summary.className = "user-summary";
+    summary.type = "button";
+
+    const info = document.createElement("div");
+    const name = document.createElement("strong");
+    const access = document.createElement("span");
+    name.textContent = user.username;
+    access.textContent = `${getPrivilegeLabel(user)}${user.status === "pending" ? " - invite pending" : ""}`;
+    info.append(name, access);
+    summary.append(info);
+
+    const marker = document.createElement("span");
+    marker.className = "expand-marker";
+    marker.textContent = "+";
+    summary.append(marker);
+    row.append(summary);
+
+    const details = document.createElement("form");
+    details.className = "user-edit-panel";
+    details.hidden = true;
+    details.append(createEmailLabel(user), createPasswordLabel(user), createPermissionFieldset(user));
+
+    if (user.role !== "admin") {
+      const actions = document.createElement("div");
+      actions.className = "user-actions";
+
+      const saveButton = document.createElement("button");
+      saveButton.className = "save-button";
+      saveButton.type = "submit";
+      saveButton.textContent = "Save changes";
+
+      const removeButton = document.createElement("button");
+      removeButton.className = "small-danger";
+      removeButton.type = "button";
+      removeButton.textContent = "Remove";
+      removeButton.addEventListener("click", () => removeUser(user.username));
+
+      actions.append(saveButton, removeButton);
+      details.append(actions);
+      details.addEventListener("submit", (event) => updateUser(event, user.username));
+    } else {
+      const note = document.createElement("p");
+      note.className = "user-note";
+      note.textContent = "The primary admin account always keeps full access.";
+      details.append(note);
+    }
+
+    summary.addEventListener("click", () => {
+      details.hidden = !details.hidden;
+      marker.textContent = details.hidden ? "+" : "-";
+    });
+
+    row.append(details);
+    userList.append(row);
+  });
+}
+
+function sortUsersByPrivileges(a, b) {
+  const rankA = getPrivilegeRank(a);
+  const rankB = getPrivilegeRank(b);
+  if (rankA !== rankB) return rankB - rankA;
+  return a.username.localeCompare(b.username);
+}
+
+function getPrivilegeRank(user) {
+  if (user.role === "admin") return categories.length + 1;
+  return (user.permissions || []).length;
+}
+
+function getPrivilegeLabel(user) {
+  if (user.role === "admin") return "All sections";
+  return (user.permissions || []).map(getCategoryLabel).join(", ") || "No edit access";
+}
+
+function getCategoryLabel(category) {
+  return {
+    starters: "Starters",
+    mains: "Mains",
+    drinks: "Drinks"
+  }[category] || category;
+}
+
+function createPasswordLabel(user) {
+  const label = document.createElement("label");
+  label.textContent = "Password";
+
+  const input = document.createElement("input");
+  input.name = "password";
+  input.type = "password";
+  input.value = user.password;
+  input.disabled = user.role === "admin";
+  label.append(input);
+  return label;
+}
+
+function createEmailLabel(user) {
+  const label = document.createElement("label");
+  label.textContent = "Email";
+
+  const input = document.createElement("input");
+  input.name = "email";
+  input.type = "email";
+  input.value = user.email || "";
+  input.disabled = user.role === "admin";
+  label.append(input);
+  return label;
+}
+
+function createPermissionFieldset(user) {
+  const fieldset = document.createElement("fieldset");
+  fieldset.className = "permission-group";
+
+  const legend = document.createElement("legend");
+  legend.textContent = "Can modify";
+  fieldset.append(legend);
+
+  categories.forEach((category) => {
+    const label = document.createElement("label");
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.name = "permissions";
+    input.value = category;
+    input.checked = user.role === "admin" || (user.permissions || []).includes(category);
+    input.disabled = user.role === "admin";
+    label.append(input, document.createTextNode(` ${getCategoryLabel(category)}`));
+    fieldset.append(label);
+  });
+
+  return fieldset;
+}
+
+function saveUser(event) {
+  event.preventDefault();
+  if (!isAdmin()) return;
+
+  const username = newUsername.value.trim();
+  const email = newEmail.value.trim();
+  const permissions = [...userForm.querySelectorAll("input[name='permissions']:checked")].map((input) => input.value);
+
+  if (!permissions.length) {
+    userMessage.textContent = "Choose at least one section.";
+    return;
+  }
+
+  const existingIndex = users.findIndex((user) => user.username === username);
+  const user = {
+    username,
+    email,
+    password: "",
+    role: "editor",
+    permissions,
+    status: "pending"
+  };
+
+  if (existingIndex >= 0 && users[existingIndex].role === "admin") {
+    userMessage.textContent = "The admin account cannot be changed here.";
+    return;
+  }
+
+  if (existingIndex >= 0) {
+    users[existingIndex] = user;
+  } else {
+    users.push(user);
+  }
+
+  saveUsers();
+  userForm.reset();
+  sendInviteEmail(user);
+  userMessage.textContent = "Invite created. Your email app should open.";
+  renderUserList();
+}
+
+function sendInviteEmail(user) {
+  const inviteUrl = `${window.location.origin}${window.location.pathname}?invite=${encodeURIComponent(user.username)}`;
+  const subject = encodeURIComponent("Create your Menu Matrix password");
+  const body = encodeURIComponent(
+    `Hi ${user.username},\n\nYou've been invited to edit Menu Matrix sections: ${getPrivilegeLabel(user)}.\n\nCreate your password here:\n${inviteUrl}\n\nUsername: ${user.username}`
+  );
+  window.location.href = `mailto:${encodeURIComponent(user.email)}?subject=${subject}&body=${body}`;
+}
+
+function removeUser(username) {
+  if (!isAdmin()) return;
+  users = users.filter((user) => user.username !== username || user.role === "admin");
+  saveUsers();
+  renderUserList();
+}
+
+function updateUser(event, username) {
+  event.preventDefault();
+  if (!isAdmin()) return;
+
+  const userIndex = users.findIndex((user) => user.username === username);
+  if (userIndex < 0 || users[userIndex].role === "admin") return;
+
+  const form = event.currentTarget;
+  const permissions = [...form.querySelectorAll("input[name='permissions']:checked")].map((input) => input.value);
+
+  if (!permissions.length) {
+    userMessage.textContent = "Choose at least one section.";
+    return;
+  }
+
+  users[userIndex] = {
+    ...users[userIndex],
+    email: form.elements.email.value,
+    password: form.elements.password.value,
+    permissions
+  };
+
+  saveUsers();
+  userMessage.textContent = "User updated.";
+  renderUserList();
+}
+
+function closeItemDialog() {
+  itemDialog.close();
+  itemForm.reset();
+}
+
+function readImageFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(reader.result));
+    reader.addEventListener("error", () => reject(reader.error));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function updateItemImageFromFile(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  itemImage.value = await readImageFile(file);
+}
+
+async function updateHeroImageFromFile(event) {
+  const file = event.target.files?.[0];
+  if (!file || !isAdmin()) return;
+  const dataUrl = await readImageFile(file);
+  heroImageUrl.value = dataUrl;
+  designSettings = {
+    ...designSettings,
+    heroImage: dataUrl
+  };
+  saveDesignSettings();
+  applyDesignSettings();
+}
+
+function getStyleForItem(category, heat) {
+  if (category === "drinks") return "sea";
+  if (heat > 1) return "fire";
+  return "";
+}
+
+function getFormItem() {
+  const heat = Math.max(0, Math.min(3, Number(itemHeat.value)));
+  const category = itemCategory.value;
+  const allergens = itemAllergens.value
+    .split(",")
+    .map((allergen) => allergen.trim())
+    .filter(Boolean);
+
+  return {
+    id: itemId.value,
+    name: itemName.value.trim(),
+    description: itemDescription.value.trim(),
+    details: itemDetails.value.trim() || "Key ingredients, flavor notes, and service talking points can go here.",
+    image: itemImage.value.trim() || "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    category,
+    diet: itemDiet.value,
+    style: getStyleForItem(category, heat),
+    heat,
+    allergens,
+    price: Math.max(0, Number(itemPrice.value))
+  };
+}
+
+function saveItem(event) {
+  event.preventDefault();
+
+  const item = getFormItem();
+  const itemIndex = menuItems.findIndex((menuItem) => menuItem.id === item.id);
+  const previousItem = menuItems[itemIndex];
+
+  if (!canEditCategory(item.category) || (previousItem && !canEditCategory(previousItem.category))) {
+    return;
+  }
+
+  if (itemIndex >= 0) {
+    menuItems[itemIndex] = item;
+  } else {
+    menuItems = [item, ...menuItems];
+  }
+
+  saveMenuItems();
+  closeItemDialog();
+  renderAllergyChips();
+  renderMenu();
+}
+
+function deleteItem() {
+  const id = itemId.value;
+  const item = menuItems.find((menuItem) => menuItem.id === id);
+  if (!item || !canEditCategory(item.category)) return;
+
+  menuItems = menuItems.filter((item) => item.id !== id);
+  saveMenuItems();
+  closeItemDialog();
+  renderMenu();
+}
+
+tabs.forEach((tab) => {
+  tab.addEventListener("click", () => {
+    state.category = tab.dataset.category;
+    tabs.forEach((button) => button.classList.toggle("is-active", button === tab));
+    renderMenu();
+  });
+});
+
+searchInput.addEventListener("input", (event) => {
+  state.query = event.target.value;
+  renderMenu();
+});
+
+editModeButton.addEventListener("click", () => {
+  setEditMode(!state.editing);
+});
+
+addItemButton.addEventListener("click", () => {
+  openItemDialog();
+});
+
+manageUsersButton.addEventListener("click", openUsersPage);
+designButton.addEventListener("click", openDesignDialog);
+editHeroButton.addEventListener("click", openDesignDialog);
+backToMenuButton.addEventListener("click", closeUsersPage);
+drawerOpenButton.addEventListener("click", openDrawer);
+drawerCloseButton.addEventListener("click", closeDrawer);
+drawerOverlay.addEventListener("click", closeDrawer);
+adminLoginForm.addEventListener("submit", loginAdmin);
+passwordSetupForm.addEventListener("submit", setupInvitedPassword);
+logoutButton.addEventListener("click", logoutAdmin);
+userForm.addEventListener("submit", saveUser);
+itemImageFile.addEventListener("change", updateItemImageFromFile);
+heroImageFile.addEventListener("change", updateHeroImageFromFile);
+designForm.addEventListener("submit", saveDesign);
+closeDesignButton.addEventListener("click", closeDesignDialog);
+resetDesignButton.addEventListener("click", resetDesign);
+closeDialogButton.addEventListener("click", closeItemDialog);
+deleteItemButton.addEventListener("click", deleteItem);
+itemForm.addEventListener("submit", saveItem);
+
+applyDesignSettings();
+renderAdminState();
+renderAllergyChips();
+renderMenu();
