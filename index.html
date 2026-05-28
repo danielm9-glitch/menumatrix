@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Menu Matrix</title>
-    <link rel="stylesheet" href="styles.css?v=admin-media-theme" />
+    <link rel="stylesheet" href="styles.css?v=visible-pdf-arrow" />
   </head>
   <body>
     <main class="app-shell" aria-label="Restaurant menu matrix app">
@@ -92,6 +92,8 @@
         <p id="adminStatus" class="admin-status">Signed in</p>
         <button id="editModeButton" class="action-button" type="button">Edit menu</button>
         <button id="addItemButton" class="action-button add-button" type="button" hidden>Add item</button>
+        <button id="scanMenuButton" class="action-button" type="button" hidden>Scan menu photo</button>
+        <button id="pdfBuilderButton" class="action-button" type="button" hidden>Create PDF</button>
         <button id="manageUsersButton" class="action-button" type="button" hidden>Manage Users</button>
         <button id="designButton" class="action-button" type="button" hidden>Color Scheme</button>
         <button id="logoutButton" class="danger-button" type="button">Log out</button>
@@ -108,28 +110,42 @@
       </header>
 
       <section class="user-manager">
-        <div class="section-heading">
-          <p class="kicker">Privileges</p>
-          <strong>Create user</strong>
+        <button id="createUserToggle" class="user-summary" type="button" aria-expanded="false">
+          <div>
+            <p class="kicker">Privileges</p>
+            <strong>Create user</strong>
+          </div>
+          <span class="expand-marker">+</span>
+        </button>
+        <div id="createUserPanel" class="create-user-panel" hidden>
+          <div class="method-tabs" role="tablist" aria-label="Create user method">
+            <button class="method-tab is-active" type="button" data-method="invite">Email invite</button>
+            <button class="method-tab" type="button" data-method="manual">Username + pass</button>
+          </div>
+          <form id="userForm" class="user-form">
+            <input id="createMethod" type="hidden" value="invite" />
+            <label>
+              Username
+              <input id="newUsername" required />
+            </label>
+            <label id="newEmailLabel">
+              Email
+              <input id="newEmail" type="email" placeholder="name@example.com" required />
+            </label>
+            <label id="newPasswordLabel" hidden>
+              Password
+              <input id="newPassword" type="password" autocomplete="new-password" />
+            </label>
+            <fieldset class="permission-group">
+              <legend>Can modify</legend>
+              <label><input type="checkbox" name="permissions" value="starters" /> Starters</label>
+              <label><input type="checkbox" name="permissions" value="mains" /> Mains</label>
+              <label><input type="checkbox" name="permissions" value="drinks" /> Drinks</label>
+            </fieldset>
+            <button id="createUserSubmit" class="save-button" type="submit">Send invite</button>
+            <p id="userMessage" class="login-message" role="status"></p>
+          </form>
         </div>
-        <form id="userForm" class="user-form">
-          <label>
-            Username
-            <input id="newUsername" required />
-          </label>
-          <label>
-            Email
-            <input id="newEmail" type="email" placeholder="name@example.com" required />
-          </label>
-          <fieldset class="permission-group">
-            <legend>Can modify</legend>
-            <label><input type="checkbox" name="permissions" value="starters" /> Starters</label>
-            <label><input type="checkbox" name="permissions" value="mains" /> Mains</label>
-            <label><input type="checkbox" name="permissions" value="drinks" /> Drinks</label>
-          </fieldset>
-          <button class="save-button" type="submit">Send invite</button>
-          <p id="userMessage" class="login-message" role="status"></p>
-        </form>
       </section>
 
       <section class="user-manager">
@@ -138,6 +154,43 @@
           <strong>Users</strong>
         </div>
         <div id="userList" class="user-list"></div>
+      </section>
+    </main>
+
+    <main id="pdfPage" class="app-shell users-page" aria-label="Create PDF" hidden>
+      <header class="page-top-bar">
+        <button id="backFromPdfButton" class="action-button" type="button">Back</button>
+        <div>
+          <p class="kicker">Admin</p>
+          <h1>Create PDF</h1>
+        </div>
+      </header>
+
+      <section class="user-manager">
+        <div class="section-heading">
+          <p class="kicker">PDF options</p>
+          <strong>Include in file</strong>
+        </div>
+        <div class="pdf-options">
+          <label><input id="pdfIncludePhotos" type="checkbox" checked /> Photos</label>
+          <label><input id="pdfIncludePrices" type="checkbox" checked /> Prices</label>
+          <label><input id="pdfIncludeAllergens" type="checkbox" checked /> Allergens</label>
+          <label><input id="pdfIncludeNotes" type="checkbox" checked /> Notes</label>
+        </div>
+        <div class="pdf-actions">
+          <button id="selectAllPdfButton" class="action-button" type="button">Select all</button>
+          <button id="clearPdfButton" class="action-button" type="button">Clear</button>
+          <button id="generatePdfButton" class="save-button" type="button">Print / Save PDF</button>
+        </div>
+        <p id="pdfMessage" class="login-message" role="status"></p>
+      </section>
+
+      <section class="user-manager">
+        <div class="section-heading">
+          <p class="kicker">Menu items</p>
+          <strong>Select items</strong>
+        </div>
+        <div id="pdfItemList" class="pdf-item-list"></div>
       </section>
     </main>
 
@@ -209,6 +262,41 @@
         <div class="form-actions">
           <button id="deleteItemButton" class="danger-button" type="button">Delete</button>
           <button class="save-button" type="submit">Save item</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="scanDialog" class="item-dialog" aria-labelledby="scanTitle">
+      <form class="item-form" method="dialog">
+        <div class="dialog-head">
+          <div>
+            <p class="kicker">Quick add</p>
+            <h2 id="scanTitle">Scan menu photo</h2>
+          </div>
+          <button class="icon-button" type="button" aria-label="Close scanner" id="closeScanButton">x</button>
+        </div>
+
+        <label>
+          Menu photo
+          <input id="scanImageFile" type="file" accept="image/*" capture="environment" />
+        </label>
+        <button id="runScanButton" class="action-button" type="button">Scan text</button>
+        <label>
+          Detected text
+          <textarea id="scanText" rows="7" placeholder="Scanned menu text will appear here. You can edit it before creating the item."></textarea>
+        </label>
+        <label>
+          Category
+          <select id="scanCategory">
+            <option value="starters">Starters</option>
+            <option value="mains">Mains</option>
+            <option value="drinks">Drinks</option>
+          </select>
+        </label>
+        <p id="scanMessage" class="login-message" role="status"></p>
+        <div class="form-actions">
+          <button class="danger-button" type="button" id="clearScanButton">Clear</button>
+          <button class="save-button" type="button" id="createScannedItemButton">Create draft</button>
         </div>
       </form>
     </dialog>
@@ -291,6 +379,7 @@
       </article>
     </template>
 
-    <script src="app.js?v=mott32-five"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="app.js?v=scan-menu-photo"></script>
   </body>
 </html>

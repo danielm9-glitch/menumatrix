@@ -231,6 +231,147 @@ h1 {
   padding-top: 14px;
 }
 
+.create-user-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.method-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.method-tab {
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.method-tab.is-active {
+  border-color: var(--leaf);
+  background: var(--leaf);
+  color: white;
+}
+
+.pdf-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.pdf-options label,
+.pdf-item-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 9px;
+  align-items: start;
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.pdf-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.pdf-actions .save-button {
+  grid-column: 1 / -1;
+}
+
+.pdf-item-list {
+  display: grid;
+  gap: 18px;
+}
+
+.pdf-category {
+  display: grid;
+  gap: 10px;
+}
+
+.pdf-category-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: #fffdfa;
+}
+
+.pdf-category-select {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+}
+
+.pdf-category-select strong {
+  display: block;
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+
+.pdf-category-select small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.small-toggle {
+  display: grid;
+  width: 34px;
+  min-height: 34px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  padding: 0;
+  background: var(--white);
+  color: var(--ink);
+  font-size: 1.28rem;
+  font-weight: 950;
+  line-height: 1;
+  transition: transform 160ms ease;
+}
+
+.small-toggle.is-open {
+  transform: rotate(180deg);
+}
+
+.pdf-category-items {
+  display: grid;
+  gap: 8px;
+  padding-left: 10px;
+}
+
+.pdf-item-row {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: #fffdfa;
+}
+
+.pdf-item-row strong,
+.pdf-item-row small {
+  display: block;
+}
+
+.pdf-item-row small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.3;
+}
+
 .permission-group {
   display: grid;
   gap: 8px;

@@ -133,16 +133,37 @@ const inviteIntro = document.querySelector("#inviteIntro");
 const loginMessage = document.querySelector("#loginMessage");
 const adminStatus = document.querySelector("#adminStatus");
 const editModeButton = document.querySelector("#editModeButton");
+const pdfBuilderButton = document.querySelector("#pdfBuilderButton");
 const addItemButton = document.querySelector("#addItemButton");
+const scanMenuButton = document.querySelector("#scanMenuButton");
 const manageUsersButton = document.querySelector("#manageUsersButton");
 const designButton = document.querySelector("#designButton");
 const logoutButton = document.querySelector("#logoutButton");
 const menuPage = document.querySelector("main[aria-label='Restaurant menu matrix app']");
 const usersPage = document.querySelector("#usersPage");
+const pdfPage = document.querySelector("#pdfPage");
 const backToMenuButton = document.querySelector("#backToMenuButton");
+const backFromPdfButton = document.querySelector("#backFromPdfButton");
+const pdfItemList = document.querySelector("#pdfItemList");
+const pdfIncludePhotos = document.querySelector("#pdfIncludePhotos");
+const pdfIncludePrices = document.querySelector("#pdfIncludePrices");
+const pdfIncludeAllergens = document.querySelector("#pdfIncludeAllergens");
+const pdfIncludeNotes = document.querySelector("#pdfIncludeNotes");
+const selectAllPdfButton = document.querySelector("#selectAllPdfButton");
+const clearPdfButton = document.querySelector("#clearPdfButton");
+const generatePdfButton = document.querySelector("#generatePdfButton");
+const pdfMessage = document.querySelector("#pdfMessage");
+const createUserToggle = document.querySelector("#createUserToggle");
+const createUserPanel = document.querySelector("#createUserPanel");
+const createUserSubmit = document.querySelector("#createUserSubmit");
+const createMethod = document.querySelector("#createMethod");
+const methodTabs = [...document.querySelectorAll(".method-tab")];
 const userForm = document.querySelector("#userForm");
 const newUsername = document.querySelector("#newUsername");
 const newEmail = document.querySelector("#newEmail");
+const newEmailLabel = document.querySelector("#newEmailLabel");
+const newPassword = document.querySelector("#newPassword");
+const newPasswordLabel = document.querySelector("#newPasswordLabel");
 const userMessage = document.querySelector("#userMessage");
 const userList = document.querySelector("#userList");
 const itemDialog = document.querySelector("#itemDialog");
@@ -161,6 +182,15 @@ const itemDiet = document.querySelector("#itemDiet");
 const itemHeat = document.querySelector("#itemHeat");
 const itemPrice = document.querySelector("#itemPrice");
 const itemAllergens = document.querySelector("#itemAllergens");
+const scanDialog = document.querySelector("#scanDialog");
+const closeScanButton = document.querySelector("#closeScanButton");
+const scanImageFile = document.querySelector("#scanImageFile");
+const runScanButton = document.querySelector("#runScanButton");
+const scanText = document.querySelector("#scanText");
+const scanCategory = document.querySelector("#scanCategory");
+const scanMessage = document.querySelector("#scanMessage");
+const clearScanButton = document.querySelector("#clearScanButton");
+const createScannedItemButton = document.querySelector("#createScannedItemButton");
 const heroImage = document.querySelector("#heroImage");
 const editHeroButton = document.querySelector("#editHeroButton");
 const designDialog = document.querySelector("#designDialog");
@@ -506,6 +536,40 @@ function closeUsersPage() {
   menuPage.hidden = false;
 }
 
+function openPdfPage() {
+  const activeUser = getActiveUser();
+  if (!activeUser) return;
+
+  closeDrawer();
+  usersPage.hidden = true;
+  menuPage.hidden = true;
+  pdfPage.hidden = false;
+  renderPdfItemList();
+}
+
+function closePdfPage() {
+  pdfPage.hidden = true;
+  menuPage.hidden = false;
+}
+
+function toggleCreateUserPanel() {
+  createUserPanel.hidden = !createUserPanel.hidden;
+  createUserToggle.setAttribute("aria-expanded", String(!createUserPanel.hidden));
+  createUserToggle.querySelector(".expand-marker").textContent = createUserPanel.hidden ? "+" : "-";
+}
+
+function setCreateMethod(method) {
+  const isInvite = method === "invite";
+  createMethod.value = method;
+  newEmailLabel.hidden = !isInvite;
+  newEmail.required = isInvite;
+  newPasswordLabel.hidden = isInvite;
+  newPassword.required = !isInvite;
+  createUserSubmit.textContent = isInvite ? "Send invite" : "Create user";
+  methodTabs.forEach((tab) => tab.classList.toggle("is-active", tab.dataset.method === method));
+  userMessage.textContent = "";
+}
+
 function openDesignDialog() {
   if (!isAdmin()) return;
   syncDesignForm();
@@ -544,6 +608,252 @@ function resetDesign() {
   syncDesignForm();
 }
 
+function renderPdfItemList() {
+  pdfItemList.replaceChildren();
+  pdfMessage.textContent = "";
+
+  categories.forEach((category) => {
+    const items = menuItems.filter((item) => item.category === category);
+    if (!items.length) return;
+
+    const group = document.createElement("section");
+    group.className = "pdf-category";
+
+    const header = document.createElement("div");
+    header.className = "pdf-category-header";
+
+    const label = document.createElement("label");
+    label.className = "pdf-category-select";
+
+    const categoryInput = document.createElement("input");
+    categoryInput.type = "checkbox";
+    categoryInput.checked = true;
+    categoryInput.dataset.category = category;
+
+    const title = document.createElement("span");
+    title.innerHTML = `<strong>${escapeHtml(getCategoryLabel(category))}</strong><small>${items.length} items</small>`;
+    label.append(categoryInput, title);
+
+    const toggle = document.createElement("button");
+    toggle.className = "small-toggle";
+    toggle.type = "button";
+    toggle.setAttribute("aria-label", `Show ${getCategoryLabel(category)} items`);
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.textContent = "⌄";
+
+    header.append(label, toggle);
+    group.append(header);
+
+    const itemPanel = document.createElement("div");
+    itemPanel.className = "pdf-category-items";
+    itemPanel.hidden = true;
+
+    items.forEach((item) => {
+      const itemLabel = document.createElement("label");
+      itemLabel.className = "pdf-item-row";
+
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.name = "pdf-item";
+      input.value = item.id;
+      input.dataset.category = category;
+      input.checked = true;
+
+      const info = document.createElement("span");
+      info.innerHTML = `<strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.description)}</small>`;
+
+      itemLabel.append(input, info);
+      itemPanel.append(itemLabel);
+    });
+
+    categoryInput.addEventListener("change", () => {
+      itemPanel.querySelectorAll("input[name='pdf-item']").forEach((input) => {
+        input.checked = categoryInput.checked;
+      });
+    });
+
+    itemPanel.addEventListener("change", () => {
+      const itemInputs = [...itemPanel.querySelectorAll("input[name='pdf-item']")];
+      categoryInput.checked = itemInputs.every((input) => input.checked);
+      categoryInput.indeterminate = itemInputs.some((input) => input.checked) && !categoryInput.checked;
+    });
+
+    toggle.addEventListener("click", () => {
+      itemPanel.hidden = !itemPanel.hidden;
+      toggle.classList.toggle("is-open", !itemPanel.hidden);
+      toggle.setAttribute("aria-expanded", String(!itemPanel.hidden));
+    });
+
+    group.append(itemPanel);
+    pdfItemList.append(group);
+  });
+}
+
+function setPdfSelection(isSelected) {
+  pdfItemList.querySelectorAll("input[name='pdf-item']").forEach((input) => {
+    input.checked = isSelected;
+  });
+}
+
+function generatePdf() {
+  const selectedIds = [...pdfItemList.querySelectorAll("input[name='pdf-item']:checked")].map((input) => input.value);
+  const selectedItems = menuItems.filter((item) => selectedIds.includes(item.id));
+
+  if (!selectedItems.length) {
+    pdfMessage.textContent = "Select at least one item.";
+    return;
+  }
+
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) {
+    pdfMessage.textContent = "Allow popups to create the PDF page.";
+    return;
+  }
+
+  printWindow.document.write(getPrintableHtml(selectedItems));
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => printWindow.print(), 300);
+}
+
+function getPrintableHtml(items) {
+  const groupedItems = categories
+    .map((category) => ({
+      category,
+      items: items.filter((item) => item.category === category)
+    }))
+    .filter((group) => group.items.length);
+
+  const itemMarkup = groupedItems
+    .map(
+      (group) => `
+        <section class="category">
+          <h2>${escapeHtml(getCategoryLabel(group.category))}</h2>
+          ${group.items.map(getPrintableItemMarkup).join("")}
+        </section>
+      `
+    )
+    .join("");
+
+  return `
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Menu Matrix PDF</title>
+        <style>
+          @page { margin: 0.55in; }
+          * { box-sizing: border-box; }
+          body {
+            margin: 0;
+            color: ${designSettings.ink};
+            font-family: Arial, sans-serif;
+            line-height: 1.35;
+          }
+          header {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            border-bottom: 2px solid ${designSettings.leaf};
+            padding-bottom: 16px;
+            margin-bottom: 20px;
+          }
+          header img {
+            width: 110px;
+            max-height: 72px;
+            object-fit: contain;
+          }
+          h1 {
+            margin: 0;
+            font-size: 28px;
+          }
+          h2 {
+            margin: 22px 0 10px;
+            color: ${designSettings.leaf};
+            font-size: 18px;
+            text-transform: uppercase;
+          }
+          .item {
+            display: grid;
+            grid-template-columns: ${pdfIncludePhotos.checked ? "92px 1fr" : "1fr"};
+            gap: 14px;
+            border-bottom: 1px solid #ddd8cc;
+            padding: 12px 0;
+            break-inside: avoid;
+          }
+          .item img {
+            width: 92px;
+            height: 92px;
+            border-radius: 8px;
+            object-fit: cover;
+          }
+          h3 {
+            margin: 0 0 4px;
+            font-size: 16px;
+          }
+          .price {
+            color: ${designSettings.gold};
+            font-weight: 700;
+          }
+          p {
+            margin: 4px 0;
+            font-size: 12px;
+          }
+          .meta {
+            color: #5e6862;
+            font-size: 11px;
+            font-weight: 700;
+          }
+        </style>
+      </head>
+      <body>
+        <header>
+          <img src="${escapeAttribute(designSettings.heroImage)}" alt="Restaurant logo" />
+          <div>
+            <h1>Menu Matrix</h1>
+            <p>Selected menu items</p>
+          </div>
+        </header>
+        ${itemMarkup}
+      </body>
+    </html>
+  `;
+}
+
+function getPrintableItemMarkup(item) {
+  const photo = pdfIncludePhotos.checked ? `<img src="${escapeAttribute(item.image)}" alt="" />` : "";
+  const price = pdfIncludePrices.checked ? ` <span class="price">${formatter.format(item.price)}</span>` : "";
+  const allergens = pdfIncludeAllergens.checked
+    ? `<p class="meta">Allergens: ${escapeHtml(item.allergens.length ? item.allergens.join(", ") : "No major allergens")}</p>`
+    : "";
+  const notes = pdfIncludeNotes.checked ? `<p>${escapeHtml(item.details)}</p>` : "";
+
+  return `
+    <article class="item">
+      ${photo}
+      <div>
+        <h3>${escapeHtml(item.name)}${price}</h3>
+        <p>${escapeHtml(item.description)}</p>
+        ${allergens}
+        ${notes}
+      </div>
+    </article>
+  `;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function escapeAttribute(value) {
+  return escapeHtml(value).replaceAll("`", "&#096;");
+}
+
 function renderAdminState() {
   const activeUser = getActiveUser();
   const invitedUser = getInvitedUser();
@@ -551,6 +861,8 @@ function renderAdminState() {
   adminLoginForm.hidden = Boolean(activeUser) || Boolean(invitedUser);
   passwordSetupForm.hidden = !invitedUser || Boolean(activeUser);
   adminControls.hidden = !activeUser;
+  pdfBuilderButton.hidden = !activeUser;
+  scanMenuButton.hidden = !canEditAnyCategory();
   manageUsersButton.hidden = !isAdmin();
   designButton.hidden = !isAdmin();
   editHeroButton.hidden = !isAdmin();
@@ -575,6 +887,10 @@ function renderAdminState() {
 
   if (!isAdmin() && !usersPage.hidden) {
     closeUsersPage();
+  }
+
+  if (!activeUser && !pdfPage.hidden) {
+    closePdfPage();
   }
 
   renderUserList();
@@ -775,6 +1091,7 @@ function saveUser(event) {
 
   const username = newUsername.value.trim();
   const email = newEmail.value.trim();
+  const isInvite = createMethod.value === "invite";
   const permissions = [...userForm.querySelectorAll("input[name='permissions']:checked")].map((input) => input.value);
 
   if (!permissions.length) {
@@ -782,14 +1099,19 @@ function saveUser(event) {
     return;
   }
 
+  if (!isInvite && !newPassword.value) {
+    userMessage.textContent = "Enter a password.";
+    return;
+  }
+
   const existingIndex = users.findIndex((user) => user.username === username);
   const user = {
     username,
-    email,
-    password: "",
+    email: isInvite ? email : "",
+    password: isInvite ? "" : newPassword.value,
     role: "editor",
     permissions,
-    status: "pending"
+    status: isInvite ? "pending" : "active"
   };
 
   if (existingIndex >= 0 && users[existingIndex].role === "admin") {
@@ -805,8 +1127,13 @@ function saveUser(event) {
 
   saveUsers();
   userForm.reset();
-  sendInviteEmail(user);
-  userMessage.textContent = "Invite created. Your email app should open.";
+  if (isInvite) {
+    sendInviteEmail(user);
+    userMessage.textContent = "Invite created. Your email app should open.";
+  } else {
+    userMessage.textContent = "User created.";
+  }
+  setCreateMethod(createMethod.value);
   renderUserList();
 }
 
@@ -856,6 +1183,123 @@ function updateUser(event, username) {
 function closeItemDialog() {
   itemDialog.close();
   itemForm.reset();
+}
+
+function openScanDialog() {
+  const editableCategories = getEditableCategories();
+  if (!editableCategories.length) return;
+
+  scanText.value = "";
+  scanImageFile.value = "";
+  scanMessage.textContent = "";
+  [...scanCategory.options].forEach((option) => {
+    option.disabled = !canEditCategory(option.value);
+  });
+  scanCategory.value = editableCategories[0];
+  scanDialog.showModal();
+}
+
+function closeScanDialog() {
+  scanDialog.close();
+}
+
+function clearScan() {
+  scanText.value = "";
+  scanImageFile.value = "";
+  scanMessage.textContent = "";
+}
+
+async function runMenuPhotoScan() {
+  const file = scanImageFile.files?.[0];
+  if (!file) {
+    scanMessage.textContent = "Choose or take a photo first.";
+    return;
+  }
+
+  if (!window.Tesseract) {
+    scanMessage.textContent = "OCR did not load. Check internet connection and try again.";
+    return;
+  }
+
+  runScanButton.disabled = true;
+  scanMessage.textContent = "Scanning photo...";
+
+  try {
+    const result = await window.Tesseract.recognize(file, "eng", {
+      logger: (event) => {
+        if (event.status === "recognizing text") {
+          scanMessage.textContent = `Scanning photo... ${Math.round(event.progress * 100)}%`;
+        }
+      }
+    });
+    scanText.value = result.data.text.trim();
+    scanMessage.textContent = scanText.value ? "Text scanned. Review it, then create a draft." : "No text found. Try a clearer photo.";
+  } catch {
+    scanMessage.textContent = "Could not scan this photo.";
+  } finally {
+    runScanButton.disabled = false;
+  }
+}
+
+function createScannedItemDraft() {
+  if (!scanText.value.trim()) {
+    scanMessage.textContent = "Add or scan text first.";
+    return;
+  }
+
+  const draft = parseScannedItem(scanText.value, scanCategory.value);
+  closeScanDialog();
+  openItemDialogWithDraft(draft);
+}
+
+function parseScannedItem(text, category) {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const fullText = lines.join(" ");
+  const priceMatch = fullText.match(/\$\s*(\d+(?:\.\d{1,2})?)/) || fullText.match(/\b(\d{1,3}(?:\.\d{2})?)\s*$/);
+  const price = priceMatch ? Number(priceMatch[1]) : 0;
+  const name = cleanScannedLine(lines[0] || "New Menu Item");
+  const description = cleanScannedLine(lines.slice(1).join(" ").replace(priceMatch?.[0] || "", "")) || "Review scanned menu text and update this description.";
+
+  return {
+    id: `item-${Date.now()}`,
+    name,
+    description,
+    category,
+    diet: "NA",
+    style: getStyleForItem(category, 0),
+    heat: 0,
+    allergens: [],
+    details: description,
+    image: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    price: Number.isFinite(price) ? price : 0
+  };
+}
+
+function cleanScannedLine(line) {
+  return line.replace(/\s+/g, " ").replace(/\$\s*\d+(?:\.\d{1,2})?/g, "").trim();
+}
+
+function openItemDialogWithDraft(currentItem) {
+  dialogTitle.textContent = "Add item";
+  itemId.value = currentItem.id;
+  itemName.value = currentItem.name;
+  itemDescription.value = currentItem.description;
+  itemDetails.value = currentItem.details;
+  itemImage.value = currentItem.image;
+  itemImageFile.value = "";
+  itemCategory.value = currentItem.category;
+  [...itemCategory.options].forEach((option) => {
+    option.disabled = !canEditCategory(option.value);
+  });
+  itemDiet.value = currentItem.diet;
+  itemHeat.value = currentItem.heat;
+  itemPrice.value = currentItem.price;
+  itemAllergens.value = currentItem.allergens.join(", ");
+  deleteItemButton.hidden = true;
+  itemDialog.showModal();
 }
 
 function readImageFile(file) {
@@ -970,6 +1414,20 @@ addItemButton.addEventListener("click", () => {
   openItemDialog();
 });
 
+scanMenuButton.addEventListener("click", openScanDialog);
+closeScanButton.addEventListener("click", closeScanDialog);
+clearScanButton.addEventListener("click", clearScan);
+runScanButton.addEventListener("click", runMenuPhotoScan);
+createScannedItemButton.addEventListener("click", createScannedItemDraft);
+pdfBuilderButton.addEventListener("click", openPdfPage);
+backFromPdfButton.addEventListener("click", closePdfPage);
+selectAllPdfButton.addEventListener("click", () => setPdfSelection(true));
+clearPdfButton.addEventListener("click", () => setPdfSelection(false));
+generatePdfButton.addEventListener("click", generatePdf);
+createUserToggle.addEventListener("click", toggleCreateUserPanel);
+methodTabs.forEach((tab) => {
+  tab.addEventListener("click", () => setCreateMethod(tab.dataset.method));
+});
 manageUsersButton.addEventListener("click", openUsersPage);
 designButton.addEventListener("click", openDesignDialog);
 editHeroButton.addEventListener("click", openDesignDialog);
