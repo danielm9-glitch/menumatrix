@@ -211,6 +211,13 @@ h1 {
   font-weight: 800;
 }
 
+.scan-hint {
+  margin: -4px 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
 .admin-status {
   margin-bottom: 0;
   color: var(--leaf);

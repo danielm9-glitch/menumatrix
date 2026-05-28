@@ -1222,23 +1222,79 @@ async function runMenuPhotoScan() {
   }
 
   runScanButton.disabled = true;
-  scanMessage.textContent = "Scanning photo...";
+  scanMessage.textContent = "Preparing photo...";
 
   try {
-    const result = await window.Tesseract.recognize(file, "eng", {
+    const preparedImage = await prepareImageForOcr(file);
+    scanMessage.textContent = "Scanning photo...";
+    const result = await window.Tesseract.recognize(preparedImage, "eng", {
       logger: (event) => {
         if (event.status === "recognizing text") {
           scanMessage.textContent = `Scanning photo... ${Math.round(event.progress * 100)}%`;
         }
-      }
+      },
+      tessedit_pageseg_mode: "6",
+      tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789$.,&'()-/ "
     });
-    scanText.value = result.data.text.trim();
-    scanMessage.textContent = scanText.value ? "Text scanned. Review it, then create a draft." : "No text found. Try a clearer photo.";
+    scanText.value = cleanOcrText(result.data.text);
+    scanMessage.textContent = scanText.value
+      ? "Text scanned. Review it, then create a draft."
+      : "No usable text found. Try cropping closer to one item.";
   } catch {
     scanMessage.textContent = "Could not scan this photo.";
   } finally {
     runScanButton.disabled = false;
   }
+}
+
+function prepareImageForOcr(file) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    const reader = new FileReader();
+
+    reader.addEventListener("load", () => {
+      image.src = reader.result;
+    });
+    reader.addEventListener("error", () => reject(reader.error));
+
+    image.addEventListener("load", () => {
+      const maxWidth = 1600;
+      const scale = Math.min(1, maxWidth / image.width);
+      const width = Math.round(image.width * scale);
+      const height = Math.round(image.height * scale);
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d");
+      canvas.width = width;
+      canvas.height = height;
+      context.drawImage(image, 0, 0, width, height);
+
+      const imageData = context.getImageData(0, 0, width, height);
+      for (let index = 0; index < imageData.data.length; index += 4) {
+        const red = imageData.data[index];
+        const green = imageData.data[index + 1];
+        const blue = imageData.data[index + 2];
+        const gray = red * 0.299 + green * 0.587 + blue * 0.114;
+        const contrast = gray > 150 ? 255 : 0;
+        imageData.data[index] = contrast;
+        imageData.data[index + 1] = contrast;
+        imageData.data[index + 2] = contrast;
+      }
+      context.putImageData(imageData, 0, 0);
+      resolve(canvas.toDataURL("image/png"));
+    });
+    image.addEventListener("error", reject);
+    reader.readAsDataURL(file);
+  });
+}
+
+function cleanOcrText(text) {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.replace(/[^A-Za-z0-9$.,&'()\-\/ ]+/g, " ").replace(/\s+/g, " ").trim())
+    .filter((line) => line.length > 2)
+    .filter((line) => /[A-Za-z]{3,}/.test(line) || /\$\s*\d+/.test(line))
+    .slice(0, 6)
+    .join("\n");
 }
 
 function createScannedItemDraft() {
@@ -1257,11 +1313,12 @@ function parseScannedItem(text, category) {
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
-  const fullText = lines.join(" ");
+  const meaningfulLines = lines.filter((line) => /[A-Za-z]{3,}/.test(line));
+  const fullText = meaningfulLines.join(" ");
   const priceMatch = fullText.match(/\$\s*(\d+(?:\.\d{1,2})?)/) || fullText.match(/\b(\d{1,3}(?:\.\d{2})?)\s*$/);
   const price = priceMatch ? Number(priceMatch[1]) : 0;
-  const name = cleanScannedLine(lines[0] || "New Menu Item");
-  const description = cleanScannedLine(lines.slice(1).join(" ").replace(priceMatch?.[0] || "", "")) || "Review scanned menu text and update this description.";
+  const name = cleanScannedLine(meaningfulLines[0] || "New Menu Item");
+  const description = cleanScannedLine(meaningfulLines.slice(1).join(" ").replace(priceMatch?.[0] || "", "")) || "Review scanned menu text and update this description.";
 
   return {
     id: `item-${Date.now()}`,

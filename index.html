@@ -280,6 +280,7 @@
           Menu photo
           <input id="scanImageFile" type="file" accept="image/*" capture="environment" />
         </label>
+        <p class="scan-hint">For best results, crop close to one menu item, keep the phone straight, and use bright light.</p>
         <button id="runScanButton" class="action-button" type="button">Scan text</button>
         <label>
           Detected text
@@ -380,6 +381,6 @@
     </template>
 
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <script src="app.js?v=scan-menu-photo"></script>
+    <script src="app.js?v=ocr-cleanup"></script>
   </body>
 </html>
