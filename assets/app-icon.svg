@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Menu Matrix app icon">
+  <defs>
+    <linearGradient id="bg" x1="72" y1="40" x2="440" y2="472" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#20362b" />
+      <stop offset="0.52" stop-color="#14231c" />
+      <stop offset="1" stop-color="#090d0b" />
+    </linearGradient>
+    <linearGradient id="gold" x1="128" y1="96" x2="384" y2="416" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f5d27a" />
+      <stop offset="1" stop-color="#d99d2b" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)" />
+  <circle cx="256" cy="256" r="158" fill="#fbfaf6" opacity="0.96" />
+  <circle cx="256" cy="256" r="128" fill="none" stroke="url(#gold)" stroke-width="18" />
+  <g fill="#19211d">
+    <rect x="176" y="158" width="42" height="42" rx="10" />
+    <rect x="235" y="158" width="42" height="42" rx="10" />
+    <rect x="294" y="158" width="42" height="42" rx="10" />
+    <rect x="176" y="217" width="42" height="42" rx="10" />
+    <rect x="235" y="217" width="42" height="42" rx="10" />
+    <rect x="294" y="217" width="42" height="42" rx="10" />
+  </g>
+  <path d="M177 351V290H205L224 326L244 290H271V351H249V321L232 351H217L199 321V351H177Z" fill="#19211d" />
+  <path d="M281 351V290H309L328 326L348 290H375V351H353V321L336 351H321L303 321V351H281Z" fill="#19211d" />
+  <path d="M132 118L388 374" stroke="#d99d2b" stroke-width="14" stroke-linecap="round" opacity="0.85" />
+  <path d="M154 96L410 352" stroke="#f5d27a" stroke-width="8" stroke-linecap="round" opacity="0.78" />
+</svg>
