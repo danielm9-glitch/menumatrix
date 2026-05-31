@@ -89,6 +89,20 @@ textarea {
   backdrop-filter: blur(12px);
 }
 
+.auth-brand {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+}
+
+.auth-brand-icon {
+  width: 78px;
+  aspect-ratio: 1;
+  margin-bottom: 9px;
+  border-radius: 20px;
+  box-shadow: 0 12px 26px rgba(25, 33, 29, 0.18);
+}
+
 .auth-brand h1 {
   font-size: clamp(2rem, 11vw, 2.8rem);
 }
@@ -150,6 +164,37 @@ textarea {
 
 .menus-top-bar h1 {
   font-size: clamp(2.35rem, 13vw, 3.25rem);
+}
+
+.brand-title {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.header-brand-icon {
+  width: 44px;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  box-shadow: 0 8px 18px rgba(25, 33, 29, 0.14);
+}
+
+.compact-brand-title {
+  gap: 8px;
+}
+
+.compact-brand-title .header-brand-icon {
+  width: 38px;
+  border-radius: 10px;
+}
+
+.compact-brand-title h1 {
+  overflow: hidden;
+  font-size: clamp(1.45rem, 7vw, 2rem);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .compact-nav-button {

@@ -4,13 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Menu Matrix</title>
-    <link rel="stylesheet" href="styles.css?v=tester-login-hint" />
+    <link rel="stylesheet" href="styles.css?v=brand-icon-ui" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
       <div class="auth-background" aria-hidden="true"></div>
       <section class="auth-panel">
         <div class="auth-brand">
+          <img class="auth-brand-icon" src="assets/app-icon-launcher-preview.png" alt="Menu Matrix app icon" />
           <p class="kicker">Menu Matrix</p>
           <h1>Sign in</h1>
         </div>
@@ -52,6 +53,7 @@
       <div class="auth-background" aria-hidden="true"></div>
       <section class="auth-panel">
         <div class="auth-brand">
+          <img class="auth-brand-icon" src="assets/app-icon-launcher-preview.png" alt="Menu Matrix app icon" />
           <p class="kicker">Menu Matrix</p>
           <h1>Create account</h1>
         </div>
@@ -79,9 +81,12 @@
 
     <main id="menusPage" class="app-shell menus-page" aria-label="Restaurant menus" hidden>
       <header class="menus-top-bar">
-        <div>
-          <p class="kicker">Restaurants</p>
-          <h1>Menus</h1>
+        <div class="brand-title">
+          <img class="header-brand-icon" src="assets/app-icon-launcher-preview.png" alt="" aria-hidden="true" />
+          <div>
+            <p class="kicker">Restaurants</p>
+            <h1>Menus</h1>
+          </div>
         </div>
         <button id="menusLogoutButton" class="action-button compact-nav-button" type="button">Log out</button>
       </header>
@@ -92,8 +97,12 @@
     <main id="menuPage" class="app-shell" aria-label="Restaurant menu matrix app" hidden>
       <header class="top-bar">
         <button id="backToMenusButton" class="action-button compact-nav-button" type="button">Menus</button>
-        <div>
-          <h1>Menu Matrix</h1>
+        <div class="brand-title compact-brand-title">
+          <img class="header-brand-icon" src="assets/app-icon-launcher-preview.png" alt="" aria-hidden="true" />
+          <div>
+            <p class="kicker">Training</p>
+            <h1>Menu Matrix</h1>
+          </div>
         </div>
         <button id="drawerOpenButton" class="icon-button" type="button" aria-label="Open admin menu">
           <span aria-hidden="true">≡</span>
@@ -441,6 +450,6 @@
 
     <script src="ocr-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <script src="app.js?v=tester-login-hint"></script>
+    <script src="app.js?v=brand-icon-ui"></script>
   </body>
 </html>
