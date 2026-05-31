@@ -1,0 +1,1 @@
+window.MENU_MATRIX_OCR_ENDPOINT = "";

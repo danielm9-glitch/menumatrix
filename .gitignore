@@ -1,0 +1,20 @@
+node_modules/
+
+# Local build outputs and caches
+dist/
+build/
+.cache/
+
+# Generated release archive
+menu-matrix-web-release.zip
+
+# Android/Gradle generated files
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+
+# Logs and OS files
+*.log
+.DS_Store
+Thumbs.db

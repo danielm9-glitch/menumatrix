@@ -1,0 +1,67 @@
+[
+  {
+    "name": "Apple Wood Roasted 42 Days Peking Duck",
+    "description": "Signature Mott 32 cut, carved for crisp skin and tender meat",
+    "details": "One of Mott 32's signature dishes. Teach the team to mention the apple wood roast, 42-day duck, crisp skin, and classic tableside-style presentation.",
+    "category": "mains",
+    "diet": "NA",
+    "heat": 0,
+    "price": 108,
+    "allergens": ["Soy", "Wheat"],
+    "imageUrl": "https://images.unsplash.com/photo-1518492104633-130d0cc84637?auto=format&fit=crop&w=800&q=80",
+    "isActive": true,
+    "sortOrder": 1
+  },
+  {
+    "name": "Traditional Iberico Pork Shanghainese Soup Dumplings",
+    "description": "Four delicate xiao long bao with savory pork broth",
+    "details": "A dim sum staple. Coach staff to warn guests the dumplings contain hot broth and should be eaten carefully with the soup spoon.",
+    "category": "starters",
+    "diet": "NA",
+    "heat": 1,
+    "price": 13,
+    "allergens": ["Wheat", "Soy"],
+    "imageUrl": "https://images.unsplash.com/photo-1496116218417-1a781b1c416c?auto=format&fit=crop&w=800&q=80",
+    "isActive": true,
+    "sortOrder": 2
+  },
+  {
+    "name": "Crispy Sugar Coated BBQ Iberico Pork Bun",
+    "description": "Three baked buns with sweet-savory barbecue pork filling",
+    "details": "This is a baked dim sum item with a crisp sugar-coated exterior and rich Iberico pork barbecue center. Good for guests who like sweet and savory.",
+    "category": "starters",
+    "diet": "NA",
+    "heat": 0,
+    "price": 13,
+    "allergens": ["Wheat", "Soy"],
+    "imageUrl": "https://images.unsplash.com/photo-1563245372-f21724e3856d?auto=format&fit=crop&w=800&q=80",
+    "isActive": true,
+    "sortOrder": 3
+  },
+  {
+    "name": "Signature Smoked Black Cod",
+    "description": "Smoky, silky black cod with a rich Cantonese-style glaze",
+    "details": "A polished seafood signature. Describe it as delicate, smoky, slightly sweet, and very soft in texture.",
+    "category": "mains",
+    "diet": "NA",
+    "heat": 0,
+    "price": 42,
+    "allergens": ["Fish", "Soy"],
+    "imageUrl": "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=800&q=80",
+    "isActive": true,
+    "sortOrder": 4
+  },
+  {
+    "name": "Signature Maine Lobster Fried Rice",
+    "description": "King oyster mushrooms and edamame folded into lobster fried rice",
+    "details": "A premium rice and noodle section dish. Highlight the lobster, mushroom, and edamame; confirm shellfish allergy before recommending.",
+    "category": "mains",
+    "diet": "NA",
+    "heat": 0,
+    "price": 68,
+    "allergens": ["Shellfish", "Egg", "Soy"],
+    "imageUrl": "https://images.unsplash.com/photo-1603133872878-684f208fb84b?auto=format&fit=crop&w=800&q=80",
+    "isActive": true,
+    "sortOrder": 5
+  }
+]
