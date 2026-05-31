@@ -4,6 +4,8 @@ const currentMenuSeed = "mott32-las-vegas-five";
 const usersStorageKey = "restaurant-menu-matrix-users";
 const currentUserKey = "restaurant-menu-matrix-current-user";
 const designStorageKey = "restaurant-menu-matrix-design";
+const authFlowKey = "restaurant-menu-matrix-auth-flow";
+const currentAuthFlow = "login-first-menus";
 const cloudOcrEndpoint = window.MENU_MATRIX_OCR_ENDPOINT || "";
 const defaultHeroImage = "https://www.nicepng.com/png/detail/809-8099031_mott32-las-vegas-mott-32-logo.png";
 const defaultDesign = {
@@ -94,6 +96,19 @@ const defaultMenuItems = [
 ];
 
 const allergyOptions = ["Dairy", "Egg", "Fish", "Sesame", "Shellfish", "Soy", "Wheat"];
+const restaurantMenus = [
+  {
+    id: "mott32-las-vegas",
+    name: "Mott 32 Las Vegas",
+    label: "Chinese menu training",
+    categories: ["Starters", "Mains", "Drinks"]
+  }
+];
+
+if (localStorage.getItem(authFlowKey) !== currentAuthFlow) {
+  localStorage.removeItem(currentUserKey);
+  localStorage.setItem(authFlowKey, currentAuthFlow);
+}
 
 let menuItems = loadMenuItems();
 let users = loadUsers();
@@ -105,7 +120,9 @@ const state = {
   allergies: new Set(),
   openItems: new Set(),
   currentUser: loadCurrentUser(),
-  editing: false
+  editing: false,
+  screen: loadCurrentUser() ? "menus" : "login",
+  activeRestaurantMenu: restaurantMenus[0].id
 };
 
 const formatter = new Intl.NumberFormat("en-US", {
@@ -123,11 +140,24 @@ const drawerOpenButton = document.querySelector("#drawerOpenButton");
 const drawerCloseButton = document.querySelector("#drawerCloseButton");
 const drawerOverlay = document.querySelector("#drawerOverlay");
 const adminDrawer = document.querySelector("#adminDrawer");
+const authPage = document.querySelector("#authPage");
+const registerPage = document.querySelector("#registerPage");
+const menusPage = document.querySelector("#menusPage");
 const adminLoginForm = document.querySelector("#adminLoginForm");
 const passwordSetupForm = document.querySelector("#passwordSetupForm");
 const adminControls = document.querySelector("#adminControls");
 const adminUsername = document.querySelector("#adminUsername");
 const adminPassword = document.querySelector("#adminPassword");
+const selfRegisterForm = document.querySelector("#selfRegisterForm");
+const registerUsername = document.querySelector("#registerUsername");
+const registerEmail = document.querySelector("#registerEmail");
+const registerPassword = document.querySelector("#registerPassword");
+const registerMessage = document.querySelector("#registerMessage");
+const registerLinkButton = document.querySelector("#registerLinkButton");
+const loginLinkButton = document.querySelector("#loginLinkButton");
+const restaurantList = document.querySelector("#restaurantList");
+const menusLogoutButton = document.querySelector("#menusLogoutButton");
+const backToMenusButton = document.querySelector("#backToMenusButton");
 const setupPassword = document.querySelector("#setupPassword");
 const setupMessage = document.querySelector("#setupMessage");
 const inviteIntro = document.querySelector("#inviteIntro");
@@ -140,7 +170,7 @@ const scanMenuButton = document.querySelector("#scanMenuButton");
 const manageUsersButton = document.querySelector("#manageUsersButton");
 const designButton = document.querySelector("#designButton");
 const logoutButton = document.querySelector("#logoutButton");
-const menuPage = document.querySelector("main[aria-label='Restaurant menu matrix app']");
+const menuPage = document.querySelector("#menuPage");
 const usersPage = document.querySelector("#usersPage");
 const pdfPage = document.querySelector("#pdfPage");
 const backToMenuButton = document.querySelector("#backToMenuButton");
@@ -237,6 +267,7 @@ function normalizeMenuItem(item) {
 
 function saveMenuItems() {
   localStorage.setItem(storageKey, JSON.stringify(menuItems));
+  if (restaurantList) renderRestaurantList();
 }
 
 function loadDesignSettings() {
@@ -262,6 +293,7 @@ function applyDesignSettings() {
   document.documentElement.style.setProperty("--page-bg", designSettings.page);
   document.documentElement.style.setProperty("--panel-bg", designSettings.panel);
   heroImage.src = designSettings.heroImage;
+  renderRestaurantList();
 }
 
 function syncDesignForm() {
@@ -330,6 +362,61 @@ function canEditCategory(category) {
 
 function canEditAnyCategory() {
   return getEditableCategories().length > 0;
+}
+
+function showScreen(screen) {
+  state.screen = screen;
+  renderAdminState();
+}
+
+function normalizeScreen(activeUser, invitedUser) {
+  if (invitedUser && !activeUser) {
+    state.screen = "login";
+    return;
+  }
+
+  if (!activeUser && state.screen !== "register") {
+    state.screen = "login";
+    return;
+  }
+
+  if (activeUser && ["login", "register"].includes(state.screen)) {
+    state.screen = "menus";
+  }
+
+  if (state.screen === "users" && !isAdmin()) {
+    state.screen = "menus";
+  }
+}
+
+function renderRestaurantList() {
+  restaurantList.replaceChildren();
+
+  restaurantMenus.forEach((menu) => {
+    const button = document.createElement("button");
+    button.className = "restaurant-card";
+    button.type = "button";
+    button.addEventListener("click", () => openRestaurantMenu(menu.id));
+
+    const image = document.createElement("img");
+    image.src = designSettings.heroImage;
+    image.alt = `${menu.name} logo`;
+
+    const info = document.createElement("span");
+    const name = document.createElement("strong");
+    const details = document.createElement("span");
+    name.textContent = menu.name;
+    details.textContent = `${menu.label} - ${menuItems.length} items`;
+    info.append(name, details);
+
+    button.append(image, info);
+    restaurantList.append(button);
+  });
+}
+
+function openRestaurantMenu(menuId) {
+  state.activeRestaurantMenu = menuId;
+  showScreen("menu");
 }
 
 function getVisibleItems() {
@@ -507,14 +594,11 @@ function openItemDialog(id) {
 }
 
 function openDrawer() {
+  if (!getActiveUser()) return;
+
   drawerOverlay.hidden = false;
   adminDrawer.classList.add("is-open");
   adminDrawer.setAttribute("aria-hidden", "false");
-  if (getInvitedUser()) {
-    setupPassword.focus();
-  } else if (!state.currentUser) {
-    adminUsername.focus();
-  }
 }
 
 function closeDrawer() {
@@ -527,14 +611,12 @@ function openUsersPage() {
   if (!isAdmin()) return;
 
   closeDrawer();
-  menuPage.hidden = true;
-  usersPage.hidden = false;
+  showScreen("users");
   renderUserList();
 }
 
 function closeUsersPage() {
-  usersPage.hidden = true;
-  menuPage.hidden = false;
+  showScreen("menu");
 }
 
 function openPdfPage() {
@@ -542,15 +624,12 @@ function openPdfPage() {
   if (!activeUser) return;
 
   closeDrawer();
-  usersPage.hidden = true;
-  menuPage.hidden = true;
-  pdfPage.hidden = false;
+  showScreen("pdf");
   renderPdfItemList();
 }
 
 function closePdfPage() {
-  pdfPage.hidden = true;
-  menuPage.hidden = false;
+  showScreen("menu");
 }
 
 function toggleCreateUserPanel() {
@@ -858,9 +937,19 @@ function escapeAttribute(value) {
 function renderAdminState() {
   const activeUser = getActiveUser();
   const invitedUser = getInvitedUser();
+  normalizeScreen(activeUser, invitedUser);
+  const showingInviteSetup = Boolean(invitedUser) && !activeUser;
 
-  adminLoginForm.hidden = Boolean(activeUser) || Boolean(invitedUser);
-  passwordSetupForm.hidden = !invitedUser || Boolean(activeUser);
+  authPage.hidden = Boolean(activeUser) || state.screen === "register";
+  registerPage.hidden = Boolean(activeUser) || showingInviteSetup || state.screen !== "register";
+  menusPage.hidden = !activeUser || state.screen !== "menus";
+  menuPage.hidden = !activeUser || state.screen !== "menu";
+  usersPage.hidden = !activeUser || state.screen !== "users" || !isAdmin();
+  pdfPage.hidden = !activeUser || state.screen !== "pdf";
+
+  adminLoginForm.hidden = Boolean(activeUser) || showingInviteSetup;
+  passwordSetupForm.hidden = !showingInviteSetup;
+  registerLinkButton.hidden = showingInviteSetup;
   adminControls.hidden = !activeUser;
   pdfBuilderButton.hidden = !activeUser;
   scanMenuButton.hidden = !canEditAnyCategory();
@@ -886,14 +975,7 @@ function renderAdminState() {
     addItemButton.hidden = true;
   }
 
-  if (!isAdmin() && !usersPage.hidden) {
-    closeUsersPage();
-  }
-
-  if (!activeUser && !pdfPage.hidden) {
-    closePdfPage();
-  }
-
+  renderRestaurantList();
   renderUserList();
   renderMenu();
 }
@@ -901,9 +983,13 @@ function renderAdminState() {
 function loginAdmin(event) {
   event.preventDefault();
 
-  const username = adminUsername.value.trim();
+  const identity = adminUsername.value.trim().toLowerCase();
   const password = adminPassword.value;
-  const user = users.find((savedUser) => savedUser.username === username && savedUser.password === password && savedUser.status !== "pending");
+  const user = users.find((savedUser) => {
+    const username = savedUser.username.toLowerCase();
+    const email = (savedUser.email || "").toLowerCase();
+    return (username === identity || email === identity) && savedUser.password === password && savedUser.status !== "pending";
+  });
 
   if (!user) {
     loginMessage.textContent = "Invalid login.";
@@ -911,8 +997,60 @@ function loginAdmin(event) {
   }
 
   state.currentUser = user.username;
+  state.screen = "menus";
   localStorage.setItem(currentUserKey, user.username);
   adminLoginForm.reset();
+  renderAdminState();
+}
+
+function openRegisterPage() {
+  loginMessage.textContent = "";
+  adminLoginForm.reset();
+  state.screen = "register";
+  renderAdminState();
+  registerUsername.focus();
+}
+
+function openLoginPage() {
+  registerMessage.textContent = "";
+  selfRegisterForm.reset();
+  state.screen = "login";
+  renderAdminState();
+  adminUsername.focus();
+}
+
+function registerAccount(event) {
+  event.preventDefault();
+
+  const username = registerUsername.value.trim();
+  const email = registerEmail.value.trim();
+  const password = registerPassword.value;
+  const normalizedUsername = username.toLowerCase();
+  const normalizedEmail = email.toLowerCase();
+  const userExists = users.some((user) => {
+    return user.username.toLowerCase() === normalizedUsername || (user.email || "").toLowerCase() === normalizedEmail;
+  });
+
+  if (userExists) {
+    registerMessage.textContent = "That username or email is already registered.";
+    return;
+  }
+
+  const user = {
+    username,
+    email,
+    password,
+    role: "viewer",
+    permissions: [],
+    status: "active"
+  };
+
+  users.push(user);
+  saveUsers();
+  state.currentUser = user.username;
+  state.screen = "menus";
+  localStorage.setItem(currentUserKey, user.username);
+  selfRegisterForm.reset();
   renderAdminState();
 }
 
@@ -934,6 +1072,7 @@ function setupInvitedPassword(event) {
 
   saveUsers();
   state.currentUser = users[userIndex].username;
+  state.screen = "menus";
   localStorage.setItem(currentUserKey, users[userIndex].username);
   passwordSetupForm.reset();
   window.history.replaceState({}, "", window.location.pathname);
@@ -942,8 +1081,11 @@ function setupInvitedPassword(event) {
 
 function logoutAdmin() {
   state.currentUser = null;
+  state.screen = "login";
   localStorage.removeItem(currentUserKey);
+  closeDrawer();
   setEditMode(false);
+  adminLoginForm.reset();
   renderAdminState();
 }
 
@@ -1531,6 +1673,15 @@ drawerOverlay.addEventListener("click", closeDrawer);
 adminLoginForm.addEventListener("submit", loginAdmin);
 passwordSetupForm.addEventListener("submit", setupInvitedPassword);
 logoutButton.addEventListener("click", logoutAdmin);
+menusLogoutButton.addEventListener("click", logoutAdmin);
+backToMenusButton.addEventListener("click", () => {
+  closeDrawer();
+  setEditMode(false);
+  showScreen("menus");
+});
+registerLinkButton.addEventListener("click", openRegisterPage);
+loginLinkButton.addEventListener("click", openLoginPage);
+selfRegisterForm.addEventListener("submit", registerAccount);
 userForm.addEventListener("submit", saveUser);
 itemImageFile.addEventListener("change", updateItemImageFromFile);
 heroImageFile.addEventListener("change", updateHeroImageFromFile);

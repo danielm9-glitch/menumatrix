@@ -4,11 +4,88 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Menu Matrix</title>
-    <link rel="stylesheet" href="styles.css?v=visible-pdf-arrow" />
+    <link rel="stylesheet" href="styles.css?v=login-menus" />
   </head>
   <body>
-    <main class="app-shell" aria-label="Restaurant menu matrix app">
+    <main id="authPage" class="auth-page" aria-label="Log in">
+      <div class="auth-background" aria-hidden="true"></div>
+      <section class="auth-panel">
+        <div class="auth-brand">
+          <p class="kicker">Menu Matrix</p>
+          <h1>Sign in</h1>
+        </div>
+
+        <form id="adminLoginForm" class="auth-form">
+          <label>
+            Email or username
+            <input id="adminUsername" autocomplete="username" required />
+          </label>
+          <label>
+            Password
+            <input id="adminPassword" type="password" autocomplete="current-password" required />
+          </label>
+          <button class="save-button" type="submit">Log in</button>
+          <p id="loginMessage" class="login-message" role="status"></p>
+        </form>
+
+        <form id="passwordSetupForm" class="auth-form" hidden>
+          <p id="inviteIntro" class="admin-status">Create your password</p>
+          <label>
+            New password
+            <input id="setupPassword" type="password" autocomplete="new-password" required />
+          </label>
+          <button class="save-button" type="submit">Set password</button>
+          <p id="setupMessage" class="login-message" role="status"></p>
+        </form>
+
+        <button id="registerLinkButton" class="link-button" type="button">Register</button>
+      </section>
+    </main>
+
+    <main id="registerPage" class="auth-page" aria-label="Create account" hidden>
+      <div class="auth-background" aria-hidden="true"></div>
+      <section class="auth-panel">
+        <div class="auth-brand">
+          <p class="kicker">Menu Matrix</p>
+          <h1>Create account</h1>
+        </div>
+
+        <form id="selfRegisterForm" class="auth-form">
+          <label>
+            Username
+            <input id="registerUsername" autocomplete="username" required />
+          </label>
+          <label>
+            Email
+            <input id="registerEmail" type="email" autocomplete="email" required />
+          </label>
+          <label>
+            Password
+            <input id="registerPassword" type="password" autocomplete="new-password" required />
+          </label>
+          <button class="save-button" type="submit">Create account</button>
+          <p id="registerMessage" class="login-message" role="status"></p>
+        </form>
+
+        <button id="loginLinkButton" class="link-button" type="button">Back to log in</button>
+      </section>
+    </main>
+
+    <main id="menusPage" class="app-shell menus-page" aria-label="Restaurant menus" hidden>
+      <header class="menus-top-bar">
+        <div>
+          <p class="kicker">Restaurants</p>
+          <h1>Menus</h1>
+        </div>
+        <button id="menusLogoutButton" class="action-button compact-nav-button" type="button">Log out</button>
+      </header>
+
+      <section id="restaurantList" class="restaurant-list" aria-label="Available restaurant menus"></section>
+    </main>
+
+    <main id="menuPage" class="app-shell" aria-label="Restaurant menu matrix app" hidden>
       <header class="top-bar">
+        <button id="backToMenusButton" class="action-button compact-nav-button" type="button">Menus</button>
         <div>
           <h1>Menu Matrix</h1>
         </div>
@@ -63,29 +140,6 @@
         </div>
         <button id="drawerCloseButton" class="icon-button" type="button" aria-label="Close admin menu">x</button>
       </div>
-
-      <form id="adminLoginForm" class="admin-login">
-        <label>
-          Username
-          <input id="adminUsername" autocomplete="username" required />
-        </label>
-        <label>
-          Password
-          <input id="adminPassword" type="password" autocomplete="current-password" required />
-        </label>
-        <button class="save-button" type="submit">Log in</button>
-        <p id="loginMessage" class="login-message" role="status"></p>
-      </form>
-
-      <form id="passwordSetupForm" class="admin-login" hidden>
-        <p id="inviteIntro" class="admin-status">Create your password</p>
-        <label>
-          New password
-          <input id="setupPassword" type="password" autocomplete="new-password" required />
-        </label>
-        <button class="save-button" type="submit">Set password</button>
-        <p id="setupMessage" class="login-message" role="status"></p>
-      </form>
 
       <section id="adminControls" class="admin-controls" hidden>
         <p id="adminStatus" class="admin-status">Signed in</p>
@@ -381,6 +435,6 @@
 
     <script src="ocr-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <script src="app.js?v=cloud-ocr"></script>
+    <script src="app.js?v=login-menus"></script>
   </body>
 </html>

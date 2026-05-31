@@ -46,10 +46,138 @@ textarea {
   background: color-mix(in srgb, var(--panel-bg) 86%, transparent);
 }
 
+.auth-page {
+  position: relative;
+  display: grid;
+  width: min(100%, 430px);
+  min-height: 100vh;
+  margin: 0 auto;
+  overflow: hidden;
+  padding: 22px 18px;
+  place-items: center;
+  isolation: isolate;
+}
+
+.auth-background {
+  position: absolute;
+  inset: -14px;
+  z-index: -2;
+  background:
+    linear-gradient(rgba(13, 16, 14, 0.18), rgba(13, 16, 14, 0.58)),
+    url("https://images.unsplash.com/photo-1556911220-bff31c812dba?auto=format&fit=crop&w=1200&q=80") center / cover;
+  filter: blur(8px);
+  transform: scale(1.05);
+}
+
+.auth-page::after {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: "";
+  background: rgba(11, 15, 13, 0.22);
+}
+
+.auth-panel {
+  display: grid;
+  gap: 18px;
+  width: min(100%, 360px);
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 8px;
+  padding: 22px;
+  background: rgba(251, 250, 246, 0.9);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(18px);
+}
+
+.auth-brand h1 {
+  font-size: clamp(2.35rem, 13vw, 3.3rem);
+}
+
+.auth-form {
+  display: grid;
+  gap: 12px;
+}
+
+.link-button {
+  min-height: 38px;
+  border: 0;
+  background: transparent;
+  color: var(--leaf);
+  font-weight: 950;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
 .users-page {
   display: grid;
   align-content: start;
   gap: 14px;
+}
+
+.menus-page {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+}
+
+.menus-top-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.menus-top-bar h1 {
+  font-size: clamp(2.35rem, 13vw, 3.25rem);
+}
+
+.compact-nav-button {
+  min-width: 68px;
+}
+
+.restaurant-list {
+  display: grid;
+  gap: 12px;
+}
+
+.restaurant-card {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--white);
+  color: var(--ink);
+  text-align: left;
+  box-shadow: 0 14px 34px rgba(25, 33, 29, 0.08);
+}
+
+.restaurant-card img {
+  width: 82px;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  object-fit: contain;
+  background: #f7f1e6;
+}
+
+.restaurant-card strong,
+.restaurant-card span {
+  display: block;
+}
+
+.restaurant-card strong {
+  margin-bottom: 4px;
+  font-size: 1rem;
+}
+
+.restaurant-card span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.35;
 }
 
 .page-top-bar {
@@ -72,7 +200,7 @@ textarea {
 }
 
 .top-bar {
-  grid-template-columns: minmax(0, 1fr) 44px;
+  grid-template-columns: auto minmax(0, 1fr) 44px;
   gap: 8px;
   padding-bottom: 16px;
 }
@@ -169,6 +297,7 @@ h1 {
 }
 
 .admin-login,
+.auth-form,
 .admin-controls,
 .user-form {
   display: grid;
@@ -176,6 +305,7 @@ h1 {
 }
 
 .admin-login label,
+.auth-form label,
 .user-form label {
   display: grid;
   gap: 6px;
@@ -186,6 +316,7 @@ h1 {
 }
 
 .admin-login input,
+.auth-form input,
 .user-form input {
   width: 100%;
   border: 1px solid var(--line);
@@ -198,6 +329,7 @@ h1 {
 }
 
 .admin-login input:focus,
+.auth-form input:focus,
 .user-form input:focus {
   border-color: var(--leaf);
   box-shadow: 0 0 0 3px rgba(47, 125, 86, 0.16);
@@ -227,6 +359,7 @@ h1 {
 
 .admin-controls .action-button,
 .admin-controls .danger-button,
+.auth-form .save-button,
 .admin-login .save-button {
   width: 100%;
 }
@@ -1011,6 +1144,13 @@ h1 {
   }
 
   .app-shell {
+    min-height: 812px;
+    border: 10px solid #1c201e;
+    border-radius: 34px;
+    box-shadow: 0 28px 80px rgba(25, 33, 29, 0.26);
+  }
+
+  .auth-page {
     min-height: 812px;
     border: 10px solid #1c201e;
     border-radius: 34px;
