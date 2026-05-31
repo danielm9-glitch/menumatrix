@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Menu Matrix</title>
-    <link rel="stylesheet" href="styles.css?v=auth-visual-tune" />
+    <link rel="stylesheet" href="styles.css?v=tester-login-hint" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -27,6 +27,12 @@
           <button class="save-button" type="submit">Log in</button>
           <p id="loginMessage" class="login-message" role="status"></p>
         </form>
+
+        <p class="tester-login">
+          <strong>Tester login</strong>
+          Admin: admin<br />
+          Password: menu123
+        </p>
 
         <form id="passwordSetupForm" class="auth-form" hidden>
           <p id="inviteIntro" class="admin-status">Create your password</p>
@@ -435,6 +441,6 @@
 
     <script src="ocr-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <script src="app.js?v=login-menus"></script>
+    <script src="app.js?v=tester-login-hint"></script>
   </body>
 </html>
