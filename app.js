@@ -120,7 +120,8 @@ const state = {
   currentUser: loadCurrentUser(),
   editing: false,
   screen: loadCurrentUser() ? "menus" : "login",
-  activeRestaurantMenu: initialRestaurantMenu?.id || defaultRestaurantMenuId
+  activeRestaurantMenu: initialRestaurantMenu?.id || defaultRestaurantMenuId,
+  dashboardTab: "users"
 };
 
 const cloudSync = {
@@ -238,6 +239,7 @@ const createScannedItemButton = document.querySelector("#createScannedItemButton
 const heroImage = document.querySelector("#heroImage");
 const editHeroButton = document.querySelector("#editHeroButton");
 const currentMenuTitle = document.querySelector("#currentMenuTitle");
+const topAddItemButton = document.querySelector("#topAddItemButton");
 const renameMenuButton = document.querySelector("#renameMenuButton");
 const renameMenuDialog = document.querySelector("#renameMenuDialog");
 const renameMenuForm = document.querySelector("#renameMenuForm");
@@ -267,6 +269,12 @@ const colorPage = document.querySelector("#colorPage");
 const colorPanel = document.querySelector("#colorPanel");
 const heroImageUrl = document.querySelector("#heroImageUrl");
 const heroImageFile = document.querySelector("#heroImageFile");
+const dashboardTabs = [...document.querySelectorAll(".dashboard-tab")];
+const dashboardPanels = [...document.querySelectorAll(".dashboard-panel")];
+const dashboardAuthSummary = document.querySelector("#dashboardAuthSummary");
+const dashboardPaymentsSummary = document.querySelector("#dashboardPaymentsSummary");
+const dashboardRestaurantList = document.querySelector("#dashboardRestaurantList");
+const dashboardMenuList = document.querySelector("#dashboardMenuList");
 
 function loadMenuItems() {
   if (localStorage.getItem(menuSeedKey) !== currentMenuSeed) {
@@ -858,6 +866,7 @@ function renderRestaurantList() {
 function renderActiveMenuHeader() {
   const activeMenu = getActiveRestaurantMenu();
   currentMenuTitle.textContent = activeMenu?.name || "No menu selected";
+  topAddItemButton.hidden = !activeMenu || !canEditAnyCategory();
   renameMenuButton.hidden = !state.editing || !canEditAnyCategory() || !activeMenu;
 }
 
@@ -1279,11 +1288,156 @@ function openUsersPage() {
 
   closeDrawer();
   showScreen("users");
+  showDashboardTab(state.dashboardTab || "users");
+  renderDashboard();
   renderUserList();
 }
 
 function closeUsersPage() {
   showScreen("menu");
+}
+
+function showDashboardTab(tabName) {
+  state.dashboardTab = tabName;
+
+  dashboardTabs.forEach((tab) => {
+    const isActive = tab.dataset.dashboardTab === tabName;
+    tab.classList.toggle("is-active", isActive);
+    tab.setAttribute("aria-selected", String(isActive));
+  });
+
+  dashboardPanels.forEach((panel) => {
+    panel.hidden = panel.dataset.dashboardPanel !== tabName;
+  });
+
+  renderDashboard();
+}
+
+function renderDashboard() {
+  if (!isAdmin()) return;
+
+  renderDashboardAuthSummary();
+  renderDashboardPaymentsSummary();
+  renderDashboardRestaurants();
+  renderDashboardMenus();
+}
+
+function createDashboardMetric(label, value, note = "") {
+  const card = document.createElement("article");
+  card.className = "dashboard-metric";
+
+  const labelElement = document.createElement("span");
+  labelElement.textContent = label;
+
+  const valueElement = document.createElement("strong");
+  valueElement.textContent = value;
+
+  card.append(labelElement, valueElement);
+
+  if (note) {
+    const noteElement = document.createElement("small");
+    noteElement.textContent = note;
+    card.append(noteElement);
+  }
+
+  return card;
+}
+
+function renderDashboardAuthSummary() {
+  dashboardAuthSummary.replaceChildren(
+    createDashboardMetric("Total accounts", String(users.length), "Local app accounts"),
+    createDashboardMetric(
+      "Verified owners",
+      String(users.filter((user) => user.role === "owner" && user.status === "active").length),
+      "Email verified restaurant owners"
+    ),
+    createDashboardMetric(
+      "Need attention",
+      String(users.filter((user) => ["pending", "unverified"].includes(user.status)).length),
+      "Pending invites or unverified emails"
+    ),
+    createDashboardMetric("Admins", String(users.filter((user) => user.role === "admin").length), "Full access")
+  );
+}
+
+function renderDashboardPaymentsSummary() {
+  dashboardPaymentsSummary.replaceChildren(
+    createDashboardMetric("Payment status", "Not connected", "No live charges"),
+    createDashboardMetric("Provider", "None", "Stripe can be added later"),
+    createDashboardMetric("Plans", "0", "No subscription plans yet")
+  );
+}
+
+function renderDashboardRestaurants() {
+  dashboardRestaurantList.replaceChildren();
+
+  if (!restaurantMenus.length) {
+    dashboardRestaurantList.append(createDashboardEmpty("No restaurants have been created yet."));
+    return;
+  }
+
+  restaurantMenus.forEach((menu) => {
+    dashboardRestaurantList.append(
+      createDashboardListRow({
+        title: menu.name,
+        meta: `${menu.label} - ${menu.items.length} items`,
+        badge: `Owner: ${getMenuOwner(menu)}`,
+        onClick: () => openRestaurantMenu(menu.id)
+      })
+    );
+  });
+}
+
+function renderDashboardMenus() {
+  dashboardMenuList.replaceChildren();
+
+  if (!restaurantMenus.length) {
+    dashboardMenuList.append(createDashboardEmpty("No menus have been created yet."));
+    return;
+  }
+
+  restaurantMenus.forEach((menu) => {
+    const itemCategories = categories
+      .map((category) => `${getCategoryLabel(category)}: ${menu.items.filter((item) => item.category === category).length}`)
+      .join(" / ");
+
+    dashboardMenuList.append(
+      createDashboardListRow({
+        title: menu.name,
+        meta: itemCategories,
+        badge: `${menu.items.length} items`,
+        onClick: () => openRestaurantMenu(menu.id)
+      })
+    );
+  });
+}
+
+function createDashboardEmpty(message) {
+  const empty = document.createElement("p");
+  empty.className = "empty-state restaurant-empty";
+  empty.textContent = message;
+  return empty;
+}
+
+function createDashboardListRow({ title, meta, badge, onClick }) {
+  const row = document.createElement("button");
+  row.className = "dashboard-list-row";
+  row.type = "button";
+  row.addEventListener("click", onClick);
+
+  const copy = document.createElement("span");
+  const titleElement = document.createElement("strong");
+  const metaElement = document.createElement("small");
+  titleElement.textContent = title;
+  metaElement.textContent = meta;
+  copy.append(titleElement, metaElement);
+
+  const badgeElement = document.createElement("span");
+  badgeElement.className = "dashboard-badge";
+  badgeElement.textContent = badge;
+
+  row.append(copy, badgeElement);
+  return row;
 }
 
 function openPdfPage() {
@@ -1648,6 +1802,7 @@ function renderAdminState() {
 
   renderRestaurantList();
   renderActiveMenuHeader();
+  renderDashboard();
   renderUserList();
   renderMenu();
 }
@@ -2459,6 +2614,9 @@ editModeButton.addEventListener("click", () => {
 addItemButton.addEventListener("click", () => {
   openItemDialog();
 });
+topAddItemButton.addEventListener("click", () => {
+  openItemDialog();
+});
 
 deleteMenuButton.addEventListener("click", openDeleteMenuDialog);
 closeDeleteMenuButton.addEventListener("click", closeDeleteMenuDialog);
@@ -2485,6 +2643,9 @@ generatePdfButton.addEventListener("click", generatePdf);
 createUserToggle.addEventListener("click", toggleCreateUserPanel);
 methodTabs.forEach((tab) => {
   tab.addEventListener("click", () => setCreateMethod(tab.dataset.method));
+});
+dashboardTabs.forEach((tab) => {
+  tab.addEventListener("click", () => showDashboardTab(tab.dataset.dashboardTab));
 });
 manageUsersButton.addEventListener("click", openUsersPage);
 designButton.addEventListener("click", openDesignDialog);

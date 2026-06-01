@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Menu Matrix</title>
-    <link rel="stylesheet" href="styles.css?v=auth-domain-fallback" />
+    <link rel="stylesheet" href="styles.css?v=admin-dashboard" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -124,9 +124,15 @@
           <p class="kicker">Restaurant menu</p>
           <h2 id="currentMenuTitle">Mott 32 Las Vegas</h2>
         </div>
-        <button id="renameMenuButton" class="small-icon-action" type="button" aria-label="Rename menu" hidden>
-          <span aria-hidden="true">&#9998;</span>
-        </button>
+        <div class="menu-title-actions">
+          <button id="topAddItemButton" class="top-add-item-button" type="button" hidden>
+            <span aria-hidden="true">+</span>
+            Add item
+          </button>
+          <button id="renameMenuButton" class="small-icon-action" type="button" aria-label="Rename menu" hidden>
+            <span aria-hidden="true">&#9998;</span>
+          </button>
+        </div>
       </section>
 
       <section class="controls" aria-label="Menu filters">
@@ -178,66 +184,110 @@
         <button id="deleteMenuButton" class="danger-button delete-menu-button" type="button" hidden>Delete Menu</button>
         <button id="scanMenuButton" class="action-button" type="button" hidden>Scan menu photo</button>
         <button id="pdfBuilderButton" class="action-button" type="button" hidden>Create PDF</button>
-        <button id="manageUsersButton" class="action-button" type="button" hidden>Manage Users</button>
+        <button id="manageUsersButton" class="action-button" type="button" hidden>Admin Dashboard</button>
         <button id="designButton" class="action-button" type="button" hidden>Color Scheme</button>
         <button id="logoutButton" class="danger-button" type="button">Log out</button>
       </section>
     </aside>
 
-    <main id="usersPage" class="app-shell users-page" aria-label="Manage users" hidden>
+    <main id="usersPage" class="app-shell dashboard-page" aria-label="Admin dashboard" hidden>
       <header class="page-top-bar">
         <button id="backToMenuButton" class="action-button" type="button">Back</button>
         <div>
           <p class="kicker">Admin</p>
-          <h1>Manage Users</h1>
+          <h1>Dashboard</h1>
         </div>
       </header>
 
-      <section class="user-manager">
-        <button id="createUserToggle" class="user-summary" type="button" aria-expanded="false">
-          <div>
-            <p class="kicker">Privileges</p>
-            <strong>Create user</strong>
+      <nav class="dashboard-tabs" role="tablist" aria-label="Admin dashboard sections">
+        <button class="dashboard-tab is-active" type="button" role="tab" aria-selected="true" data-dashboard-tab="users">Users</button>
+        <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="auth">Authentications</button>
+        <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="payments">Payments</button>
+        <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="restaurants">Restaurants</button>
+        <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="menus">Menus</button>
+      </nav>
+
+      <section class="dashboard-panel" data-dashboard-panel="users">
+        <section class="user-manager">
+          <button id="createUserToggle" class="user-summary" type="button" aria-expanded="false">
+            <div>
+              <p class="kicker">Privileges</p>
+              <strong>Create user</strong>
+            </div>
+            <span class="expand-marker">+</span>
+          </button>
+          <div id="createUserPanel" class="create-user-panel" hidden>
+            <div class="method-tabs" role="tablist" aria-label="Create user method">
+              <button class="method-tab is-active" type="button" data-method="invite">Email invite</button>
+              <button class="method-tab" type="button" data-method="manual">Username + pass</button>
+            </div>
+            <form id="userForm" class="user-form">
+              <input id="createMethod" type="hidden" value="invite" />
+              <label>
+                Username
+                <input id="newUsername" required />
+              </label>
+              <label id="newEmailLabel">
+                Email
+                <input id="newEmail" type="email" placeholder="name@example.com" required />
+              </label>
+              <label id="newPasswordLabel" hidden>
+                Password
+                <input id="newPassword" type="password" autocomplete="new-password" />
+              </label>
+              <fieldset class="permission-group">
+                <legend>Can modify</legend>
+                <label><input type="checkbox" name="permissions" value="starters" /> Starters</label>
+                <label><input type="checkbox" name="permissions" value="mains" /> Mains</label>
+                <label><input type="checkbox" name="permissions" value="drinks" /> Drinks</label>
+              </fieldset>
+              <button id="createUserSubmit" class="save-button" type="submit">Send invite</button>
+              <p id="userMessage" class="login-message" role="status"></p>
+            </form>
           </div>
-          <span class="expand-marker">+</span>
-        </button>
-        <div id="createUserPanel" class="create-user-panel" hidden>
-          <div class="method-tabs" role="tablist" aria-label="Create user method">
-            <button class="method-tab is-active" type="button" data-method="invite">Email invite</button>
-            <button class="method-tab" type="button" data-method="manual">Username + pass</button>
+        </section>
+
+        <section class="user-manager">
+          <div class="section-heading">
+            <p class="kicker">Sorted by privileges</p>
+            <strong>Users</strong>
           </div>
-          <form id="userForm" class="user-form">
-            <input id="createMethod" type="hidden" value="invite" />
-            <label>
-              Username
-              <input id="newUsername" required />
-            </label>
-            <label id="newEmailLabel">
-              Email
-              <input id="newEmail" type="email" placeholder="name@example.com" required />
-            </label>
-            <label id="newPasswordLabel" hidden>
-              Password
-              <input id="newPassword" type="password" autocomplete="new-password" />
-            </label>
-            <fieldset class="permission-group">
-              <legend>Can modify</legend>
-              <label><input type="checkbox" name="permissions" value="starters" /> Starters</label>
-              <label><input type="checkbox" name="permissions" value="mains" /> Mains</label>
-              <label><input type="checkbox" name="permissions" value="drinks" /> Drinks</label>
-            </fieldset>
-            <button id="createUserSubmit" class="save-button" type="submit">Send invite</button>
-            <p id="userMessage" class="login-message" role="status"></p>
-          </form>
-        </div>
+          <div id="userList" class="user-list"></div>
+        </section>
       </section>
 
-      <section class="user-manager">
+      <section class="dashboard-panel" data-dashboard-panel="auth" hidden>
         <div class="section-heading">
-          <p class="kicker">Sorted by privileges</p>
-          <strong>Users</strong>
+          <p class="kicker">Firebase</p>
+          <strong>Authentications</strong>
         </div>
-        <div id="userList" class="user-list"></div>
+        <div id="dashboardAuthSummary" class="dashboard-metric-grid"></div>
+        <p class="dashboard-note">Email verification is active for self-registered owner accounts. Admin-created editor accounts still use the invite/manual flow for now.</p>
+      </section>
+
+      <section class="dashboard-panel" data-dashboard-panel="payments" hidden>
+        <div class="section-heading">
+          <p class="kicker">Payments</p>
+          <strong>Billing setup</strong>
+        </div>
+        <div id="dashboardPaymentsSummary" class="dashboard-metric-grid"></div>
+        <p class="dashboard-note">Payments are ready for a future Stripe or Firebase extension setup. No charges or subscriptions are connected yet.</p>
+      </section>
+
+      <section class="dashboard-panel" data-dashboard-panel="restaurants" hidden>
+        <div class="section-heading">
+          <p class="kicker">Created restaurants</p>
+          <strong>Restaurants</strong>
+        </div>
+        <div id="dashboardRestaurantList" class="dashboard-list"></div>
+      </section>
+
+      <section class="dashboard-panel" data-dashboard-panel="menus" hidden>
+        <div class="section-heading">
+          <p class="kicker">Created menus</p>
+          <strong>Menus</strong>
+        </div>
+        <div id="dashboardMenuList" class="dashboard-list"></div>
       </section>
     </main>
 
@@ -533,6 +583,6 @@
     <script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore-compat.js"></script>
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <script src="app.js?v=auth-domain-fallback"></script>
+    <script src="app.js?v=admin-dashboard"></script>
   </body>
 </html>
