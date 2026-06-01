@@ -11,7 +11,8 @@ const firebaseMenuDocumentId = "main";
 const primaryAdminUsername = "admin";
 const cloudOcrEndpoint = window.MENU_MATRIX_OCR_ENDPOINT || "";
 const menuFullnessTarget = 12;
-const defaultHeroImage = "https://www.nicepng.com/png/detail/809-8099031_mott32-las-vegas-mott-32-logo.png";
+const legacyMott32HeroImage = "https://www.nicepng.com/png/detail/809-8099031_mott32-las-vegas-mott-32-logo.png";
+const defaultHeroImage = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 260'%3E%3Crect width='640' height='260' fill='%23f7f1e6'/%3E%3Ctext x='320' y='116' text-anchor='middle' font-family='Georgia%2C serif' font-size='84' font-weight='700' fill='%2319211d'%3EMOTT 32%3C/text%3E%3Ctext x='320' y='168' text-anchor='middle' font-family='Arial%2C sans-serif' font-size='22' letter-spacing='8' fill='%2366716b'%3ELAS VEGAS%3C/text%3E%3C/svg%3E";
 const defaultDesign = {
   ink: "#19211d",
   leaf: "#2f7d56",
@@ -185,6 +186,10 @@ const inviteIntro = document.querySelector("#inviteIntro");
 const loginMessage = document.querySelector("#loginMessage");
 const adminStatus = document.querySelector("#adminStatus");
 const editModeButton = document.querySelector("#editModeButton");
+const quickMenuActions = document.querySelector("#quickMenuActions");
+const quickEditModeButton = document.querySelector("#quickEditModeButton");
+const quickScanMenuButton = document.querySelector("#quickScanMenuButton");
+const quickPdfBuilderButton = document.querySelector("#quickPdfBuilderButton");
 const pdfBuilderButton = document.querySelector("#pdfBuilderButton");
 const addItemButton = document.querySelector("#addItemButton");
 const deleteMenuButton = document.querySelector("#deleteMenuButton");
@@ -353,7 +358,7 @@ function normalizeRestaurantMenu(menu, index = 0) {
   const items = Array.isArray(menu.items) ? menu.items : isDefaultMenu ? loadMenuItems() : [];
   const normalizedDesign = normalizeDesignSettings(design);
 
-  if (isDefaultMenu && !normalizedDesign.heroImage) {
+  if ((isDefaultMenu && !normalizedDesign.heroImage) || shouldUseBuiltInMott32Hero(menu, normalizedDesign.heroImage)) {
     normalizedDesign.heroImage = defaultHeroImage;
   }
 
@@ -367,6 +372,15 @@ function normalizeRestaurantMenu(menu, index = 0) {
     stats: normalizeMenuStats(menu.stats),
     designSettings: normalizedDesign
   };
+}
+
+function isMott32Menu(menu) {
+  const normalizedName = String(menu?.name || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+  return menu?.id === defaultRestaurantMenuId || normalizedName.includes("mott32");
+}
+
+function shouldUseBuiltInMott32Hero(menu, heroImageValue) {
+  return isMott32Menu(menu) && (!heroImageValue || heroImageValue === legacyMott32HeroImage);
 }
 
 function normalizeMenuStats(stats = {}) {
@@ -433,6 +447,14 @@ function syncActiveRestaurantMenuData() {
 
   menuItems = activeMenu.items.map(normalizeMenuItem);
   designSettings = normalizeDesignSettings(activeMenu.designSettings);
+  if (shouldUseBuiltInMott32Hero(activeMenu, designSettings.heroImage)) {
+    designSettings.heroImage = defaultHeroImage;
+    activeMenu.designSettings = normalizeDesignSettings({
+      ...activeMenu.designSettings,
+      heroImage: defaultHeroImage
+    });
+    saveRestaurantMenus();
+  }
   localStorage.setItem(storageKey, JSON.stringify(menuItems));
   localStorage.setItem(designStorageKey, JSON.stringify(designSettings));
 }
@@ -1120,9 +1142,17 @@ function createAdminHomeHighlight({ label, menu, badge, emptyText }) {
 
 function renderActiveMenuHeader() {
   const activeMenu = getActiveRestaurantMenu();
+  const canEditMenu = Boolean(activeMenu) && canEditAnyCategory();
+  const canUsePdf = Boolean(activeMenu && getActiveUser());
   currentMenuTitle.textContent = activeMenu?.name || "No menu selected";
-  topAddItemButton.hidden = !activeMenu || !canEditAnyCategory();
-  renameMenuButton.hidden = !state.editing || !canEditAnyCategory() || !activeMenu;
+  topAddItemButton.hidden = !canEditMenu;
+  renameMenuButton.hidden = !state.editing || !canEditMenu;
+  quickEditModeButton.textContent = state.editing ? "Done editing" : "Edit menu";
+  quickEditModeButton.classList.toggle("is-active", state.editing);
+  quickEditModeButton.hidden = !canEditMenu;
+  quickScanMenuButton.hidden = !canEditMenu;
+  quickPdfBuilderButton.hidden = !canUsePdf;
+  quickMenuActions.hidden = quickEditModeButton.hidden && quickScanMenuButton.hidden && quickPdfBuilderButton.hidden;
 }
 
 function openRestaurantMenu(menuId) {
@@ -1771,7 +1801,8 @@ function saveDesign(event) {
   if (!isAdmin()) return;
 
   const activeMenu = getActiveRestaurantMenu();
-  const heroImageValue = heroImageUrl.value.trim() || (activeMenu?.id === defaultRestaurantMenuId ? defaultHeroImage : "");
+  const requestedHeroImage = heroImageUrl.value.trim();
+  const heroImageValue = shouldUseBuiltInMott32Hero(activeMenu, requestedHeroImage) ? defaultHeroImage : requestedHeroImage;
   designSettings = {
     ...designSettings,
     ink: colorInk.value,
@@ -2927,6 +2958,9 @@ searchInput.addEventListener("input", (event) => {
 editModeButton.addEventListener("click", () => {
   setEditMode(!state.editing);
 });
+quickEditModeButton.addEventListener("click", () => {
+  setEditMode(!state.editing);
+});
 
 addItemButton.addEventListener("click", () => {
   openItemDialog();
@@ -2948,11 +2982,13 @@ deleteMenuSlider.addEventListener("pointercancel", () => {
 });
 deleteMenuSlider.addEventListener("keydown", handleDeleteSliderKeydown);
 scanMenuButton.addEventListener("click", openScanDialog);
+quickScanMenuButton.addEventListener("click", openScanDialog);
 closeScanButton.addEventListener("click", closeScanDialog);
 clearScanButton.addEventListener("click", clearScan);
 runScanButton.addEventListener("click", runMenuPhotoScan);
 createScannedItemButton.addEventListener("click", createScannedItemDraft);
 pdfBuilderButton.addEventListener("click", openPdfPage);
+quickPdfBuilderButton.addEventListener("click", openPdfPage);
 backFromPdfButton.addEventListener("click", closePdfPage);
 selectAllPdfButton.addEventListener("click", () => setPdfSelection(true));
 clearPdfButton.addEventListener("click", () => setPdfSelection(false));

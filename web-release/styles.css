@@ -1147,6 +1147,30 @@ h1 {
   line-height: 1;
 }
 
+.quick-menu-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.quick-action-button {
+  min-height: 42px;
+  border: 1px solid rgba(47, 125, 86, 0.22);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: var(--white);
+  color: var(--ink);
+  font-size: 0.74rem;
+  font-weight: 950;
+}
+
+.quick-action-button.is-active {
+  border-color: var(--leaf);
+  background: var(--leaf);
+  color: white;
+}
+
 .hero-copy {
   position: absolute;
   right: 18px;
@@ -1842,6 +1866,7 @@ h1 {
 
   #menuPage .hero,
   #menuPage .menu-title-panel,
+  #menuPage .quick-menu-actions,
   #menuPage .controls,
   #menuPage .allergy-panel {
     grid-column: 1;
@@ -1849,7 +1874,7 @@ h1 {
 
   #menuPage .matrix-card {
     grid-column: 2;
-    grid-row: 2 / span 5;
+    grid-row: 2 / span 6;
     align-self: start;
   }
 
