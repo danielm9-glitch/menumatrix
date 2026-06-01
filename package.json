@@ -6,7 +6,9 @@
   "scripts": {
     "cap:add:android": "cap add android",
     "cap:sync": "cap sync android",
-    "cap:open": "cap open android"
+    "cap:open": "cap open android",
+    "firebase:deploy": "firebase deploy --only hosting,firestore:rules",
+    "firebase:deploy:hosting": "firebase deploy --only hosting"
   },
   "keywords": [],
   "author": "",
@@ -17,6 +19,7 @@
     "@capacitor/core": "^8.3.4"
   },
   "devDependencies": {
-    "@capacitor/cli": "^8.3.4"
+    "@capacitor/cli": "^8.3.4",
+    "firebase-tools": "^15.19.0"
   }
 }
