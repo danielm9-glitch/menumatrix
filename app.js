@@ -8,6 +8,7 @@ const menusStorageKey = "restaurant-menu-matrix-restaurant-menus";
 const authFlowKey = "restaurant-menu-matrix-auth-flow";
 const currentAuthFlow = "login-first-menus";
 const firebaseMenuDocumentId = "main";
+const primaryAdminUsername = "admin";
 const cloudOcrEndpoint = window.MENU_MATRIX_OCR_ENDPOINT || "";
 const defaultHeroImage = "https://www.nicepng.com/png/detail/809-8099031_mott32-las-vegas-mott-32-logo.png";
 const defaultDesign = {
@@ -306,6 +307,7 @@ function createDefaultRestaurantMenu() {
   return {
     id: defaultRestaurantMenuId,
     name: "Mott 32 Las Vegas",
+    owner: primaryAdminUsername,
     label: "Chinese menu training",
     categories: ["Starters", "Mains", "Drinks"],
     items: loadMenuItems(),
@@ -321,6 +323,7 @@ function normalizeRestaurantMenu(menu, index = 0) {
   return {
     id: menu.id || `menu-${Date.now()}-${index}`,
     name: menu.name || (isDefaultMenu ? "Mott 32 Las Vegas" : `Blank Menu ${index + 1}`),
+    owner: menu.owner || primaryAdminUsername,
     label: menu.label || (isDefaultMenu ? "Chinese menu training" : "Blank menu"),
     categories: Array.isArray(menu.categories) && menu.categories.length ? menu.categories : ["Starters", "Mains", "Drinks"],
     items: items.map(normalizeMenuItem),
@@ -369,12 +372,19 @@ function saveDesignSettings() {
 }
 
 function getActiveRestaurantMenu() {
-  return restaurantMenus.find((menu) => menu.id === state.activeRestaurantMenu) || restaurantMenus[0] || null;
+  const visibleMenus = getVisibleRestaurantMenus();
+  return visibleMenus.find((menu) => menu.id === state.activeRestaurantMenu) || visibleMenus[0] || null;
 }
 
 function syncActiveRestaurantMenuData() {
   const activeMenu = getActiveRestaurantMenu();
-  if (!activeMenu) return;
+  if (!activeMenu) {
+    menuItems = [];
+    designSettings = { ...defaultDesign, heroImage: "" };
+    localStorage.setItem(storageKey, JSON.stringify(menuItems));
+    localStorage.setItem(designStorageKey, JSON.stringify(designSettings));
+    return;
+  }
 
   menuItems = activeMenu.items.map(normalizeMenuItem);
   designSettings = normalizeDesignSettings(activeMenu.designSettings);
@@ -469,9 +479,34 @@ function isAdmin() {
   return getActiveUser()?.role === "admin";
 }
 
+function getMenuOwner(menu) {
+  return menu?.owner || primaryAdminUsername;
+}
+
+function getVisibleRestaurantMenus() {
+  const user = getActiveUser();
+  if (!user) return [];
+  if (isAdmin()) return restaurantMenus;
+
+  return restaurantMenus.filter((menu) => {
+    const owner = getMenuOwner(menu);
+    return owner === user.username || (user.role === "editor" && owner === primaryAdminUsername);
+  });
+}
+
+function ownsMenu(menu) {
+  const user = getActiveUser();
+  return Boolean(user && menu && getMenuOwner(menu) === user.username);
+}
+
+function ownsActiveMenu() {
+  return ownsMenu(getActiveRestaurantMenu());
+}
+
 function getEditableCategories() {
   const user = getActiveUser();
   if (!user) return [];
+  if (ownsActiveMenu()) return [...categories];
   return isAdmin() ? [...categories] : user.permissions || [];
 }
 
@@ -545,8 +580,9 @@ function applyCloudSnapshot(data) {
   try {
     if (Array.isArray(data.menus) && data.menus.length) {
       restaurantMenus = data.menus.map(normalizeRestaurantMenu);
-      if (!restaurantMenus.some((menu) => menu.id === state.activeRestaurantMenu)) {
-        state.activeRestaurantMenu = restaurantMenus[0].id;
+      const visibleMenus = getVisibleRestaurantMenus();
+      if (!visibleMenus.some((menu) => menu.id === state.activeRestaurantMenu)) {
+        state.activeRestaurantMenu = visibleMenus[0]?.id || "";
       }
       saveRestaurantMenus({ sync: false });
       syncActiveRestaurantMenuData();
@@ -557,7 +593,8 @@ function applyCloudSnapshot(data) {
         designSettings: data.designSettings && typeof data.designSettings === "object" ? data.designSettings : defaultDesign
       });
       restaurantMenus = [legacyMenu];
-      state.activeRestaurantMenu = legacyMenu.id;
+      const visibleMenus = getVisibleRestaurantMenus();
+      state.activeRestaurantMenu = visibleMenus[0]?.id || "";
       saveRestaurantMenus({ sync: false });
       syncActiveRestaurantMenuData();
     }
@@ -618,6 +655,7 @@ function sanitizeRestaurantMenuForStorage(menu) {
   return {
     id: menu.id || `menu-${Date.now()}`,
     name: menu.name || "Untitled Menu",
+    owner: menu.owner || primaryAdminUsername,
     label: menu.label || "Menu training",
     categories: Array.isArray(menu.categories) && menu.categories.length ? menu.categories : ["Starters", "Mains", "Drinks"],
     items: Array.isArray(menu.items) ? menu.items.map(sanitizeMenuItemForCloud) : [],
@@ -657,6 +695,10 @@ function normalizeScreen(activeUser, invitedUser) {
     state.screen = "menus";
   }
 
+  if (activeUser && state.screen === "menu" && !getActiveRestaurantMenu()) {
+    state.screen = "menus";
+  }
+
   if (state.screen === "users" && !isAdmin()) {
     state.screen = "menus";
   }
@@ -665,7 +707,17 @@ function normalizeScreen(activeUser, invitedUser) {
 function renderRestaurantList() {
   restaurantList.replaceChildren();
 
-  restaurantMenus.forEach((menu) => {
+  const visibleMenus = getVisibleRestaurantMenus();
+
+  if (!visibleMenus.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state restaurant-empty";
+    empty.textContent = "No menus yet. Create a blank menu to start a restaurant.";
+    restaurantList.append(empty);
+    return;
+  }
+
+  visibleMenus.forEach((menu) => {
     const button = document.createElement("button");
     button.className = "restaurant-card";
     button.classList.toggle("is-active", menu.id === state.activeRestaurantMenu);
@@ -695,11 +747,13 @@ function renderRestaurantList() {
 
 function renderActiveMenuHeader() {
   const activeMenu = getActiveRestaurantMenu();
-  currentMenuTitle.textContent = activeMenu?.name || "Menu";
+  currentMenuTitle.textContent = activeMenu?.name || "No menu selected";
   renameMenuButton.hidden = !state.editing || !canEditAnyCategory() || !activeMenu;
 }
 
 function openRestaurantMenu(menuId) {
+  if (!getVisibleRestaurantMenus().some((menu) => menu.id === menuId)) return;
+
   state.activeRestaurantMenu = menuId;
   state.category = "all";
   state.query = "";
@@ -746,7 +800,7 @@ function saveMenuName(event) {
 }
 
 function canDeleteActiveMenu() {
-  return state.editing && isAdmin() && Boolean(getActiveRestaurantMenu());
+  return state.editing && Boolean(getActiveRestaurantMenu()) && (isAdmin() || ownsActiveMenu());
 }
 
 function updateDeleteMenuButton() {
@@ -817,7 +871,7 @@ function deleteActiveRestaurantMenu() {
   if (!activeMenu || restaurantMenus.length <= 1 || deleteSliderProgress < 92) return;
 
   restaurantMenus = restaurantMenus.filter((menu) => menu.id !== activeMenu.id);
-  state.activeRestaurantMenu = restaurantMenus[0].id;
+  state.activeRestaurantMenu = getVisibleRestaurantMenus()[0]?.id || "";
   state.category = "all";
   state.query = "";
   state.openItems.clear();
@@ -893,10 +947,14 @@ function handleDeleteSliderKeydown(event) {
 }
 
 function createBlankRestaurantMenu() {
+  const activeUser = getActiveUser();
+  if (!activeUser) return;
+
   const blankCount = restaurantMenus.filter((menu) => menu.id.startsWith("blank-menu-")).length + 1;
   const blankMenu = normalizeRestaurantMenu({
     id: `blank-menu-${Date.now()}`,
     name: `Blank Menu ${blankCount}`,
+    owner: activeUser.username,
     label: "Blank menu",
     categories: ["Starters", "Mains", "Drinks"],
     items: [],
@@ -1503,6 +1561,7 @@ function loginAdmin(event) {
   state.currentUser = user.username;
   state.screen = "menus";
   localStorage.setItem(currentUserKey, user.username);
+  resetMenuViewForCurrentUser();
   adminLoginForm.reset();
   renderAdminState();
 }
@@ -1521,6 +1580,20 @@ function openLoginPage() {
   state.screen = "login";
   renderAdminState();
   adminUsername.focus();
+}
+
+function resetMenuViewForCurrentUser() {
+  const visibleMenus = getVisibleRestaurantMenus();
+  state.activeRestaurantMenu = visibleMenus[0]?.id || "";
+  state.category = "all";
+  state.query = "";
+  state.openItems.clear();
+  state.allergies.clear();
+  searchInput.value = "";
+  tabs.forEach((button) => button.classList.toggle("is-active", button.dataset.category === "all"));
+  syncActiveRestaurantMenuData();
+  applyDesignSettings();
+  renderAllergyChips();
 }
 
 function registerAccount(event) {
@@ -1544,8 +1617,8 @@ function registerAccount(event) {
     username,
     email,
     password,
-    role: "viewer",
-    permissions: [],
+    role: "owner",
+    permissions: [...categories],
     status: "active"
   };
 
@@ -1554,6 +1627,7 @@ function registerAccount(event) {
   state.currentUser = user.username;
   state.screen = "menus";
   localStorage.setItem(currentUserKey, user.username);
+  resetMenuViewForCurrentUser();
   selfRegisterForm.reset();
   renderAdminState();
 }
@@ -1578,6 +1652,7 @@ function setupInvitedPassword(event) {
   state.currentUser = users[userIndex].username;
   state.screen = "menus";
   localStorage.setItem(currentUserKey, users[userIndex].username);
+  resetMenuViewForCurrentUser();
   passwordSetupForm.reset();
   window.history.replaceState({}, "", window.location.pathname);
   renderAdminState();
@@ -1667,11 +1742,13 @@ function sortUsersByPrivileges(a, b) {
 
 function getPrivilegeRank(user) {
   if (user.role === "admin") return categories.length + 1;
+  if (user.role === "owner") return categories.length;
   return (user.permissions || []).length;
 }
 
 function getPrivilegeLabel(user) {
   if (user.role === "admin") return "All sections";
+  if (user.role === "owner") return "Own menus";
   return (user.permissions || []).map(getCategoryLabel).join(", ") || "No edit access";
 }
 

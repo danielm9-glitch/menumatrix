@@ -89,6 +89,7 @@ const defaultMenus = [
   {
     id: "mott32-las-vegas",
     name: "Mott 32 Las Vegas",
+    owner: "admin",
     label: "Chinese menu training",
     categories: ["Starters", "Mains", "Drinks"],
     items: defaultMenuItems,
@@ -183,13 +184,17 @@ function getMenusForSync(existingDocument) {
   );
 
   if (Array.isArray(existing.menus) && existing.menus.length) {
-    return existing.menus;
+    return existing.menus.map((menu) => ({
+      ...menu,
+      owner: menu.owner || "admin"
+    }));
   }
 
   if (Array.isArray(existing.menuItems) || existing.designSettings) {
     return [
       {
         ...defaultMenus[0],
+        owner: "admin",
         items: Array.isArray(existing.menuItems) ? existing.menuItems : defaultMenuItems,
         designSettings: existing.designSettings || defaultDesign
       }

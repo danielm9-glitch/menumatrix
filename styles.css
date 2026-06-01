@@ -1188,6 +1188,13 @@ h1 {
   text-align: center;
 }
 
+.restaurant-empty {
+  grid-column: 1 / -1;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.58);
+}
+
 .order-panel {
   position: sticky;
   bottom: 12px;
