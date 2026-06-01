@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Menu Matrix</title>
-    <link rel="stylesheet" href="styles.css?v=quick-actions-header" />
+    <link rel="stylesheet" href="styles.css?v=auth-rate-limit" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -27,6 +27,9 @@
           </label>
           <button class="save-button" type="submit">Log in</button>
           <p id="loginMessage" class="login-message" role="status"></p>
+          <button id="resendVerificationButton" class="link-button auth-secondary-action" type="button" hidden>
+            Resend verification email
+          </button>
         </form>
 
         <p class="tester-login">
@@ -642,6 +645,6 @@
     <script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore-compat.js"></script>
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <script src="app.js?v=quick-actions-header"></script>
+    <script src="app.js?v=auth-rate-limit"></script>
   </body>
 </html>

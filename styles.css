@@ -122,6 +122,13 @@ textarea {
   text-underline-offset: 4px;
 }
 
+.auth-secondary-action {
+  justify-self: center;
+  min-height: 32px;
+  padding: 0 8px;
+  font-size: 0.78rem;
+}
+
 .tester-login {
   margin: -2px 0 0;
   border: 1px solid rgba(47, 125, 86, 0.24);

@@ -162,6 +162,7 @@ const passwordSetupForm = document.querySelector("#passwordSetupForm");
 const adminControls = document.querySelector("#adminControls");
 const adminUsername = document.querySelector("#adminUsername");
 const adminPassword = document.querySelector("#adminPassword");
+const resendVerificationButton = document.querySelector("#resendVerificationButton");
 const selfRegisterForm = document.querySelector("#selfRegisterForm");
 const registerUsername = document.querySelector("#registerUsername");
 const registerEmail = document.querySelector("#registerEmail");
@@ -801,6 +802,9 @@ function getAuthErrorMessage(error) {
   if (code === "auth/operation-not-allowed") {
     return "Enable Email/Password sign-in in Firebase Authentication first.";
   }
+  if (code === "auth/too-many-requests") {
+    return "Firebase temporarily blocked this device because of too many login or email attempts. Stop trying for a while, then try again later.";
+  }
   if (code === "auth/network-request-failed") return "Network error. Try again in a moment.";
   return error?.message || "Authentication failed.";
 }
@@ -820,6 +824,10 @@ async function sendVerificationEmail(firebaseUser) {
     await firebaseUser.sendEmailVerification();
     return "firebase-default";
   }
+}
+
+function setResendVerificationVisible(isVisible) {
+  resendVerificationButton.hidden = !isVisible;
 }
 
 async function initializeCloudSync() {
@@ -2178,11 +2186,9 @@ async function loginWithFirebaseAccount(identity, password) {
     await credential.user.reload();
 
     if (!credential.user.emailVerified) {
-      const verificationMode = await sendVerificationEmail(credential.user);
       loginMessage.textContent =
-        verificationMode === "firebase-default"
-          ? "Verify your email first. I resent it using Firebase's default link because this domain is not allowlisted yet."
-          : "Verify your email first. I sent the verification email again.";
+        "Verify your email first. Check your inbox and spam folder. Use resend only after waiting a few minutes.";
+      setResendVerificationVisible(true);
       await auth.signOut();
       await restoreAnonymousAuth();
       return true;
@@ -2194,6 +2200,7 @@ async function loginWithFirebaseAccount(identity, password) {
     localStorage.setItem(currentUserKey, user.username);
     activateWorkspaceForCurrentUser();
     adminLoginForm.reset();
+    setResendVerificationVisible(false);
     renderAdminState();
     return true;
   } catch (error) {
@@ -2203,11 +2210,65 @@ async function loginWithFirebaseAccount(identity, password) {
   }
 }
 
+async function resendVerificationFromLogin() {
+  const auth = await getFirebaseAuth();
+  if (!auth) {
+    loginMessage.textContent = "Firebase Auth is not connected.";
+    return;
+  }
+
+  const identity = adminUsername.value.trim().toLowerCase();
+  const password = adminPassword.value;
+  const existingUser = users.find((user) => {
+    return user.username.toLowerCase() === identity || (user.email || "").toLowerCase() === identity;
+  });
+  const email = identity.includes("@") ? identity : existingUser?.email || "";
+
+  if (!email || !password) {
+    loginMessage.textContent = "Enter the account email and password, then resend verification.";
+    return;
+  }
+
+  resendVerificationButton.disabled = true;
+  loginMessage.textContent = "Sending verification email...";
+
+  try {
+    const credential = await auth.signInWithEmailAndPassword(email, password);
+    await credential.user.reload();
+
+    if (credential.user.emailVerified) {
+      const user = upsertFirebaseOwner(credential.user, existingUser?.username || getUsernameFromEmail(email));
+      state.currentUser = user.username;
+      state.screen = "menus";
+      localStorage.setItem(currentUserKey, user.username);
+      setResendVerificationVisible(false);
+      activateWorkspaceForCurrentUser();
+      adminLoginForm.reset();
+      renderAdminState();
+      return;
+    }
+
+    const verificationMode = await sendVerificationEmail(credential.user);
+    loginMessage.textContent =
+      verificationMode === "firebase-default"
+        ? "Verification email sent with Firebase's default link. Check inbox and spam."
+        : "Verification email sent. Check inbox and spam.";
+    await auth.signOut();
+    await restoreAnonymousAuth();
+  } catch (error) {
+    loginMessage.textContent = getAuthErrorMessage(error);
+    await restoreAnonymousAuth();
+  } finally {
+    resendVerificationButton.disabled = false;
+  }
+}
+
 async function loginAdmin(event) {
   event.preventDefault();
 
   const identity = adminUsername.value.trim().toLowerCase();
   const password = adminPassword.value;
+  setResendVerificationVisible(false);
   const user = users.find((savedUser) => {
     const username = savedUser.username.toLowerCase();
     const email = (savedUser.email || "").toLowerCase();
@@ -2239,6 +2300,7 @@ async function loginAdmin(event) {
 function openRegisterPage() {
   loginMessage.textContent = "";
   adminLoginForm.reset();
+  setResendVerificationVisible(false);
   state.screen = "register";
   renderAdminState();
   registerUsername.focus();
@@ -2247,6 +2309,7 @@ function openRegisterPage() {
 function openLoginPage() {
   registerMessage.textContent = "";
   selfRegisterForm.reset();
+  setResendVerificationVisible(false);
   state.screen = "login";
   renderAdminState();
   adminUsername.focus();
@@ -2313,7 +2376,22 @@ async function registerAccount(event) {
 
     users.push(user);
     saveUsers();
-    const verificationMode = await sendVerificationEmail(credential.user);
+    let verificationMode = "";
+    try {
+      verificationMode = await sendVerificationEmail(credential.user);
+    } catch (verificationError) {
+      await auth.signOut();
+      await restoreAnonymousAuth();
+      selfRegisterForm.reset();
+      if (verificationError?.code === "auth/too-many-requests") {
+        registerMessage.textContent =
+          "Account created, but Firebase temporarily blocked verification emails from this device. Wait a while, then log in and use Resend verification.";
+      } else {
+        registerMessage.textContent =
+          `Account created, but the verification email could not be sent: ${getAuthErrorMessage(verificationError)}`;
+      }
+      return;
+    }
     await auth.signOut();
     await restoreAnonymousAuth();
     selfRegisterForm.reset();
@@ -3013,6 +3091,7 @@ drawerOpenButton.addEventListener("click", openDrawer);
 drawerCloseButton.addEventListener("click", closeDrawer);
 drawerOverlay.addEventListener("click", closeDrawer);
 adminLoginForm.addEventListener("submit", loginAdmin);
+resendVerificationButton.addEventListener("click", resendVerificationFromLogin);
 passwordSetupForm.addEventListener("submit", setupInvitedPassword);
 logoutButton.addEventListener("click", logoutAdmin);
 menusLogoutButton.addEventListener("click", logoutAdmin);
