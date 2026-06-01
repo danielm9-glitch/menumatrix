@@ -4,6 +4,7 @@ const currentMenuSeed = "mott32-las-vegas-five";
 const usersStorageKey = "restaurant-menu-matrix-users";
 const currentUserKey = "restaurant-menu-matrix-current-user";
 const designStorageKey = "restaurant-menu-matrix-design";
+const menusStorageKey = "restaurant-menu-matrix-restaurant-menus";
 const authFlowKey = "restaurant-menu-matrix-auth-flow";
 const currentAuthFlow = "login-first-menus";
 const firebaseRestaurantId = "mott32-las-vegas";
@@ -97,23 +98,18 @@ const defaultMenuItems = [
 ];
 
 const allergyOptions = ["Dairy", "Egg", "Fish", "Sesame", "Shellfish", "Soy", "Wheat"];
-const restaurantMenus = [
-  {
-    id: "mott32-las-vegas",
-    name: "Mott 32 Las Vegas",
-    label: "Chinese menu training",
-    categories: ["Starters", "Mains", "Drinks"]
-  }
-];
+const defaultRestaurantMenuId = "mott32-las-vegas";
 
 if (localStorage.getItem(authFlowKey) !== currentAuthFlow) {
   localStorage.removeItem(currentUserKey);
   localStorage.setItem(authFlowKey, currentAuthFlow);
 }
 
-let menuItems = loadMenuItems();
+let restaurantMenus = loadRestaurantMenus();
+const initialRestaurantMenu = restaurantMenus[0];
+let menuItems = initialRestaurantMenu?.items || [];
 let users = loadUsers();
-let designSettings = loadDesignSettings();
+let designSettings = initialRestaurantMenu?.designSettings || { ...defaultDesign };
 
 const state = {
   category: "all",
@@ -123,7 +119,7 @@ const state = {
   currentUser: loadCurrentUser(),
   editing: false,
   screen: loadCurrentUser() ? "menus" : "login",
-  activeRestaurantMenu: restaurantMenus[0].id
+  activeRestaurantMenu: initialRestaurantMenu?.id || defaultRestaurantMenuId
 };
 
 const cloudSync = {
@@ -166,6 +162,7 @@ const loginLinkButton = document.querySelector("#loginLinkButton");
 const restaurantList = document.querySelector("#restaurantList");
 const menusLogoutButton = document.querySelector("#menusLogoutButton");
 const backToMenusButton = document.querySelector("#backToMenusButton");
+const createMenuButton = document.querySelector("#createMenuButton");
 const syncStatus = document.querySelector("#syncStatus");
 const setupPassword = document.querySelector("#setupPassword");
 const setupMessage = document.querySelector("#setupMessage");
@@ -264,6 +261,59 @@ function loadMenuItems() {
   }
 }
 
+function loadRestaurantMenus() {
+  const savedMenus = localStorage.getItem(menusStorageKey);
+
+  if (savedMenus) {
+    try {
+      const parsed = JSON.parse(savedMenus);
+      if (Array.isArray(parsed) && parsed.length) {
+        return parsed.map(normalizeRestaurantMenu);
+      }
+    } catch {
+      // Fall through to the legacy single-menu data.
+    }
+  }
+
+  const defaultMenu = createDefaultRestaurantMenu();
+  localStorage.setItem(menusStorageKey, JSON.stringify([sanitizeRestaurantMenuForStorage(defaultMenu)]));
+  return [defaultMenu];
+}
+
+function createDefaultRestaurantMenu() {
+  return {
+    id: defaultRestaurantMenuId,
+    name: "Mott 32 Las Vegas",
+    label: "Chinese menu training",
+    categories: ["Starters", "Mains", "Drinks"],
+    items: loadMenuItems(),
+    designSettings: loadDesignSettings()
+  };
+}
+
+function normalizeRestaurantMenu(menu, index = 0) {
+  const isDefaultMenu = menu.id === defaultRestaurantMenuId || (!menu.id && index === 0);
+  const design = menu.designSettings || (isDefaultMenu ? loadDesignSettings() : { ...defaultDesign, heroImage: "" });
+  const items = Array.isArray(menu.items) ? menu.items : isDefaultMenu ? loadMenuItems() : [];
+
+  return {
+    id: menu.id || `menu-${Date.now()}-${index}`,
+    name: menu.name || (isDefaultMenu ? "Mott 32 Las Vegas" : `Blank Menu ${index + 1}`),
+    label: menu.label || (isDefaultMenu ? "Chinese menu training" : "Blank menu"),
+    categories: Array.isArray(menu.categories) && menu.categories.length ? menu.categories : ["Starters", "Mains", "Drinks"],
+    items: items.map(normalizeMenuItem),
+    designSettings: normalizeDesignSettings(design)
+  };
+}
+
+function normalizeDesignSettings(settings = {}) {
+  return {
+    ...defaultDesign,
+    ...settings,
+    heroImage: typeof settings.heroImage === "string" ? settings.heroImage : defaultHeroImage
+  };
+}
+
 function normalizeMenuItem(item) {
   const defaultMatch = defaultMenuItems.find((defaultItem) => defaultItem.id === item.id);
 
@@ -276,8 +326,8 @@ function normalizeMenuItem(item) {
 
 function saveMenuItems() {
   localStorage.setItem(storageKey, JSON.stringify(menuItems));
+  persistActiveRestaurantMenuData();
   if (restaurantList) renderRestaurantList();
-  scheduleCloudSave();
 }
 
 function loadDesignSettings() {
@@ -293,7 +343,35 @@ function loadDesignSettings() {
 
 function saveDesignSettings() {
   localStorage.setItem(designStorageKey, JSON.stringify(designSettings));
-  scheduleCloudSave();
+  persistActiveRestaurantMenuData();
+}
+
+function getActiveRestaurantMenu() {
+  return restaurantMenus.find((menu) => menu.id === state.activeRestaurantMenu) || restaurantMenus[0] || null;
+}
+
+function syncActiveRestaurantMenuData() {
+  const activeMenu = getActiveRestaurantMenu();
+  if (!activeMenu) return;
+
+  menuItems = activeMenu.items.map(normalizeMenuItem);
+  designSettings = normalizeDesignSettings(activeMenu.designSettings);
+  localStorage.setItem(storageKey, JSON.stringify(menuItems));
+  localStorage.setItem(designStorageKey, JSON.stringify(designSettings));
+}
+
+function persistActiveRestaurantMenuData() {
+  const activeMenu = getActiveRestaurantMenu();
+  if (!activeMenu) return;
+
+  activeMenu.items = menuItems.map(normalizeMenuItem);
+  activeMenu.designSettings = normalizeDesignSettings(designSettings);
+  saveRestaurantMenus();
+}
+
+function saveRestaurantMenus({ sync = true } = {}) {
+  localStorage.setItem(menusStorageKey, JSON.stringify(restaurantMenus.map(sanitizeRestaurantMenuForStorage)));
+  if (sync) scheduleCloudSave();
 }
 
 function applyDesignSettings() {
@@ -303,7 +381,14 @@ function applyDesignSettings() {
   document.documentElement.style.setProperty("--aqua", designSettings.aqua);
   document.documentElement.style.setProperty("--page-bg", designSettings.page);
   document.documentElement.style.setProperty("--panel-bg", designSettings.panel);
-  heroImage.src = designSettings.heroImage;
+  const hasHeroImage = Boolean(designSettings.heroImage);
+  heroImage.hidden = !hasHeroImage;
+  heroImage.closest(".logo-hero")?.classList.toggle("is-empty", !hasHeroImage);
+  if (hasHeroImage) {
+    heroImage.src = designSettings.heroImage;
+  } else {
+    heroImage.removeAttribute("src");
+  }
   renderRestaurantList();
 }
 
@@ -436,14 +521,23 @@ function applyCloudSnapshot(data) {
   cloudSync.applying = true;
 
   try {
-    if (Array.isArray(data.menuItems)) {
-      menuItems = data.menuItems.map(normalizeMenuItem);
-      localStorage.setItem(storageKey, JSON.stringify(menuItems));
-    }
-
-    if (data.designSettings && typeof data.designSettings === "object") {
-      designSettings = { ...defaultDesign, ...data.designSettings };
-      localStorage.setItem(designStorageKey, JSON.stringify(designSettings));
+    if (Array.isArray(data.menus) && data.menus.length) {
+      restaurantMenus = data.menus.map(normalizeRestaurantMenu);
+      if (!restaurantMenus.some((menu) => menu.id === state.activeRestaurantMenu)) {
+        state.activeRestaurantMenu = restaurantMenus[0].id;
+      }
+      saveRestaurantMenus({ sync: false });
+      syncActiveRestaurantMenuData();
+    } else {
+      const legacyMenu = normalizeRestaurantMenu({
+        ...createDefaultRestaurantMenu(),
+        items: Array.isArray(data.menuItems) ? data.menuItems : defaultMenuItems,
+        designSettings: data.designSettings && typeof data.designSettings === "object" ? data.designSettings : defaultDesign
+      });
+      restaurantMenus = [legacyMenu];
+      state.activeRestaurantMenu = legacyMenu.id;
+      saveRestaurantMenus({ sync: false });
+      syncActiveRestaurantMenuData();
     }
 
     setSyncStatus("Synced with Firebase", "connected");
@@ -470,8 +564,7 @@ async function uploadCloudSnapshot(reason) {
   try {
     await cloudSync.ref.set(
       {
-        designSettings: sanitizeDesignSettings(designSettings),
-        menuItems: menuItems.map(sanitizeMenuItemForCloud),
+        menus: restaurantMenus.map(sanitizeRestaurantMenuForStorage),
         source: reason,
         updatedAt: new Date().toISOString()
       },
@@ -499,6 +592,17 @@ function sanitizeMenuItemForCloud(item) {
   };
 }
 
+function sanitizeRestaurantMenuForStorage(menu) {
+  return {
+    id: menu.id || `menu-${Date.now()}`,
+    name: menu.name || "Untitled Menu",
+    label: menu.label || "Menu training",
+    categories: Array.isArray(menu.categories) && menu.categories.length ? menu.categories : ["Starters", "Mains", "Drinks"],
+    items: Array.isArray(menu.items) ? menu.items.map(sanitizeMenuItemForCloud) : [],
+    designSettings: sanitizeDesignSettings(menu.designSettings || defaultDesign)
+  };
+}
+
 function sanitizeDesignSettings(settings) {
   return {
     ink: settings.ink || defaultDesign.ink,
@@ -507,7 +611,7 @@ function sanitizeDesignSettings(settings) {
     aqua: settings.aqua || defaultDesign.aqua,
     page: settings.page || defaultDesign.page,
     panel: settings.panel || defaultDesign.panel,
-    heroImage: settings.heroImage || defaultHeroImage
+    heroImage: typeof settings.heroImage === "string" ? settings.heroImage : defaultHeroImage
   };
 }
 
@@ -542,18 +646,24 @@ function renderRestaurantList() {
   restaurantMenus.forEach((menu) => {
     const button = document.createElement("button");
     button.className = "restaurant-card";
+    button.classList.toggle("is-active", menu.id === state.activeRestaurantMenu);
     button.type = "button";
     button.addEventListener("click", () => openRestaurantMenu(menu.id));
 
-    const image = document.createElement("img");
-    image.src = designSettings.heroImage;
-    image.alt = `${menu.name} logo`;
+    const image = menu.designSettings?.heroImage ? document.createElement("img") : document.createElement("span");
+    if (menu.designSettings?.heroImage) {
+      image.src = menu.designSettings.heroImage;
+      image.alt = `${menu.name} logo`;
+    } else {
+      image.className = "restaurant-card-placeholder";
+      image.setAttribute("aria-hidden", "true");
+    }
 
     const info = document.createElement("span");
     const name = document.createElement("strong");
     const details = document.createElement("span");
     name.textContent = menu.name;
-    details.textContent = `${menu.label} - ${menuItems.length} items`;
+    details.textContent = `${menu.label} - ${menu.items.length} items`;
     info.append(name, details);
 
     button.append(image, info);
@@ -563,6 +673,39 @@ function renderRestaurantList() {
 
 function openRestaurantMenu(menuId) {
   state.activeRestaurantMenu = menuId;
+  state.category = "all";
+  state.query = "";
+  state.openItems.clear();
+  state.allergies.clear();
+  searchInput.value = "";
+  tabs.forEach((button) => button.classList.toggle("is-active", button.dataset.category === "all"));
+  syncActiveRestaurantMenuData();
+  applyDesignSettings();
+  renderAllergyChips();
+  showScreen("menu");
+}
+
+function createBlankRestaurantMenu() {
+  const blankCount = restaurantMenus.filter((menu) => menu.id.startsWith("blank-menu-")).length + 1;
+  const blankMenu = normalizeRestaurantMenu({
+    id: `blank-menu-${Date.now()}`,
+    name: `Blank Menu ${blankCount}`,
+    label: "Blank menu",
+    categories: ["Starters", "Mains", "Drinks"],
+    items: [],
+    designSettings: {
+      ...designSettings,
+      heroImage: ""
+    }
+  }, restaurantMenus.length);
+
+  restaurantMenus = [blankMenu, ...restaurantMenus];
+  state.activeRestaurantMenu = blankMenu.id;
+  menuItems = [];
+  designSettings = blankMenu.designSettings;
+  saveRestaurantMenus();
+  applyDesignSettings();
+  renderRestaurantList();
   showScreen("menu");
 }
 
@@ -593,7 +736,7 @@ function renderMenu() {
   if (items.length === 0) {
     const empty = document.createElement("p");
     empty.className = "empty-state";
-    empty.textContent = "No matching dishes.";
+    empty.textContent = menuItems.length ? "No matching dishes." : "No menu items yet.";
     menuGrid.append(empty);
     return;
   }
@@ -819,7 +962,7 @@ function saveDesign(event) {
     aqua: colorAqua.value,
     page: colorPage.value,
     panel: colorPanel.value,
-    heroImage: heroImageUrl.value.trim() || defaultHeroImage
+    heroImage: heroImageUrl.value.trim()
   };
 
   saveDesignSettings();
@@ -1821,6 +1964,7 @@ adminLoginForm.addEventListener("submit", loginAdmin);
 passwordSetupForm.addEventListener("submit", setupInvitedPassword);
 logoutButton.addEventListener("click", logoutAdmin);
 menusLogoutButton.addEventListener("click", logoutAdmin);
+createMenuButton.addEventListener("click", createBlankRestaurantMenu);
 backToMenusButton.addEventListener("click", () => {
   closeDrawer();
   setEditMode(false);

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Menu Matrix</title>
-    <link rel="stylesheet" href="styles.css?v=firebase-sync" />
+    <link rel="stylesheet" href="styles.css?v=blank-menu-create" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -91,6 +91,10 @@
         <button id="menusLogoutButton" class="action-button compact-nav-button" type="button">Log out</button>
       </header>
       <p id="syncStatus" class="sync-status" role="status">Local mode</p>
+      <button id="createMenuButton" class="create-menu-button" type="button">
+        <span aria-hidden="true">+</span>
+        New blank menu
+      </button>
 
       <section id="restaurantList" class="restaurant-list" aria-label="Available restaurant menus"></section>
     </main>
@@ -455,6 +459,6 @@
     <script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore-compat.js"></script>
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <script src="app.js?v=firebase-sync"></script>
+    <script src="app.js?v=blank-menu-create"></script>
   </body>
 </html>

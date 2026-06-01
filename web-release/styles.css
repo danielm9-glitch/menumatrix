@@ -222,6 +222,34 @@ textarea {
   color: var(--tomato);
 }
 
+.create-menu-button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+  min-height: 48px;
+  border: 1px solid rgba(47, 125, 86, 0.28);
+  border-radius: 8px;
+  padding: 0 13px;
+  background: var(--leaf);
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 950;
+  text-align: left;
+  box-shadow: 0 14px 34px rgba(47, 125, 86, 0.16);
+}
+
+.create-menu-button span {
+  display: grid;
+  width: 28px;
+  aspect-ratio: 1;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
 .restaurant-list {
   display: grid;
   gap: 12px;
@@ -242,12 +270,35 @@ textarea {
   box-shadow: 0 14px 34px rgba(25, 33, 29, 0.08);
 }
 
+.restaurant-card.is-active {
+  border-color: rgba(47, 125, 86, 0.45);
+  box-shadow: 0 14px 34px rgba(47, 125, 86, 0.14);
+}
+
 .restaurant-card img {
   width: 82px;
   aspect-ratio: 1;
   border-radius: 8px;
   object-fit: contain;
   background: #f7f1e6;
+}
+
+.restaurant-card-placeholder {
+  display: grid;
+  width: 82px;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: #f4f1ea;
+}
+
+.restaurant-card-placeholder::before {
+  width: 28px;
+  height: 28px;
+  border: 2px solid rgba(102, 113, 107, 0.34);
+  border-radius: 8px;
+  content: "";
 }
 
 .restaurant-card strong,
@@ -764,6 +815,19 @@ h1 {
   height: auto;
   max-height: 150px;
   object-fit: contain;
+}
+
+.logo-hero.is-empty {
+  border: 1px dashed var(--line);
+  background: #f4f1ea;
+}
+
+.logo-hero.is-empty::before {
+  width: 68px;
+  height: 68px;
+  border: 2px solid rgba(102, 113, 107, 0.22);
+  border-radius: 18px;
+  content: "";
 }
 
 .hero::after {

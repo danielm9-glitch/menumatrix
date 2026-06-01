@@ -15,7 +15,8 @@ The app now includes the Firebase web config and can sync menu items and design 
 
 Synced now:
 
-- Menu items
+- Restaurant menu list
+- Menu items per restaurant menu
 - Design settings
 
 Still local until Firebase Auth is fully added:
