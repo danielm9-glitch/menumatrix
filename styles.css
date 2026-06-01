@@ -201,6 +201,27 @@ textarea {
   min-width: 68px;
 }
 
+.sync-status {
+  margin: -8px 0 0;
+  border: 1px solid rgba(47, 125, 86, 0.18);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.62);
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 850;
+}
+
+.sync-status.connected {
+  border-color: rgba(47, 125, 86, 0.28);
+  color: var(--leaf);
+}
+
+.sync-status.error {
+  border-color: rgba(201, 79, 61, 0.26);
+  color: var(--tomato);
+}
+
 .restaurant-list {
   display: grid;
   gap: 12px;

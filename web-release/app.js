@@ -6,6 +6,7 @@ const currentUserKey = "restaurant-menu-matrix-current-user";
 const designStorageKey = "restaurant-menu-matrix-design";
 const authFlowKey = "restaurant-menu-matrix-auth-flow";
 const currentAuthFlow = "login-first-menus";
+const firebaseRestaurantId = "mott32-las-vegas";
 const cloudOcrEndpoint = window.MENU_MATRIX_OCR_ENDPOINT || "";
 const defaultHeroImage = "https://www.nicepng.com/png/detail/809-8099031_mott32-las-vegas-mott-32-logo.png";
 const defaultDesign = {
@@ -125,6 +126,13 @@ const state = {
   activeRestaurantMenu: restaurantMenus[0].id
 };
 
+const cloudSync = {
+  applying: false,
+  ref: null,
+  saveTimer: null,
+  unsubscribe: null
+};
+
 const formatter = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
@@ -158,6 +166,7 @@ const loginLinkButton = document.querySelector("#loginLinkButton");
 const restaurantList = document.querySelector("#restaurantList");
 const menusLogoutButton = document.querySelector("#menusLogoutButton");
 const backToMenusButton = document.querySelector("#backToMenusButton");
+const syncStatus = document.querySelector("#syncStatus");
 const setupPassword = document.querySelector("#setupPassword");
 const setupMessage = document.querySelector("#setupMessage");
 const inviteIntro = document.querySelector("#inviteIntro");
@@ -268,6 +277,7 @@ function normalizeMenuItem(item) {
 function saveMenuItems() {
   localStorage.setItem(storageKey, JSON.stringify(menuItems));
   if (restaurantList) renderRestaurantList();
+  scheduleCloudSave();
 }
 
 function loadDesignSettings() {
@@ -283,6 +293,7 @@ function loadDesignSettings() {
 
 function saveDesignSettings() {
   localStorage.setItem(designStorageKey, JSON.stringify(designSettings));
+  scheduleCloudSave();
 }
 
 function applyDesignSettings() {
@@ -323,6 +334,7 @@ function loadUsers() {
 
 function saveUsers() {
   localStorage.setItem(usersStorageKey, JSON.stringify(users));
+  scheduleCloudSave();
 }
 
 function loadCurrentUser() {
@@ -362,6 +374,141 @@ function canEditCategory(category) {
 
 function canEditAnyCategory() {
   return getEditableCategories().length > 0;
+}
+
+function setSyncStatus(message, tone = "") {
+  if (!syncStatus) return;
+
+  syncStatus.textContent = message;
+  syncStatus.classList.toggle("connected", tone === "connected");
+  syncStatus.classList.toggle("error", tone === "error");
+}
+
+function waitForFirebaseClient() {
+  if (window.menuMatrixFirebase) {
+    return Promise.resolve(window.menuMatrixFirebase);
+  }
+
+  return new Promise((resolve) => {
+    const timeout = window.setTimeout(() => resolve(window.menuMatrixFirebase || null), 5000);
+    window.addEventListener(
+      "menuMatrixFirebaseReady",
+      () => {
+        window.clearTimeout(timeout);
+        resolve(window.menuMatrixFirebase || null);
+      },
+      { once: true }
+    );
+  });
+}
+
+async function initializeCloudSync() {
+  const client = await waitForFirebaseClient();
+
+  if (!client?.enabled || !client.db) {
+    setSyncStatus("Local mode - Firebase not connected", "error");
+    return;
+  }
+
+  setSyncStatus("Connecting to Firebase...");
+  await client.authReady;
+
+  cloudSync.ref = client.db.collection("restaurants").doc(firebaseRestaurantId);
+  cloudSync.unsubscribe = cloudSync.ref.onSnapshot(
+    (snapshot) => {
+      if (!snapshot.exists) {
+        setSyncStatus("Creating Firebase menu copy...");
+        uploadCloudSnapshot("initial");
+        return;
+      }
+
+      applyCloudSnapshot(snapshot.data());
+    },
+    () => {
+      setSyncStatus("Firebase needs Firestore/Auth setup", "error");
+    }
+  );
+}
+
+function applyCloudSnapshot(data) {
+  if (!data) return;
+
+  cloudSync.applying = true;
+
+  try {
+    if (Array.isArray(data.menuItems)) {
+      menuItems = data.menuItems.map(normalizeMenuItem);
+      localStorage.setItem(storageKey, JSON.stringify(menuItems));
+    }
+
+    if (data.designSettings && typeof data.designSettings === "object") {
+      designSettings = { ...defaultDesign, ...data.designSettings };
+      localStorage.setItem(designStorageKey, JSON.stringify(designSettings));
+    }
+
+    setSyncStatus("Synced with Firebase", "connected");
+    applyDesignSettings();
+    renderAdminState();
+    renderAllergyChips();
+    renderMenu();
+  } finally {
+    cloudSync.applying = false;
+  }
+}
+
+function scheduleCloudSave() {
+  if (!cloudSync.ref || cloudSync.applying) return;
+
+  window.clearTimeout(cloudSync.saveTimer);
+  setSyncStatus("Saving to Firebase...");
+  cloudSync.saveTimer = window.setTimeout(() => uploadCloudSnapshot("update"), 600);
+}
+
+async function uploadCloudSnapshot(reason) {
+  if (!cloudSync.ref || cloudSync.applying) return;
+
+  try {
+    await cloudSync.ref.set(
+      {
+        designSettings: sanitizeDesignSettings(designSettings),
+        menuItems: menuItems.map(sanitizeMenuItemForCloud),
+        source: reason,
+        updatedAt: new Date().toISOString()
+      },
+      { merge: true }
+    );
+    setSyncStatus("Synced with Firebase", "connected");
+  } catch {
+    setSyncStatus("Firebase save failed - check rules/Auth", "error");
+  }
+}
+
+function sanitizeMenuItemForCloud(item) {
+  return {
+    id: item.id || `item-${Date.now()}`,
+    name: item.name || "",
+    description: item.description || "",
+    category: categories.includes(item.category) ? item.category : "starters",
+    diet: item.diet || "NA",
+    style: item.style || "",
+    heat: Number(item.heat) || 0,
+    allergens: Array.isArray(item.allergens) ? item.allergens : [],
+    details: item.details || "",
+    image: item.image || "",
+    price: Number(item.price) || 0
+  };
+}
+
+function sanitizeDesignSettings(settings) {
+  return {
+    ink: settings.ink || defaultDesign.ink,
+    leaf: settings.leaf || defaultDesign.leaf,
+    gold: settings.gold || defaultDesign.gold,
+    aqua: settings.aqua || defaultDesign.aqua,
+    page: settings.page || defaultDesign.page,
+    panel: settings.panel || defaultDesign.panel,
+    heroImage: settings.heroImage || defaultHeroImage
+  };
 }
 
 function showScreen(screen) {
@@ -1696,3 +1843,4 @@ applyDesignSettings();
 renderAdminState();
 renderAllergyChips();
 renderMenu();
+initializeCloudSync();
