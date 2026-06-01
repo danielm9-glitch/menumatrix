@@ -122,7 +122,8 @@ const state = {
   editing: false,
   screen: loadCurrentUser() ? "menus" : "login",
   activeRestaurantMenu: initialRestaurantMenu?.id || defaultRestaurantMenuId,
-  dashboardTab: "users"
+  dashboardTab: "users",
+  dashboardReturnScreen: "menus"
 };
 
 const cloudSync = {
@@ -172,6 +173,7 @@ const menusLogoutButton = document.querySelector("#menusLogoutButton");
 const backToMenusButton = document.querySelector("#backToMenusButton");
 const createMenuButton = document.querySelector("#createMenuButton");
 const adminHomeSummary = document.querySelector("#adminHomeSummary");
+const adminHomeDashboardButton = document.querySelector("#adminHomeDashboardButton");
 const adminHomeMetrics = document.querySelector("#adminHomeMetrics");
 const adminHomeHighlights = document.querySelector("#adminHomeHighlights");
 const menusDirectoryKicker = document.querySelector("#menusDirectoryKicker");
@@ -233,6 +235,11 @@ const itemDiet = document.querySelector("#itemDiet");
 const itemHeat = document.querySelector("#itemHeat");
 const itemPrice = document.querySelector("#itemPrice");
 const itemAllergens = document.querySelector("#itemAllergens");
+const saveItemButton = document.querySelector("#saveItemButton");
+const itemUploadPreview = document.querySelector("#itemUploadPreview");
+const itemPreviewImage = document.querySelector("#itemPreviewImage");
+const itemUploadProgress = document.querySelector("#itemUploadProgress");
+const itemUploadStatus = document.querySelector("#itemUploadStatus");
 const scanDialog = document.querySelector("#scanDialog");
 const closeScanButton = document.querySelector("#closeScanButton");
 const scanImageFile = document.querySelector("#scanImageFile");
@@ -267,6 +274,7 @@ const designDialog = document.querySelector("#designDialog");
 const designForm = document.querySelector("#designForm");
 const closeDesignButton = document.querySelector("#closeDesignButton");
 const resetDesignButton = document.querySelector("#resetDesignButton");
+const saveDesignButton = document.querySelector("#saveDesignButton");
 const colorInk = document.querySelector("#colorInk");
 const colorLeaf = document.querySelector("#colorLeaf");
 const colorGold = document.querySelector("#colorGold");
@@ -275,12 +283,18 @@ const colorPage = document.querySelector("#colorPage");
 const colorPanel = document.querySelector("#colorPanel");
 const heroImageUrl = document.querySelector("#heroImageUrl");
 const heroImageFile = document.querySelector("#heroImageFile");
+const heroUploadPreview = document.querySelector("#heroUploadPreview");
+const heroPreviewImage = document.querySelector("#heroPreviewImage");
+const heroUploadProgress = document.querySelector("#heroUploadProgress");
+const heroUploadStatus = document.querySelector("#heroUploadStatus");
 const dashboardTabs = [...document.querySelectorAll(".dashboard-tab")];
 const dashboardPanels = [...document.querySelectorAll(".dashboard-panel")];
 const dashboardAuthSummary = document.querySelector("#dashboardAuthSummary");
 const dashboardPaymentsSummary = document.querySelector("#dashboardPaymentsSummary");
 const dashboardRestaurantList = document.querySelector("#dashboardRestaurantList");
 const dashboardMenuList = document.querySelector("#dashboardMenuList");
+const dashboardCustomizationSummary = document.querySelector("#dashboardCustomizationSummary");
+const dashboardCustomizationButton = document.querySelector("#dashboardCustomizationButton");
 
 function loadMenuItems() {
   if (localStorage.getItem(menuSeedKey) !== currentMenuSeed) {
@@ -337,6 +351,11 @@ function normalizeRestaurantMenu(menu, index = 0) {
   const isDefaultMenu = menu.id === defaultRestaurantMenuId || (!menu.id && index === 0);
   const design = menu.designSettings || (isDefaultMenu ? loadDesignSettings() : { ...defaultDesign, heroImage: "" });
   const items = Array.isArray(menu.items) ? menu.items : isDefaultMenu ? loadMenuItems() : [];
+  const normalizedDesign = normalizeDesignSettings(design);
+
+  if (isDefaultMenu && !normalizedDesign.heroImage) {
+    normalizedDesign.heroImage = defaultHeroImage;
+  }
 
   return {
     id: menu.id || `menu-${Date.now()}-${index}`,
@@ -346,7 +365,7 @@ function normalizeRestaurantMenu(menu, index = 0) {
     categories: Array.isArray(menu.categories) && menu.categories.length ? menu.categories : ["Starters", "Mains", "Drinks"],
     items: items.map(normalizeMenuItem),
     stats: normalizeMenuStats(menu.stats),
-    designSettings: normalizeDesignSettings(design)
+    designSettings: normalizedDesign
   };
 }
 
@@ -458,6 +477,100 @@ function syncDesignForm() {
   colorPage.value = designSettings.page;
   colorPanel.value = designSettings.panel;
   heroImageUrl.value = designSettings.heroImage;
+  heroImageFile.value = "";
+  resetUploadPreview({
+    preview: heroUploadPreview,
+    image: heroPreviewImage,
+    progress: heroUploadProgress,
+    status: heroUploadStatus,
+    imageUrl: designSettings.heroImage,
+    message: designSettings.heroImage ? "Current header image. Choose a file to replace it." : "No header image selected yet."
+  });
+}
+
+function resetUploadPreview({ preview, image, progress, status, imageUrl = "", message = "Select an image to preview it." }) {
+  if (!preview || !image || !progress || !status) return;
+
+  preview.hidden = !imageUrl;
+  progress.value = imageUrl ? 100 : 0;
+  progress.hidden = !imageUrl;
+  status.textContent = message;
+  if (imageUrl) {
+    image.src = imageUrl;
+  } else {
+    image.removeAttribute("src");
+  }
+}
+
+function setUploadProgress({ preview, progress, status, percent, message }) {
+  if (!preview || !progress || !status) return;
+
+  preview.hidden = false;
+  progress.hidden = false;
+  progress.value = Math.max(0, Math.min(100, percent));
+  status.textContent = message;
+}
+
+function setUploadBusy(button, busy) {
+  if (!button) return;
+  button.disabled = busy;
+}
+
+async function prepareUploadedImage(file, { maxWidth = 1200, quality = 0.82, preview, image, progress, status, button }) {
+  if (!file.type.startsWith("image/")) {
+    throw new Error("Choose an image file.");
+  }
+
+  setUploadBusy(button, true);
+  setUploadProgress({ preview, progress, status, percent: 4, message: "Reading image..." });
+
+  try {
+    const originalDataUrl = await readImageFile(file, (percent) => {
+      setUploadProgress({
+        preview,
+        progress,
+        status,
+        percent: Math.round(percent * 0.45),
+        message: "Reading image..."
+      });
+    });
+    setUploadProgress({ preview, progress, status, percent: 56, message: "Preparing preview..." });
+
+    const compressedDataUrl = await compressImageDataUrl(originalDataUrl, { maxWidth, quality });
+    if (image) image.src = compressedDataUrl;
+    setUploadProgress({ preview, progress, status, percent: 100, message: "Ready to save." });
+    return compressedDataUrl;
+  } catch (error) {
+    setUploadProgress({
+      preview,
+      progress,
+      status,
+      percent: 0,
+      message: error?.message || "Could not read that image."
+    });
+    throw error;
+  } finally {
+    setUploadBusy(button, false);
+  }
+}
+
+function compressImageDataUrl(dataUrl, { maxWidth, quality }) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.addEventListener("load", () => {
+      const scale = Math.min(1, maxWidth / image.width);
+      const width = Math.max(1, Math.round(image.width * scale));
+      const height = Math.max(1, Math.round(image.height * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext("2d");
+      context.drawImage(image, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    });
+    image.addEventListener("error", () => reject(new Error("Could not preview that image.")));
+    image.src = dataUrl;
+  });
 }
 
 function loadUsers() {
@@ -1401,6 +1514,14 @@ function openItemDialog(id) {
   itemDetails.value = currentItem.details;
   itemImage.value = currentItem.image;
   itemImageFile.value = "";
+  resetUploadPreview({
+    preview: itemUploadPreview,
+    image: itemPreviewImage,
+    progress: itemUploadProgress,
+    status: itemUploadStatus,
+    imageUrl: currentItem.image,
+    message: currentItem.image ? "Current item photo. Choose a file to replace it." : "No item photo selected yet."
+  });
   itemCategory.value = currentItem.category;
   [...itemCategory.options].forEach((option) => {
     option.disabled = !canEditCategory(option.value);
@@ -1431,6 +1552,7 @@ function openUsersPage() {
   if (!isAdmin()) return;
 
   closeDrawer();
+  state.dashboardReturnScreen = state.screen === "menu" ? "menu" : "menus";
   showScreen("users");
   showDashboardTab(state.dashboardTab || "users");
   renderDashboard();
@@ -1438,7 +1560,7 @@ function openUsersPage() {
 }
 
 function closeUsersPage() {
-  showScreen("menu");
+  showScreen(state.dashboardReturnScreen || "menus");
 }
 
 function showDashboardTab(tabName) {
@@ -1462,6 +1584,7 @@ function renderDashboard() {
 
   renderDashboardAuthSummary();
   renderDashboardPaymentsSummary();
+  renderDashboardCustomizationSummary();
   renderDashboardRestaurants();
   renderDashboardMenus();
 }
@@ -1510,6 +1633,24 @@ function renderDashboardPaymentsSummary() {
     createDashboardMetric("Provider", "None", "Stripe can be added later"),
     createDashboardMetric("Plans", "0", "No subscription plans yet")
   );
+}
+
+function renderDashboardCustomizationSummary() {
+  if (!dashboardCustomizationSummary) return;
+
+  dashboardCustomizationSummary.replaceChildren(
+    createCustomizationSwatch("Accent", designSettings.leaf),
+    createCustomizationSwatch("Price", designSettings.gold),
+    createCustomizationSwatch("Edit", designSettings.aqua),
+    createDashboardMetric("Header image", designSettings.heroImage ? "Set" : "Blank", "Current menu banner")
+  );
+}
+
+function createCustomizationSwatch(label, color) {
+  const card = createDashboardMetric(label, color, "Theme color");
+  card.classList.add("theme-swatch-card");
+  card.style.setProperty("--swatch-color", color);
+  return card;
 }
 
 function renderDashboardRestaurants() {
@@ -1629,6 +1770,8 @@ function saveDesign(event) {
   event.preventDefault();
   if (!isAdmin()) return;
 
+  const activeMenu = getActiveRestaurantMenu();
+  const heroImageValue = heroImageUrl.value.trim() || (activeMenu?.id === defaultRestaurantMenuId ? defaultHeroImage : "");
   designSettings = {
     ...designSettings,
     ink: colorInk.value,
@@ -1637,7 +1780,7 @@ function saveDesign(event) {
     aqua: colorAqua.value,
     page: colorPage.value,
     panel: colorPanel.value,
-    heroImage: heroImageUrl.value.trim()
+    heroImage: heroImageValue
   };
 
   saveDesignSettings();
@@ -1919,7 +2062,7 @@ function renderAdminState() {
   pdfBuilderButton.hidden = !activeUser;
   scanMenuButton.hidden = !canEditAnyCategory();
   manageUsersButton.hidden = !isAdmin();
-  designButton.hidden = !isAdmin();
+  designButton.hidden = true;
   editHeroButton.hidden = !isAdmin();
   loginMessage.textContent = "";
   setupMessage.textContent = "";
@@ -2636,6 +2779,14 @@ function openItemDialogWithDraft(currentItem) {
   itemDetails.value = currentItem.details;
   itemImage.value = currentItem.image;
   itemImageFile.value = "";
+  resetUploadPreview({
+    preview: itemUploadPreview,
+    image: itemPreviewImage,
+    progress: itemUploadProgress,
+    status: itemUploadStatus,
+    imageUrl: currentItem.image,
+    message: currentItem.image ? "Current item photo. Choose a file to replace it." : "No item photo selected yet."
+  });
   itemCategory.value = currentItem.category;
   [...itemCategory.options].forEach((option) => {
     option.disabled = !canEditCategory(option.value);
@@ -2648,9 +2799,13 @@ function openItemDialogWithDraft(currentItem) {
   itemDialog.showModal();
 }
 
-function readImageFile(file) {
+function readImageFile(file, onProgress = null) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
+    reader.addEventListener("progress", (event) => {
+      if (!onProgress || !event.lengthComputable) return;
+      onProgress(Math.round((event.loaded / event.total) * 100));
+    });
     reader.addEventListener("load", () => resolve(reader.result));
     reader.addEventListener("error", () => reject(reader.error));
     reader.readAsDataURL(file);
@@ -2660,20 +2815,37 @@ function readImageFile(file) {
 async function updateItemImageFromFile(event) {
   const file = event.target.files?.[0];
   if (!file) return;
-  itemImage.value = await readImageFile(file);
+  try {
+    itemImage.value = await prepareUploadedImage(file, {
+      maxWidth: 900,
+      quality: 0.82,
+      preview: itemUploadPreview,
+      image: itemPreviewImage,
+      progress: itemUploadProgress,
+      status: itemUploadStatus,
+      button: saveItemButton
+    });
+  } catch {
+    itemImage.value = "";
+  }
 }
 
 async function updateHeroImageFromFile(event) {
   const file = event.target.files?.[0];
   if (!file || !isAdmin()) return;
-  const dataUrl = await readImageFile(file);
-  heroImageUrl.value = dataUrl;
-  designSettings = {
-    ...designSettings,
-    heroImage: dataUrl
-  };
-  saveDesignSettings();
-  applyDesignSettings();
+  try {
+    heroImageUrl.value = await prepareUploadedImage(file, {
+      maxWidth: 1100,
+      quality: 0.84,
+      preview: heroUploadPreview,
+      image: heroPreviewImage,
+      progress: heroUploadProgress,
+      status: heroUploadStatus,
+      button: saveDesignButton
+    });
+  } catch {
+    heroImageUrl.value = designSettings.heroImage;
+  }
 }
 
 function getStyleForItem(category, heat) {
@@ -2794,6 +2966,8 @@ dashboardTabs.forEach((tab) => {
 });
 manageUsersButton.addEventListener("click", openUsersPage);
 designButton.addEventListener("click", openDesignDialog);
+adminHomeDashboardButton.addEventListener("click", openUsersPage);
+dashboardCustomizationButton.addEventListener("click", openDesignDialog);
 editHeroButton.addEventListener("click", openDesignDialog);
 renameMenuButton.addEventListener("click", openRenameMenuDialog);
 closeRenameMenuButton.addEventListener("click", closeRenameMenuDialog);

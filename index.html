@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Menu Matrix</title>
-    <link rel="stylesheet" href="styles.css?v=admin-home" />
+    <link rel="stylesheet" href="styles.css?v=customization-upload" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -94,9 +94,12 @@
 
       <div class="menus-home-layout">
         <section id="adminHomeSummary" class="admin-home-summary" aria-label="Admin dashboard summary" hidden>
-          <div class="section-heading">
-            <p class="kicker">Admin dashboard</p>
-            <h2>Quick summary</h2>
+          <div class="section-heading with-action">
+            <div>
+              <p class="kicker">Admin dashboard</p>
+              <h2>Quick summary</h2>
+            </div>
+            <button id="adminHomeDashboardButton" class="action-button compact-action-button" type="button">Open dashboard</button>
           </div>
           <div id="adminHomeMetrics" class="admin-home-metrics"></div>
           <div id="adminHomeHighlights" class="admin-home-highlights"></div>
@@ -205,7 +208,7 @@
         <button id="scanMenuButton" class="action-button" type="button" hidden>Scan menu photo</button>
         <button id="pdfBuilderButton" class="action-button" type="button" hidden>Create PDF</button>
         <button id="manageUsersButton" class="action-button" type="button" hidden>Admin Dashboard</button>
-        <button id="designButton" class="action-button" type="button" hidden>Color Scheme</button>
+        <button id="designButton" class="action-button" type="button" hidden>Customization</button>
         <button id="logoutButton" class="danger-button" type="button">Log out</button>
       </section>
     </aside>
@@ -225,6 +228,7 @@
         <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="payments">Payments</button>
         <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="restaurants">Restaurants</button>
         <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="menus">Menus</button>
+        <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="customization">Customization</button>
       </nav>
 
       <section class="dashboard-panel" data-dashboard-panel="users">
@@ -309,6 +313,21 @@
         </div>
         <div id="dashboardMenuList" class="dashboard-list"></div>
       </section>
+
+      <section class="dashboard-panel" data-dashboard-panel="customization" hidden>
+        <div class="section-heading">
+          <p class="kicker">App appearance</p>
+          <strong>Customization</strong>
+        </div>
+        <div id="dashboardCustomizationSummary" class="dashboard-metric-grid"></div>
+        <section class="customization-card">
+          <div>
+            <p class="kicker">Theme editor</p>
+            <h2>Colors and header image</h2>
+          </div>
+          <button id="dashboardCustomizationButton" class="save-button" type="button">Open customization</button>
+        </section>
+      </section>
     </main>
 
     <main id="pdfPage" class="app-shell users-page" aria-label="Create PDF" hidden>
@@ -379,6 +398,13 @@
           Upload photo
           <input id="itemImageFile" type="file" accept="image/*" />
         </label>
+        <div id="itemUploadPreview" class="upload-preview" hidden>
+          <img id="itemPreviewImage" alt="" />
+          <div>
+            <progress id="itemUploadProgress" max="100" value="0"></progress>
+            <p id="itemUploadStatus" class="upload-status">Select an image to preview it.</p>
+          </div>
+        </div>
         <div class="form-grid">
           <label>
             Category
@@ -415,7 +441,7 @@
 
         <div class="form-actions">
           <button id="deleteItemButton" class="danger-button" type="button">Delete</button>
-          <button class="save-button" type="submit">Save item</button>
+          <button id="saveItemButton" class="save-button" type="submit">Save item</button>
         </div>
       </form>
     </dialog>
@@ -460,8 +486,8 @@
       <form id="designForm" method="dialog" class="item-form">
         <div class="dialog-head">
           <div>
-            <p class="kicker">Admin design</p>
-            <h2 id="designTitle">Color Scheme</h2>
+            <p class="kicker">Admin customization</p>
+            <h2 id="designTitle">Customization</h2>
           </div>
           <button class="icon-button" type="button" aria-label="Close design editor" id="closeDesignButton">x</button>
         </div>
@@ -501,10 +527,17 @@
           Upload header image
           <input id="heroImageFile" type="file" accept="image/*" />
         </label>
+        <div id="heroUploadPreview" class="upload-preview" hidden>
+          <img id="heroPreviewImage" alt="" />
+          <div>
+            <progress id="heroUploadProgress" max="100" value="0"></progress>
+            <p id="heroUploadStatus" class="upload-status">Select an image to preview it.</p>
+          </div>
+        </div>
 
         <div class="form-actions">
           <button id="resetDesignButton" class="danger-button" type="button">Reset</button>
-          <button class="save-button" type="submit">Save design</button>
+          <button id="saveDesignButton" class="save-button" type="submit">Save customization</button>
         </div>
       </form>
     </dialog>
@@ -603,6 +636,6 @@
     <script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore-compat.js"></script>
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <script src="app.js?v=admin-home"></script>
+    <script src="app.js?v=customization-upload"></script>
   </body>
 </html>
