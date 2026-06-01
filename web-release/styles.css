@@ -1415,22 +1415,223 @@ h1 {
 
 @media (min-width: 720px) {
   body {
-    display: grid;
-    place-items: center;
-    padding: 24px;
+    padding: 0;
+  }
+
+  .app-shell,
+  .auth-page {
+    width: 100%;
+    min-height: 100vh;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
   }
 
   .app-shell {
-    min-height: 812px;
-    border: 10px solid #1c201e;
-    border-radius: 34px;
-    box-shadow: 0 28px 80px rgba(25, 33, 29, 0.26);
+    max-width: 1180px;
+    padding: 28px clamp(24px, 5vw, 64px) 42px;
+    background: transparent;
   }
 
   .auth-page {
-    min-height: 812px;
-    border: 10px solid #1c201e;
-    border-radius: 34px;
-    box-shadow: 0 28px 80px rgba(25, 33, 29, 0.26);
+    max-width: none;
+    padding: 32px;
+  }
+
+  .auth-panel {
+    width: min(100%, 360px);
+  }
+
+  .restaurant-list {
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  }
+
+  .restaurant-card {
+    min-height: 130px;
+    grid-template-columns: 96px minmax(0, 1fr);
+    padding: 12px;
+  }
+
+  .restaurant-card img,
+  .restaurant-card-placeholder {
+    width: 96px;
+  }
+
+  .menus-top-bar h1,
+  .page-top-bar h1,
+  h1 {
+    font-size: 2.65rem;
+  }
+
+  .compact-brand-title h1 {
+    font-size: 1.85rem;
+  }
+
+  .admin-drawer {
+    width: min(420px, 92vw);
+    padding: 22px;
+  }
+
+  .item-dialog {
+    width: min(calc(100% - 36px), 560px);
+  }
+
+  .form-grid,
+  .color-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 980px) {
+  #menuPage {
+    display: grid;
+    grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+    gap: 18px 24px;
+    align-content: start;
+  }
+
+  #menuPage .top-bar {
+    grid-column: 1 / -1;
+    padding-bottom: 6px;
+  }
+
+  #menuPage .hero,
+  #menuPage .menu-title-panel,
+  #menuPage .controls,
+  #menuPage .allergy-panel {
+    grid-column: 1;
+  }
+
+  #menuPage .matrix-card {
+    grid-column: 2;
+    grid-row: 2 / span 5;
+    align-self: start;
+  }
+
+  .hero,
+  .logo-hero {
+    min-height: 232px;
+  }
+
+  .hero img {
+    height: 260px;
+  }
+
+  .logo-hero img {
+    width: min(72%, 320px);
+    max-height: 190px;
+  }
+
+  .menu-title-panel {
+    margin-top: 0;
+    padding: 14px;
+  }
+
+  .menu-title-panel h2 {
+    font-size: 1.55rem;
+    white-space: normal;
+  }
+
+  .controls {
+    margin: 0;
+  }
+
+  .tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .allergy-panel {
+    margin-bottom: 0;
+  }
+
+  .matrix-header {
+    display: grid;
+    grid-template-columns: minmax(320px, 1fr) 76px 86px 96px;
+    gap: 12px;
+    padding: 12px 14px;
+    background: #f5f1e8;
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-weight: 950;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .menu-row {
+    grid-template-columns: minmax(320px, 1fr) 76px 86px 96px;
+    gap: 12px;
+    min-height: 84px;
+    padding: 14px;
+    align-items: start;
+  }
+
+  .item-cell {
+    grid-column: 1;
+  }
+
+  .diet-pill {
+    grid-column: 2;
+  }
+
+  .heat-meter {
+    grid-column: 3;
+    min-height: 36px;
+    display: grid;
+    align-items: center;
+  }
+
+  .price-button {
+    grid-column: 4;
+  }
+
+  .item-cell h3 {
+    font-size: 1.02rem;
+  }
+
+  .item-cell p {
+    font-size: 0.8rem;
+  }
+
+  .item-details {
+    grid-column: 1 / -1;
+    grid-template-columns: 128px minmax(0, 1fr);
+    padding-top: 12px;
+  }
+
+  .item-details img {
+    width: 128px;
+  }
+
+  .users-page {
+    max-width: 980px;
+    grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+    gap: 18px 22px;
+  }
+
+  .users-page .page-top-bar {
+    grid-column: 1 / -1;
+  }
+
+  .pdf-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .pdf-actions .save-button {
+    grid-column: auto;
+  }
+
+  .pdf-category-items {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding-left: 0;
+  }
+}
+
+@media (min-width: 1280px) {
+  .app-shell {
+    max-width: 1320px;
+  }
+
+  #menuPage {
+    grid-template-columns: 360px minmax(0, 1fr);
   }
 }
