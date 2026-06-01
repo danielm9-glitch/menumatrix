@@ -3,7 +3,8 @@ const firebaseConfig = {
   projectId: "menumatrix-36116"
 };
 
-const restaurantDocumentPath = "restaurants/mott32-las-vegas";
+const menuDocumentPath = "menus/main";
+const legacyRestaurantDocumentPath = "restaurants/mott32-las-vegas";
 
 const defaultHeroImage = "https://www.nicepng.com/png/detail/809-8099031_mott32-las-vegas-mott-32-logo.png";
 const defaultDesign = {
@@ -158,8 +159,8 @@ async function getAnonymousIdToken() {
   return result.idToken;
 }
 
-async function getCurrentDocument(idToken) {
-  const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/${restaurantDocumentPath}`;
+async function getCurrentDocument(idToken, documentPath) {
+  const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/${documentPath}`;
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${idToken}` }
   });
@@ -198,7 +199,7 @@ function getMenusForSync(existingDocument) {
   return defaultMenus;
 }
 
-async function patchRestaurantDocument(idToken, menus) {
+async function patchMenuDocument(idToken, menus) {
   const fields = {
     menus: toFirestoreValue(menus),
     source: toFirestoreValue("manual-codex-sync"),
@@ -209,7 +210,7 @@ async function patchRestaurantDocument(idToken, menus) {
   const params = new URLSearchParams();
   Object.keys(fields).forEach((field) => params.append("updateMask.fieldPaths", field));
 
-  const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/${restaurantDocumentPath}?${params}`;
+  const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/${menuDocumentPath}?${params}`;
   return requestJson(url, {
     method: "PATCH",
     headers: {
@@ -222,10 +223,15 @@ async function patchRestaurantDocument(idToken, menus) {
 
 async function main() {
   const idToken = await getAnonymousIdToken();
-  const existingDocument = await getCurrentDocument(idToken);
-  const menus = getMenusForSync(existingDocument);
-  await patchRestaurantDocument(idToken, menus);
-  console.log(`Synced ${menus.length} menu(s) to Firestore document ${restaurantDocumentPath}.`);
+  const existingDocument = await getCurrentDocument(idToken, menuDocumentPath);
+  const legacyDocument = existingDocument ? null : await getCurrentDocument(idToken, legacyRestaurantDocumentPath);
+  const migratedFromLegacy = !existingDocument && Boolean(legacyDocument);
+  const menus = getMenusForSync(existingDocument || legacyDocument);
+  await patchMenuDocument(idToken, menus);
+  console.log(
+    `Synced ${menus.length} menu(s) to Firestore document ${menuDocumentPath}.` +
+      (migratedFromLegacy ? ` Migrated data from ${legacyRestaurantDocumentPath}.` : "")
+  );
 }
 
 main().catch((error) => {

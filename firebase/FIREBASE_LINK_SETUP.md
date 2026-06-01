@@ -19,6 +19,10 @@ Synced now:
 - Menu items per restaurant menu
 - Design settings
 
+Firestore document used by the app:
+
+- `menus/main`
+
 Still local until Firebase Auth is fully added:
 
 - App users

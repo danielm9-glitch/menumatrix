@@ -7,7 +7,7 @@ const designStorageKey = "restaurant-menu-matrix-design";
 const menusStorageKey = "restaurant-menu-matrix-restaurant-menus";
 const authFlowKey = "restaurant-menu-matrix-auth-flow";
 const currentAuthFlow = "login-first-menus";
-const firebaseRestaurantId = "mott32-las-vegas";
+const firebaseMenuDocumentId = "main";
 const cloudOcrEndpoint = window.MENU_MATRIX_OCR_ENDPOINT || "";
 const defaultHeroImage = "https://www.nicepng.com/png/detail/809-8099031_mott32-las-vegas-mott-32-logo.png";
 const defaultDesign = {
@@ -504,7 +504,7 @@ async function initializeCloudSync() {
   setSyncStatus("Connecting to Firebase...");
   await client.authReady;
 
-  cloudSync.ref = client.db.collection("restaurants").doc(firebaseRestaurantId);
+  cloudSync.ref = client.db.collection("menus").doc(firebaseMenuDocumentId);
   cloudSync.unsubscribe = cloudSync.ref.onSnapshot(
     (snapshot) => {
       if (!snapshot.exists) {
