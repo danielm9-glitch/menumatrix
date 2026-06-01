@@ -593,6 +593,9 @@ function getAuthErrorMessage(error) {
   if (code === "auth/email-already-in-use") return "That email is already registered. Log in instead.";
   if (code === "auth/invalid-email") return "Enter a valid email address.";
   if (code === "auth/weak-password") return "Use at least 6 characters for the password.";
+  if (code === "auth/unauthorized-continue-uri") {
+    return "Firebase needs this domain added under Authentication > Settings > Authorized domains.";
+  }
   if (code === "auth/wrong-password" || code === "auth/user-not-found" || code === "auth/invalid-credential") {
     return "Invalid login.";
   }
@@ -601,6 +604,23 @@ function getAuthErrorMessage(error) {
   }
   if (code === "auth/network-request-failed") return "Network error. Try again in a moment.";
   return error?.message || "Authentication failed.";
+}
+
+function getVerificationActionSettings() {
+  return {
+    url: `${window.location.origin}${window.location.pathname}`
+  };
+}
+
+async function sendVerificationEmail(firebaseUser) {
+  try {
+    await firebaseUser.sendEmailVerification(getVerificationActionSettings());
+    return "current-domain";
+  } catch (error) {
+    if (error?.code !== "auth/unauthorized-continue-uri") throw error;
+    await firebaseUser.sendEmailVerification();
+    return "firebase-default";
+  }
 }
 
 async function initializeCloudSync() {
@@ -1684,10 +1704,11 @@ async function loginWithFirebaseAccount(identity, password) {
     await credential.user.reload();
 
     if (!credential.user.emailVerified) {
-      await credential.user.sendEmailVerification({
-        url: `${window.location.origin}${window.location.pathname}`
-      });
-      loginMessage.textContent = "Verify your email first. I sent the verification email again.";
+      const verificationMode = await sendVerificationEmail(credential.user);
+      loginMessage.textContent =
+        verificationMode === "firebase-default"
+          ? "Verify your email first. I resent it using Firebase's default link because this domain is not allowlisted yet."
+          : "Verify your email first. I sent the verification email again.";
       await auth.signOut();
       await restoreAnonymousAuth();
       return true;
@@ -1805,9 +1826,6 @@ async function registerAccount(event) {
 
     const credential = await auth.createUserWithEmailAndPassword(email, password);
     await credential.user.updateProfile({ displayName: username });
-    await credential.user.sendEmailVerification({
-      url: `${window.location.origin}${window.location.pathname}`
-    });
 
     const user = {
       username,
@@ -1821,10 +1839,14 @@ async function registerAccount(event) {
 
     users.push(user);
     saveUsers();
+    const verificationMode = await sendVerificationEmail(credential.user);
     await auth.signOut();
     await restoreAnonymousAuth();
     selfRegisterForm.reset();
-    registerMessage.textContent = "Verification email sent. Open it, then log in.";
+    registerMessage.textContent =
+      verificationMode === "firebase-default"
+        ? "Verification email sent with Firebase's default link. Add your domain in Firebase Auth settings when you can."
+        : "Verification email sent. Open it, then log in.";
     return;
   } catch (error) {
     registerMessage.textContent = getAuthErrorMessage(error);
