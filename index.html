@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Menu Matrix</title>
-    <link rel="stylesheet" href="styles.css?v=blank-menu-create" />
+    <link rel="stylesheet" href="styles.css?v=rename-menu-title" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -117,6 +117,16 @@
       <section class="hero logo-hero" aria-label="Mott 32 logo">
         <img id="heroImage" src="https://www.nicepng.com/png/detail/809-8099031_mott32-las-vegas-mott-32-logo.png" alt="Mott 32 restaurant logo" />
         <button id="editHeroButton" class="floating-edit-button" type="button" hidden>Edit image</button>
+      </section>
+
+      <section class="menu-title-panel" aria-label="Current restaurant menu">
+        <div>
+          <p class="kicker">Restaurant menu</p>
+          <h2 id="currentMenuTitle">Mott 32 Las Vegas</h2>
+        </div>
+        <button id="renameMenuButton" class="small-icon-action" type="button" aria-label="Rename menu" hidden>
+          <span aria-hidden="true">&#9998;</span>
+        </button>
       </section>
 
       <section class="controls" aria-label="Menu filters">
@@ -428,6 +438,27 @@
       </form>
     </dialog>
 
+    <dialog id="renameMenuDialog" class="item-dialog" aria-labelledby="renameMenuTitle">
+      <form id="renameMenuForm" method="dialog" class="item-form">
+        <div class="dialog-head">
+          <div>
+            <p class="kicker">Menu editor</p>
+            <h2 id="renameMenuTitle">Rename menu</h2>
+          </div>
+          <button class="icon-button" type="button" aria-label="Close rename menu" id="closeRenameMenuButton">x</button>
+        </div>
+
+        <label>
+          Menu name
+          <input id="menuNameInput" required />
+        </label>
+
+        <div class="form-actions single-action">
+          <button class="save-button" type="submit">Save name</button>
+        </div>
+      </form>
+    </dialog>
+
     <template id="menuRowTemplate">
       <article class="menu-row">
         <div class="item-cell">
@@ -459,6 +490,6 @@
     <script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore-compat.js"></script>
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <script src="app.js?v=blank-menu-create"></script>
+    <script src="app.js?v=rename-menu-title"></script>
   </body>
 </html>

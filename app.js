@@ -230,6 +230,12 @@ const clearScanButton = document.querySelector("#clearScanButton");
 const createScannedItemButton = document.querySelector("#createScannedItemButton");
 const heroImage = document.querySelector("#heroImage");
 const editHeroButton = document.querySelector("#editHeroButton");
+const currentMenuTitle = document.querySelector("#currentMenuTitle");
+const renameMenuButton = document.querySelector("#renameMenuButton");
+const renameMenuDialog = document.querySelector("#renameMenuDialog");
+const renameMenuForm = document.querySelector("#renameMenuForm");
+const closeRenameMenuButton = document.querySelector("#closeRenameMenuButton");
+const menuNameInput = document.querySelector("#menuNameInput");
 const designDialog = document.querySelector("#designDialog");
 const designForm = document.querySelector("#designForm");
 const closeDesignButton = document.querySelector("#closeDesignButton");
@@ -671,6 +677,12 @@ function renderRestaurantList() {
   });
 }
 
+function renderActiveMenuHeader() {
+  const activeMenu = getActiveRestaurantMenu();
+  currentMenuTitle.textContent = activeMenu?.name || "Menu";
+  renameMenuButton.hidden = !state.editing || !canEditAnyCategory() || !activeMenu;
+}
+
 function openRestaurantMenu(menuId) {
   state.activeRestaurantMenu = menuId;
   state.category = "all";
@@ -683,6 +695,38 @@ function openRestaurantMenu(menuId) {
   applyDesignSettings();
   renderAllergyChips();
   showScreen("menu");
+}
+
+function openRenameMenuDialog() {
+  const activeMenu = getActiveRestaurantMenu();
+  if (!activeMenu || !state.editing || !canEditAnyCategory()) return;
+
+  menuNameInput.value = activeMenu.name;
+  renameMenuDialog.showModal();
+  menuNameInput.focus();
+  menuNameInput.select();
+}
+
+function closeRenameMenuDialog() {
+  renameMenuDialog.close();
+  renameMenuForm.reset();
+}
+
+function saveMenuName(event) {
+  event.preventDefault();
+
+  const activeMenu = getActiveRestaurantMenu();
+  const name = menuNameInput.value.trim();
+  if (!activeMenu || !name || !state.editing || !canEditAnyCategory()) return;
+
+  activeMenu.name = name;
+  if (activeMenu.label === "Blank menu") {
+    activeMenu.label = "Menu training";
+  }
+  saveRestaurantMenus();
+  renderActiveMenuHeader();
+  renderRestaurantList();
+  closeRenameMenuDialog();
 }
 
 function createBlankRestaurantMenu() {
@@ -838,6 +882,7 @@ function setEditMode(isEditing) {
   editModeButton.textContent = isEditing ? "Done" : "Edit";
   editModeButton.classList.toggle("is-active", isEditing);
   addItemButton.hidden = !isEditing || !canEditAnyCategory();
+  renderActiveMenuHeader();
   renderMenu();
 }
 
@@ -1266,6 +1311,7 @@ function renderAdminState() {
   }
 
   renderRestaurantList();
+  renderActiveMenuHeader();
   renderUserList();
   renderMenu();
 }
@@ -1956,6 +2002,9 @@ methodTabs.forEach((tab) => {
 manageUsersButton.addEventListener("click", openUsersPage);
 designButton.addEventListener("click", openDesignDialog);
 editHeroButton.addEventListener("click", openDesignDialog);
+renameMenuButton.addEventListener("click", openRenameMenuDialog);
+closeRenameMenuButton.addEventListener("click", closeRenameMenuDialog);
+renameMenuForm.addEventListener("submit", saveMenuName);
 backToMenuButton.addEventListener("click", closeUsersPage);
 drawerOpenButton.addEventListener("click", openDrawer);
 drawerCloseButton.addEventListener("click", closeDrawer);
