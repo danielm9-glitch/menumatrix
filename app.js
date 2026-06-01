@@ -10,6 +10,7 @@ const currentAuthFlow = "login-first-menus";
 const firebaseMenuDocumentId = "main";
 const primaryAdminUsername = "admin";
 const cloudOcrEndpoint = window.MENU_MATRIX_OCR_ENDPOINT || "";
+const menuFullnessTarget = 12;
 const defaultHeroImage = "https://www.nicepng.com/png/detail/809-8099031_mott32-las-vegas-mott-32-logo.png";
 const defaultDesign = {
   ink: "#19211d",
@@ -170,6 +171,11 @@ const restaurantList = document.querySelector("#restaurantList");
 const menusLogoutButton = document.querySelector("#menusLogoutButton");
 const backToMenusButton = document.querySelector("#backToMenusButton");
 const createMenuButton = document.querySelector("#createMenuButton");
+const adminHomeSummary = document.querySelector("#adminHomeSummary");
+const adminHomeMetrics = document.querySelector("#adminHomeMetrics");
+const adminHomeHighlights = document.querySelector("#adminHomeHighlights");
+const menusDirectoryKicker = document.querySelector("#menusDirectoryKicker");
+const menusDirectoryTitle = document.querySelector("#menusDirectoryTitle");
 const syncStatus = document.querySelector("#syncStatus");
 const setupPassword = document.querySelector("#setupPassword");
 const setupMessage = document.querySelector("#setupMessage");
@@ -339,7 +345,15 @@ function normalizeRestaurantMenu(menu, index = 0) {
     label: menu.label || (isDefaultMenu ? "Chinese menu training" : "Blank menu"),
     categories: Array.isArray(menu.categories) && menu.categories.length ? menu.categories : ["Starters", "Mains", "Drinks"],
     items: items.map(normalizeMenuItem),
+    stats: normalizeMenuStats(menu.stats),
     designSettings: normalizeDesignSettings(design)
+  };
+}
+
+function normalizeMenuStats(stats = {}) {
+  return {
+    clicks: Math.max(0, Number(stats.clicks) || 0),
+    lastOpenedAt: typeof stats.lastOpenedAt === "string" ? stats.lastOpenedAt : ""
   };
 }
 
@@ -524,6 +538,48 @@ function getVisibleRestaurantMenus() {
     const owner = getMenuOwner(menu);
     return owner === user.username || (user.role === "editor" && owner === primaryAdminUsername);
   });
+}
+
+function getMenuStats(menu) {
+  return normalizeMenuStats(menu?.stats);
+}
+
+function getMenuFullnessScore(menu) {
+  const items = Array.isArray(menu?.items) ? menu.items : [];
+  const usedCategories = new Set(items.map((item) => item.category).filter(Boolean));
+  return items.length * 10 + usedCategories.size * 3;
+}
+
+function getMenuFullnessPercent(menu) {
+  const items = Array.isArray(menu?.items) ? menu.items : [];
+  const usedCategories = new Set(items.map((item) => item.category).filter(Boolean));
+  const itemProgress = Math.min(1, items.length / menuFullnessTarget);
+  const categoryProgress = categories.length ? Math.min(1, usedCategories.size / categories.length) : 0;
+  return Math.round((itemProgress * 0.8 + categoryProgress * 0.2) * 100);
+}
+
+function getSortedRestaurantMenus(menus) {
+  if (!isAdmin()) return menus;
+
+  return [...menus].sort((a, b) => {
+    const clickDifference = getMenuStats(b).clicks - getMenuStats(a).clicks;
+    if (clickDifference) return clickDifference;
+
+    const fullnessDifference = getMenuFullnessScore(b) - getMenuFullnessScore(a);
+    if (fullnessDifference) return fullnessDifference;
+
+    return a.name.localeCompare(b.name);
+  });
+}
+
+function recordMenuOpen(menuId) {
+  const menu = restaurantMenus.find((candidate) => candidate.id === menuId);
+  if (!menu) return;
+
+  menu.stats = normalizeMenuStats(menu.stats);
+  menu.stats.clicks += 1;
+  menu.stats.lastOpenedAt = new Date().toISOString();
+  saveRestaurantMenus();
 }
 
 function ownsMenu(menu) {
@@ -777,6 +833,7 @@ function sanitizeRestaurantMenuForStorage(menu) {
     label: menu.label || "Menu training",
     categories: Array.isArray(menu.categories) && menu.categories.length ? menu.categories : ["Starters", "Mains", "Drinks"],
     items: Array.isArray(menu.items) ? menu.items.map(sanitizeMenuItemForCloud) : [],
+    stats: normalizeMenuStats(menu.stats),
     designSettings: sanitizeDesignSettings(menu.designSettings || defaultDesign)
   };
 }
@@ -825,7 +882,7 @@ function normalizeScreen(activeUser, invitedUser) {
 function renderRestaurantList() {
   restaurantList.replaceChildren();
 
-  const visibleMenus = getVisibleRestaurantMenus();
+  const visibleMenus = getSortedRestaurantMenus(getVisibleRestaurantMenus());
 
   if (!visibleMenus.length) {
     const empty = document.createElement("p");
@@ -852,15 +909,100 @@ function renderRestaurantList() {
     }
 
     const info = document.createElement("span");
+    info.className = "restaurant-card-copy";
     const name = document.createElement("strong");
     const details = document.createElement("span");
     name.textContent = menu.name;
     details.textContent = `${menu.label} - ${menu.items.length} items`;
     info.append(name, details);
 
+    if (isAdmin()) {
+      const stats = document.createElement("span");
+      stats.className = "restaurant-card-stats";
+      stats.textContent = `${getMenuStats(menu).clicks} clicks - ${getMenuFullnessPercent(menu)}% full`;
+      info.append(stats);
+    }
+
     button.append(image, info);
     restaurantList.append(button);
   });
+}
+
+function renderAdminHomeSummary() {
+  const showAdminHome = isAdmin();
+  menusPage.classList.toggle("is-admin-home", showAdminHome);
+  adminHomeSummary.hidden = !showAdminHome;
+  menusDirectoryKicker.textContent = showAdminHome ? "Sorted by activity" : "Restaurants";
+  menusDirectoryTitle.textContent = showAdminHome ? "Menus by clicks and fullness" : "Menus";
+
+  if (!showAdminHome) {
+    adminHomeMetrics.replaceChildren();
+    adminHomeHighlights.replaceChildren();
+    return;
+  }
+
+  const menus = restaurantMenus;
+  const sortedByClicks = getSortedRestaurantMenus(menus);
+  const sortedByFullness = [...menus].sort((a, b) => {
+    const fullnessDifference = getMenuFullnessScore(b) - getMenuFullnessScore(a);
+    if (fullnessDifference) return fullnessDifference;
+    return getMenuStats(b).clicks - getMenuStats(a).clicks;
+  });
+  const totalItems = menus.reduce((sum, menu) => sum + menu.items.length, 0);
+  const totalClicks = menus.reduce((sum, menu) => sum + getMenuStats(menu).clicks, 0);
+  const activeAccounts = users.filter((user) => user.status !== "pending").length;
+
+  adminHomeMetrics.replaceChildren(
+    createDashboardMetric("Menus", String(menus.length), "Created restaurants"),
+    createDashboardMetric("Items", String(totalItems), "Across every menu"),
+    createDashboardMetric("Clicks", String(totalClicks), "Menu opens tracked"),
+    createDashboardMetric("Users", String(activeAccounts), "Active accounts")
+  );
+
+  adminHomeHighlights.replaceChildren(
+    createAdminHomeHighlight({
+      label: "Most clicked",
+      menu: sortedByClicks[0],
+      badge: sortedByClicks[0] ? `${getMenuStats(sortedByClicks[0]).clicks} clicks` : "",
+      emptyText: "No menus have been clicked yet."
+    }),
+    createAdminHomeHighlight({
+      label: "Fullest menu",
+      menu: sortedByFullness[0],
+      badge: sortedByFullness[0] ? `${getMenuFullnessPercent(sortedByFullness[0])}% full` : "",
+      emptyText: "No menus have items yet."
+    })
+  );
+}
+
+function createAdminHomeHighlight({ label, menu, badge, emptyText }) {
+  if (!menu) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state restaurant-empty";
+    empty.textContent = emptyText;
+    return empty;
+  }
+
+  const button = document.createElement("button");
+  button.className = "admin-home-highlight";
+  button.type = "button";
+  button.addEventListener("click", () => openRestaurantMenu(menu.id));
+
+  const copy = document.createElement("span");
+  const labelElement = document.createElement("small");
+  const titleElement = document.createElement("strong");
+  const metaElement = document.createElement("span");
+  labelElement.textContent = label;
+  titleElement.textContent = menu.name;
+  metaElement.textContent = `${menu.items.length} items - Owner: ${getMenuOwner(menu)}`;
+  copy.append(labelElement, titleElement, metaElement);
+
+  const badgeElement = document.createElement("span");
+  badgeElement.className = "dashboard-badge";
+  badgeElement.textContent = badge;
+
+  button.append(copy, badgeElement);
+  return button;
 }
 
 function renderActiveMenuHeader() {
@@ -873,6 +1015,7 @@ function renderActiveMenuHeader() {
 function openRestaurantMenu(menuId) {
   if (!getVisibleRestaurantMenus().some((menu) => menu.id === menuId)) return;
 
+  recordMenuOpen(menuId);
   state.activeRestaurantMenu = menuId;
   state.category = "all";
   state.query = "";
@@ -1077,6 +1220,7 @@ function createBlankRestaurantMenu() {
     label: "Blank menu",
     categories: ["Starters", "Mains", "Drinks"],
     items: [],
+    stats: normalizeMenuStats(),
     designSettings: {
       ...designSettings,
       heroImage: ""
@@ -1801,6 +1945,7 @@ function renderAdminState() {
   }
 
   renderRestaurantList();
+  renderAdminHomeSummary();
   renderActiveMenuHeader();
   renderDashboard();
   renderUserList();

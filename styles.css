@@ -250,6 +250,85 @@ textarea {
   line-height: 1;
 }
 
+.menus-home-layout,
+.menus-directory,
+.admin-home-summary {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.menus-directory-head {
+  display: grid;
+  gap: 10px;
+  align-items: center;
+}
+
+.menus-directory-head h2,
+.admin-home-summary h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  letter-spacing: 0;
+}
+
+.admin-home-summary {
+  border: 1px solid rgba(47, 125, 86, 0.18);
+  border-radius: 8px;
+  padding: 12px;
+  background: color-mix(in srgb, var(--white) 82%, var(--panel-bg));
+  box-shadow: 0 14px 34px rgba(25, 33, 29, 0.07);
+}
+
+.admin-home-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-home-highlights {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-home-highlight {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 11px;
+  background: var(--white);
+  color: var(--ink);
+  text-align: left;
+}
+
+.admin-home-highlight span,
+.admin-home-highlight strong,
+.admin-home-highlight small {
+  display: block;
+}
+
+.admin-home-highlight small {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.admin-home-highlight strong {
+  margin-top: 3px;
+  font-size: 0.95rem;
+}
+
+.admin-home-highlight span span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
 .restaurant-list {
   display: grid;
   gap: 12px;
@@ -316,6 +395,18 @@ textarea {
   font-size: 0.78rem;
   font-weight: 800;
   line-height: 1.35;
+}
+
+.restaurant-card .restaurant-card-stats {
+  display: inline-block;
+  width: fit-content;
+  margin-top: 8px;
+  border-radius: 999px;
+  padding: 5px 8px;
+  background: #edf5ef;
+  color: var(--leaf);
+  font-size: 0.7rem;
+  font-weight: 950;
 }
 
 .page-top-bar {
@@ -1590,6 +1681,14 @@ h1 {
     width: min(100%, 360px);
   }
 
+  .menus-directory-head {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .menus-directory-head .create-menu-button {
+    width: 190px;
+  }
+
   .restaurant-list {
     grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   }
@@ -1635,6 +1734,21 @@ h1 {
 }
 
 @media (min-width: 980px) {
+  .menus-page.is-admin-home {
+    max-width: 1240px;
+  }
+
+  .menus-page.is-admin-home .menus-home-layout {
+    grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+  }
+
+  .menus-page.is-admin-home .admin-home-summary {
+    position: sticky;
+    top: 28px;
+  }
+
   #menuPage {
     display: grid;
     grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);

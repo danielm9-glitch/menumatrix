@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Menu Matrix</title>
-    <link rel="stylesheet" href="styles.css?v=admin-dashboard" />
+    <link rel="stylesheet" href="styles.css?v=admin-home" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -91,12 +91,32 @@
         <button id="menusLogoutButton" class="action-button compact-nav-button" type="button">Log out</button>
       </header>
       <p id="syncStatus" class="sync-status" role="status">Local mode</p>
-      <button id="createMenuButton" class="create-menu-button" type="button">
-        <span aria-hidden="true">+</span>
-        New blank menu
-      </button>
 
-      <section id="restaurantList" class="restaurant-list" aria-label="Available restaurant menus"></section>
+      <div class="menus-home-layout">
+        <section id="adminHomeSummary" class="admin-home-summary" aria-label="Admin dashboard summary" hidden>
+          <div class="section-heading">
+            <p class="kicker">Admin dashboard</p>
+            <h2>Quick summary</h2>
+          </div>
+          <div id="adminHomeMetrics" class="admin-home-metrics"></div>
+          <div id="adminHomeHighlights" class="admin-home-highlights"></div>
+        </section>
+
+        <section class="menus-directory" aria-label="Available restaurant menus">
+          <div class="menus-directory-head">
+            <div>
+              <p id="menusDirectoryKicker" class="kicker">Restaurants</p>
+              <h2 id="menusDirectoryTitle">Menus</h2>
+            </div>
+            <button id="createMenuButton" class="create-menu-button" type="button">
+              <span aria-hidden="true">+</span>
+              New blank menu
+            </button>
+          </div>
+
+          <section id="restaurantList" class="restaurant-list" aria-label="Available restaurant menus"></section>
+        </section>
+      </div>
     </main>
 
     <main id="menuPage" class="app-shell" aria-label="Restaurant menu matrix app" hidden>
@@ -583,6 +603,6 @@
     <script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore-compat.js"></script>
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <script src="app.js?v=admin-dashboard"></script>
+    <script src="app.js?v=admin-home"></script>
   </body>
 </html>
