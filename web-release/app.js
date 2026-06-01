@@ -125,6 +125,8 @@ const state = {
 
 const cloudSync = {
   applying: false,
+  client: null,
+  docId: "",
   ref: null,
   saveTimer: null,
   unsubscribe: null
@@ -284,8 +286,8 @@ function loadMenuItems() {
   }
 }
 
-function loadRestaurantMenus() {
-  const savedMenus = localStorage.getItem(menusStorageKey);
+function loadRestaurantMenus(user = null) {
+  const savedMenus = localStorage.getItem(getRestaurantMenusStorageKey(user));
 
   if (savedMenus) {
     try {
@@ -298,8 +300,10 @@ function loadRestaurantMenus() {
     }
   }
 
+  if (isOwnerWorkspace(user)) return [];
+
   const defaultMenu = createDefaultRestaurantMenu();
-  localStorage.setItem(menusStorageKey, JSON.stringify([sanitizeRestaurantMenuForStorage(defaultMenu)]));
+  localStorage.setItem(getRestaurantMenusStorageKey(user), JSON.stringify([sanitizeRestaurantMenuForStorage(defaultMenu)]));
   return [defaultMenu];
 }
 
@@ -402,7 +406,7 @@ function persistActiveRestaurantMenuData() {
 }
 
 function saveRestaurantMenus({ sync = true } = {}) {
-  localStorage.setItem(menusStorageKey, JSON.stringify(restaurantMenus.map(sanitizeRestaurantMenuForStorage)));
+  localStorage.setItem(getRestaurantMenusStorageKey(), JSON.stringify(restaurantMenus.map(sanitizeRestaurantMenuForStorage)));
   if (sync) scheduleCloudSave();
 }
 
@@ -483,6 +487,26 @@ function getMenuOwner(menu) {
   return menu?.owner || primaryAdminUsername;
 }
 
+function getWorkspaceOwner(user = getActiveUser()) {
+  if (!user) return primaryAdminUsername;
+  return user.role === "owner" ? user.username : primaryAdminUsername;
+}
+
+function getWorkspaceDocumentId(user = getActiveUser()) {
+  const owner = getWorkspaceOwner(user);
+  if (owner === primaryAdminUsername) return firebaseMenuDocumentId;
+  return `user-${owner.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "menu"}`;
+}
+
+function getRestaurantMenusStorageKey(user = getActiveUser()) {
+  const docId = getWorkspaceDocumentId(user);
+  return docId === firebaseMenuDocumentId ? menusStorageKey : `${menusStorageKey}-${docId}`;
+}
+
+function isOwnerWorkspace(user = getActiveUser()) {
+  return Boolean(user && user.role === "owner");
+}
+
 function getVisibleRestaurantMenus() {
   const user = getActiveUser();
   if (!user) return [];
@@ -544,6 +568,41 @@ function waitForFirebaseClient() {
   });
 }
 
+async function getFirebaseAuth() {
+  const client = await waitForFirebaseClient();
+  if (!client?.enabled || !client.auth) return null;
+  await client.authReady;
+  return client.auth;
+}
+
+async function restoreAnonymousAuth() {
+  const client = await waitForFirebaseClient();
+  if (!client?.enabled || !client.auth) return;
+
+  try {
+    if (!client.auth.currentUser) {
+      await client.auth.signInAnonymously();
+    }
+  } catch {
+    // The UI already reports Firebase connection issues through sync status.
+  }
+}
+
+function getAuthErrorMessage(error) {
+  const code = error?.code || "";
+  if (code === "auth/email-already-in-use") return "That email is already registered. Log in instead.";
+  if (code === "auth/invalid-email") return "Enter a valid email address.";
+  if (code === "auth/weak-password") return "Use at least 6 characters for the password.";
+  if (code === "auth/wrong-password" || code === "auth/user-not-found" || code === "auth/invalid-credential") {
+    return "Invalid login.";
+  }
+  if (code === "auth/operation-not-allowed") {
+    return "Enable Email/Password sign-in in Firebase Authentication first.";
+  }
+  if (code === "auth/network-request-failed") return "Network error. Try again in a moment.";
+  return error?.message || "Authentication failed.";
+}
+
 async function initializeCloudSync() {
   const client = await waitForFirebaseClient();
 
@@ -554,13 +613,35 @@ async function initializeCloudSync() {
 
   setSyncStatus("Connecting to Firebase...");
   await client.authReady;
+  cloudSync.client = client;
+  connectCloudWorkspaceForCurrentUser();
+}
 
-  cloudSync.ref = client.db.collection("menus").doc(firebaseMenuDocumentId);
+function connectCloudWorkspaceForCurrentUser() {
+  const client = cloudSync.client;
+  if (!client?.db) return;
+
+  const nextDocId = getWorkspaceDocumentId();
+  if (cloudSync.docId === nextDocId && cloudSync.ref) return;
+
+  if (cloudSync.unsubscribe) {
+    cloudSync.unsubscribe();
+    cloudSync.unsubscribe = null;
+  }
+
+  cloudSync.docId = nextDocId;
+  cloudSync.ref = client.db.collection("menus").doc(nextDocId);
+  setSyncStatus("Connecting to Firebase...");
   cloudSync.unsubscribe = cloudSync.ref.onSnapshot(
     (snapshot) => {
       if (!snapshot.exists) {
-        setSyncStatus("Creating Firebase menu copy...");
-        uploadCloudSnapshot("initial");
+        if (restaurantMenus.length) {
+          setSyncStatus("Creating Firebase menu copy...");
+          uploadCloudSnapshot("initial");
+        } else {
+          setSyncStatus("Synced with Firebase", "connected");
+          renderAdminState();
+        }
         return;
       }
 
@@ -578,17 +659,26 @@ function applyCloudSnapshot(data) {
   cloudSync.applying = true;
 
   try {
+    const workspaceOwner = getWorkspaceOwner();
     if (Array.isArray(data.menus) && data.menus.length) {
-      restaurantMenus = data.menus.map(normalizeRestaurantMenu);
+      restaurantMenus = data.menus.map((menu, index) =>
+        normalizeRestaurantMenu({ ...menu, owner: menu.owner || workspaceOwner }, index)
+      );
       const visibleMenus = getVisibleRestaurantMenus();
       if (!visibleMenus.some((menu) => menu.id === state.activeRestaurantMenu)) {
         state.activeRestaurantMenu = visibleMenus[0]?.id || "";
       }
       saveRestaurantMenus({ sync: false });
       syncActiveRestaurantMenuData();
+    } else if (isOwnerWorkspace()) {
+      restaurantMenus = [];
+      state.activeRestaurantMenu = "";
+      saveRestaurantMenus({ sync: false });
+      syncActiveRestaurantMenuData();
     } else {
       const legacyMenu = normalizeRestaurantMenu({
         ...createDefaultRestaurantMenu(),
+        owner: workspaceOwner,
         items: Array.isArray(data.menuItems) ? data.menuItems : defaultMenuItems,
         designSettings: data.designSettings && typeof data.designSettings === "object" ? data.designSettings : defaultDesign
       });
@@ -1542,7 +1632,83 @@ function renderAdminState() {
   renderMenu();
 }
 
-function loginAdmin(event) {
+function getUsernameFromEmail(email) {
+  return email.split("@")[0].replace(/[^a-z0-9_-]+/gi, "-").replace(/^-|-$/g, "") || `user-${Date.now()}`;
+}
+
+function upsertFirebaseOwner(firebaseUser, fallbackUsername = "") {
+  const email = (firebaseUser.email || "").toLowerCase();
+  const existingIndex = users.findIndex((user) => {
+    return user.firebaseUid === firebaseUser.uid || (user.email || "").toLowerCase() === email;
+  });
+  const username =
+    existingIndex >= 0
+      ? users[existingIndex].username
+      : firebaseUser.displayName || fallbackUsername || getUsernameFromEmail(email);
+  const nextUser = {
+    ...(existingIndex >= 0 ? users[existingIndex] : {}),
+    username,
+    email,
+    password: "",
+    role: existingIndex >= 0 && users[existingIndex].role !== "owner" ? users[existingIndex].role : "owner",
+    permissions: existingIndex >= 0 && users[existingIndex].permissions?.length ? users[existingIndex].permissions : [...categories],
+    status: "active",
+    firebaseUid: firebaseUser.uid
+  };
+
+  if (existingIndex >= 0) {
+    users[existingIndex] = nextUser;
+  } else {
+    users.push(nextUser);
+  }
+
+  saveUsers();
+  return nextUser;
+}
+
+async function loginWithFirebaseAccount(identity, password) {
+  const auth = await getFirebaseAuth();
+  if (!auth) {
+    loginMessage.textContent = "Firebase Auth is not connected.";
+    return false;
+  }
+
+  const existingUser = users.find((user) => {
+    return user.username.toLowerCase() === identity || (user.email || "").toLowerCase() === identity;
+  });
+  const email = identity.includes("@") ? identity : existingUser?.email || "";
+  if (!email) return false;
+
+  try {
+    const credential = await auth.signInWithEmailAndPassword(email, password);
+    await credential.user.reload();
+
+    if (!credential.user.emailVerified) {
+      await credential.user.sendEmailVerification({
+        url: `${window.location.origin}${window.location.pathname}`
+      });
+      loginMessage.textContent = "Verify your email first. I sent the verification email again.";
+      await auth.signOut();
+      await restoreAnonymousAuth();
+      return true;
+    }
+
+    const user = upsertFirebaseOwner(credential.user, existingUser?.username || getUsernameFromEmail(email));
+    state.currentUser = user.username;
+    state.screen = "menus";
+    localStorage.setItem(currentUserKey, user.username);
+    activateWorkspaceForCurrentUser();
+    adminLoginForm.reset();
+    renderAdminState();
+    return true;
+  } catch (error) {
+    loginMessage.textContent = getAuthErrorMessage(error);
+    await restoreAnonymousAuth();
+    return true;
+  }
+}
+
+async function loginAdmin(event) {
   event.preventDefault();
 
   const identity = adminUsername.value.trim().toLowerCase();
@@ -1550,18 +1716,27 @@ function loginAdmin(event) {
   const user = users.find((savedUser) => {
     const username = savedUser.username.toLowerCase();
     const email = (savedUser.email || "").toLowerCase();
-    return (username === identity || email === identity) && savedUser.password === password && savedUser.status !== "pending";
+    return (
+      savedUser.role !== "owner" &&
+      (username === identity || email === identity) &&
+      savedUser.password === password &&
+      savedUser.status !== "pending"
+    );
   });
 
   if (!user) {
-    loginMessage.textContent = "Invalid login.";
+    loginMessage.textContent = "Checking Firebase account...";
+    const handledByFirebase = await loginWithFirebaseAccount(identity, password);
+    if (!handledByFirebase) {
+      loginMessage.textContent = "Invalid login.";
+    }
     return;
   }
 
   state.currentUser = user.username;
   state.screen = "menus";
   localStorage.setItem(currentUserKey, user.username);
-  resetMenuViewForCurrentUser();
+  activateWorkspaceForCurrentUser();
   adminLoginForm.reset();
   renderAdminState();
 }
@@ -1582,6 +1757,12 @@ function openLoginPage() {
   adminUsername.focus();
 }
 
+function activateWorkspaceForCurrentUser() {
+  restaurantMenus = loadRestaurantMenus(getActiveUser());
+  resetMenuViewForCurrentUser();
+  connectCloudWorkspaceForCurrentUser();
+}
+
 function resetMenuViewForCurrentUser() {
   const visibleMenus = getVisibleRestaurantMenus();
   state.activeRestaurantMenu = visibleMenus[0]?.id || "";
@@ -1596,7 +1777,7 @@ function resetMenuViewForCurrentUser() {
   renderAllergyChips();
 }
 
-function registerAccount(event) {
+async function registerAccount(event) {
   event.preventDefault();
 
   const username = registerUsername.value.trim();
@@ -1613,23 +1794,43 @@ function registerAccount(event) {
     return;
   }
 
-  const user = {
-    username,
-    email,
-    password,
-    role: "owner",
-    permissions: [...categories],
-    status: "active"
-  };
+  registerMessage.textContent = "Creating account...";
 
-  users.push(user);
-  saveUsers();
-  state.currentUser = user.username;
-  state.screen = "menus";
-  localStorage.setItem(currentUserKey, user.username);
-  resetMenuViewForCurrentUser();
-  selfRegisterForm.reset();
-  renderAdminState();
+  try {
+    const auth = await getFirebaseAuth();
+    if (!auth) {
+      registerMessage.textContent = "Firebase Auth is not connected.";
+      return;
+    }
+
+    const credential = await auth.createUserWithEmailAndPassword(email, password);
+    await credential.user.updateProfile({ displayName: username });
+    await credential.user.sendEmailVerification({
+      url: `${window.location.origin}${window.location.pathname}`
+    });
+
+    const user = {
+      username,
+      email,
+      password: "",
+      role: "owner",
+      permissions: [...categories],
+      status: "unverified",
+      firebaseUid: credential.user.uid
+    };
+
+    users.push(user);
+    saveUsers();
+    await auth.signOut();
+    await restoreAnonymousAuth();
+    selfRegisterForm.reset();
+    registerMessage.textContent = "Verification email sent. Open it, then log in.";
+    return;
+  } catch (error) {
+    registerMessage.textContent = getAuthErrorMessage(error);
+    await restoreAnonymousAuth();
+    return;
+  }
 }
 
 function setupInvitedPassword(event) {
@@ -1652,16 +1853,21 @@ function setupInvitedPassword(event) {
   state.currentUser = users[userIndex].username;
   state.screen = "menus";
   localStorage.setItem(currentUserKey, users[userIndex].username);
-  resetMenuViewForCurrentUser();
+  activateWorkspaceForCurrentUser();
   passwordSetupForm.reset();
   window.history.replaceState({}, "", window.location.pathname);
   renderAdminState();
 }
 
-function logoutAdmin() {
+async function logoutAdmin() {
   state.currentUser = null;
   state.screen = "login";
   localStorage.removeItem(currentUserKey);
+  const auth = await getFirebaseAuth();
+  if (auth?.currentUser && !auth.currentUser.isAnonymous) {
+    await auth.signOut();
+    await restoreAnonymousAuth();
+  }
   closeDrawer();
   setEditMode(false);
   adminLoginForm.reset();
@@ -1683,7 +1889,9 @@ function renderUserList() {
     const name = document.createElement("strong");
     const access = document.createElement("span");
     name.textContent = user.username;
-    access.textContent = `${getPrivilegeLabel(user)}${user.status === "pending" ? " - invite pending" : ""}`;
+    const statusNote =
+      user.status === "pending" ? " - invite pending" : user.status === "unverified" ? " - email unverified" : "";
+    access.textContent = `${getPrivilegeLabel(user)}${statusNote}`;
     info.append(name, access);
     summary.append(info);
 
@@ -2289,8 +2497,12 @@ closeDialogButton.addEventListener("click", closeItemDialog);
 deleteItemButton.addEventListener("click", deleteItem);
 itemForm.addEventListener("submit", saveItem);
 
-applyDesignSettings();
-renderAdminState();
-renderAllergyChips();
-renderMenu();
+if (getActiveUser()) {
+  activateWorkspaceForCurrentUser();
+} else {
+  applyDesignSettings();
+  renderAdminState();
+  renderAllergyChips();
+  renderMenu();
+}
 initializeCloudSync();

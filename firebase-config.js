@@ -23,10 +23,12 @@ try {
     : window.firebase.initializeApp(firebaseConfig);
   const auth = window.firebase.auth();
   const db = window.firebase.firestore();
-  const authReady = auth.signInAnonymously().catch((error) => {
-    window.menuMatrixFirebase.error = error;
-    return null;
-  });
+  const authReady = auth.currentUser
+    ? Promise.resolve(auth.currentUser)
+    : auth.signInAnonymously().catch((error) => {
+        window.menuMatrixFirebase.error = error;
+        return null;
+      });
 
   window.menuMatrixFirebase = {
     app,
