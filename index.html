@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Menu Matrix</title>
-    <link rel="stylesheet" href="styles.css?v=rename-menu-title" />
+    <link rel="stylesheet" href="styles.css?v=delete-menu-confirm" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -175,6 +175,7 @@
         <p id="adminStatus" class="admin-status">Signed in</p>
         <button id="editModeButton" class="action-button" type="button">Edit menu</button>
         <button id="addItemButton" class="action-button add-button" type="button" hidden>Add item</button>
+        <button id="deleteMenuButton" class="danger-button delete-menu-button" type="button" hidden>Delete Menu</button>
         <button id="scanMenuButton" class="action-button" type="button" hidden>Scan menu photo</button>
         <button id="pdfBuilderButton" class="action-button" type="button" hidden>Create PDF</button>
         <button id="manageUsersButton" class="action-button" type="button" hidden>Manage Users</button>
@@ -459,6 +460,48 @@
       </form>
     </dialog>
 
+    <dialog id="deleteMenuDialog" class="item-dialog danger-dialog" aria-labelledby="deleteMenuTitle">
+      <form class="item-form" method="dialog">
+        <div class="dialog-head">
+          <div>
+            <p class="kicker">Menu editor</p>
+            <h2 id="deleteMenuTitle">Delete Menu</h2>
+          </div>
+          <button class="icon-button" type="button" aria-label="Close delete menu" id="closeDeleteMenuButton">x</button>
+        </div>
+
+        <p class="delete-menu-copy">
+          Delete <strong id="deleteMenuName">this menu</strong> from the menu list?
+        </p>
+
+        <div id="deleteMenuQuestion" class="delete-confirm-step">
+          <p id="deleteMenuWarning" class="delete-menu-warning">This cannot be undone.</p>
+          <div class="form-actions">
+            <button id="cancelDeleteMenuButton" class="action-button" type="button">No</button>
+            <button id="continueDeleteMenuButton" class="danger-button" type="button">Yes</button>
+          </div>
+        </div>
+
+        <div id="deleteMenuSlideStep" class="delete-slide-step" hidden>
+          <p class="delete-menu-warning">Grab and slide all the way across to verify Yes.</p>
+          <div
+            id="deleteMenuSlider"
+            class="confirm-slider"
+            role="slider"
+            aria-label="Slide to confirm menu delete"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow="0"
+            tabindex="0"
+          >
+            <span id="deleteMenuSliderText" class="confirm-slider-text">Slide to delete</span>
+            <span id="deleteMenuSliderThumb" class="confirm-slider-thumb" aria-hidden="true">Grab</span>
+          </div>
+          <p id="deleteMenuMessage" class="login-message" role="status"></p>
+        </div>
+      </form>
+    </dialog>
+
     <template id="menuRowTemplate">
       <article class="menu-row">
         <div class="item-cell">
@@ -490,6 +533,6 @@
     <script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore-compat.js"></script>
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <script src="app.js?v=rename-menu-title"></script>
+    <script src="app.js?v=delete-menu-confirm"></script>
   </body>
 </html>

@@ -1326,6 +1326,93 @@ h1 {
   color: var(--tomato);
 }
 
+.delete-menu-button {
+  border: 1px solid rgba(191, 74, 50, 0.22);
+}
+
+.danger-button:disabled {
+  opacity: 0.48;
+}
+
+.danger-dialog .item-form {
+  gap: 14px;
+}
+
+.delete-menu-copy {
+  margin-bottom: 0;
+  color: var(--ink);
+  font-size: 0.94rem;
+  line-height: 1.4;
+}
+
+.delete-menu-copy strong {
+  color: var(--tomato);
+}
+
+.delete-menu-warning {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.delete-confirm-step,
+.delete-slide-step {
+  display: grid;
+  gap: 12px;
+}
+
+.confirm-slider {
+  --confirm-progress: 0%;
+  position: relative;
+  min-height: 58px;
+  overflow: hidden;
+  border: 1px solid rgba(191, 74, 50, 0.24);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgba(191, 74, 50, 0.18) var(--confirm-progress), transparent var(--confirm-progress)),
+    #fff7f4;
+  color: var(--tomato);
+  touch-action: none;
+  user-select: none;
+}
+
+.confirm-slider:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(191, 74, 50, 0.18);
+}
+
+.confirm-slider-text {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding-left: 74px;
+  padding-right: 16px;
+  color: rgba(191, 74, 50, 0.78);
+  font-size: 0.82rem;
+  font-weight: 950;
+  text-align: center;
+}
+
+.confirm-slider-thumb {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  z-index: 1;
+  display: grid;
+  width: 64px;
+  height: 46px;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--tomato);
+  color: white;
+  font-size: 0.76rem;
+  font-weight: 950;
+  box-shadow: 0 10px 24px rgba(191, 74, 50, 0.24);
+}
+
 @media (min-width: 720px) {
   body {
     display: grid;

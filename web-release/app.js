@@ -129,6 +129,9 @@ const cloudSync = {
   unsubscribe: null
 };
 
+let deleteSliderDragging = false;
+let deleteSliderProgress = 0;
+
 const formatter = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
@@ -172,6 +175,7 @@ const adminStatus = document.querySelector("#adminStatus");
 const editModeButton = document.querySelector("#editModeButton");
 const pdfBuilderButton = document.querySelector("#pdfBuilderButton");
 const addItemButton = document.querySelector("#addItemButton");
+const deleteMenuButton = document.querySelector("#deleteMenuButton");
 const scanMenuButton = document.querySelector("#scanMenuButton");
 const manageUsersButton = document.querySelector("#manageUsersButton");
 const designButton = document.querySelector("#designButton");
@@ -236,6 +240,18 @@ const renameMenuDialog = document.querySelector("#renameMenuDialog");
 const renameMenuForm = document.querySelector("#renameMenuForm");
 const closeRenameMenuButton = document.querySelector("#closeRenameMenuButton");
 const menuNameInput = document.querySelector("#menuNameInput");
+const deleteMenuDialog = document.querySelector("#deleteMenuDialog");
+const closeDeleteMenuButton = document.querySelector("#closeDeleteMenuButton");
+const cancelDeleteMenuButton = document.querySelector("#cancelDeleteMenuButton");
+const continueDeleteMenuButton = document.querySelector("#continueDeleteMenuButton");
+const deleteMenuName = document.querySelector("#deleteMenuName");
+const deleteMenuQuestion = document.querySelector("#deleteMenuQuestion");
+const deleteMenuWarning = document.querySelector("#deleteMenuWarning");
+const deleteMenuSlideStep = document.querySelector("#deleteMenuSlideStep");
+const deleteMenuSlider = document.querySelector("#deleteMenuSlider");
+const deleteMenuSliderThumb = document.querySelector("#deleteMenuSliderThumb");
+const deleteMenuSliderText = document.querySelector("#deleteMenuSliderText");
+const deleteMenuMessage = document.querySelector("#deleteMenuMessage");
 const designDialog = document.querySelector("#designDialog");
 const designForm = document.querySelector("#designForm");
 const closeDesignButton = document.querySelector("#closeDesignButton");
@@ -729,6 +745,153 @@ function saveMenuName(event) {
   closeRenameMenuDialog();
 }
 
+function canDeleteActiveMenu() {
+  return state.editing && isAdmin() && Boolean(getActiveRestaurantMenu());
+}
+
+function updateDeleteMenuButton() {
+  deleteMenuButton.hidden = !canDeleteActiveMenu();
+}
+
+function resetDeleteMenuSlider() {
+  deleteSliderDragging = false;
+  setDeleteMenuSliderProgress(0);
+  deleteMenuMessage.textContent = "";
+}
+
+function setDeleteMenuSliderProgress(value) {
+  deleteSliderProgress = Math.max(0, Math.min(100, value));
+  const maxOffset = Math.max(0, deleteMenuSlider.clientWidth - deleteMenuSliderThumb.offsetWidth - 10);
+
+  deleteMenuSlider.style.setProperty("--confirm-progress", `${deleteSliderProgress}%`);
+  deleteMenuSlider.setAttribute("aria-valuenow", String(Math.round(deleteSliderProgress)));
+  deleteMenuSliderThumb.style.transform = `translateX(${(maxOffset * deleteSliderProgress) / 100}px)`;
+  deleteMenuSliderThumb.textContent = deleteSliderProgress >= 92 ? "Release" : "Grab";
+  deleteMenuSliderText.textContent = deleteSliderProgress >= 92 ? "Release to delete" : "Slide to delete";
+}
+
+function getDeleteMenuSliderValue(event) {
+  const rect = deleteMenuSlider.getBoundingClientRect();
+  const position = Math.max(0, Math.min(event.clientX - rect.left, rect.width));
+  return (position / rect.width) * 100;
+}
+
+function openDeleteMenuDialog() {
+  const activeMenu = getActiveRestaurantMenu();
+  if (!canDeleteActiveMenu() || !activeMenu) return;
+
+  deleteMenuName.textContent = activeMenu.name;
+  deleteMenuQuestion.hidden = false;
+  deleteMenuSlideStep.hidden = true;
+  continueDeleteMenuButton.disabled = restaurantMenus.length <= 1;
+  deleteMenuWarning.textContent =
+    restaurantMenus.length <= 1 ? "Create another menu before deleting this one." : "";
+  resetDeleteMenuSlider();
+  if (restaurantMenus.length > 1) {
+    deleteMenuWarning.textContent = "This cannot be undone.";
+  }
+  deleteMenuDialog.showModal();
+}
+
+function closeDeleteMenuDialog() {
+  deleteMenuDialog.close();
+  deleteMenuQuestion.hidden = false;
+  deleteMenuSlideStep.hidden = true;
+  resetDeleteMenuSlider();
+}
+
+function showDeleteMenuSlider() {
+  if (restaurantMenus.length <= 1) {
+    deleteMenuWarning.textContent = "Create another menu before deleting this one.";
+    return;
+  }
+
+  deleteMenuQuestion.hidden = true;
+  deleteMenuSlideStep.hidden = false;
+  resetDeleteMenuSlider();
+  window.requestAnimationFrame(() => deleteMenuSlider.focus());
+}
+
+function deleteActiveRestaurantMenu() {
+  const activeMenu = getActiveRestaurantMenu();
+  if (!activeMenu || restaurantMenus.length <= 1 || deleteSliderProgress < 92) return;
+
+  restaurantMenus = restaurantMenus.filter((menu) => menu.id !== activeMenu.id);
+  state.activeRestaurantMenu = restaurantMenus[0].id;
+  state.category = "all";
+  state.query = "";
+  state.openItems.clear();
+  state.allergies.clear();
+  searchInput.value = "";
+  tabs.forEach((button) => button.classList.toggle("is-active", button.dataset.category === "all"));
+  state.editing = false;
+
+  syncActiveRestaurantMenuData();
+  saveRestaurantMenus();
+  closeDeleteMenuDialog();
+  closeDrawer();
+  applyDesignSettings();
+  renderAllergyChips();
+  showScreen("menus");
+}
+
+function handleDeleteSliderPointerDown(event) {
+  if (deleteMenuSlideStep.hidden) return;
+
+  deleteSliderDragging = true;
+  deleteMenuSlider.setPointerCapture?.(event.pointerId);
+  setDeleteMenuSliderProgress(getDeleteMenuSliderValue(event));
+}
+
+function handleDeleteSliderPointerMove(event) {
+  if (!deleteSliderDragging) return;
+
+  setDeleteMenuSliderProgress(getDeleteMenuSliderValue(event));
+}
+
+function handleDeleteSliderPointerUp(event) {
+  if (!deleteSliderDragging) return;
+
+  deleteSliderDragging = false;
+  setDeleteMenuSliderProgress(getDeleteMenuSliderValue(event));
+
+  if (deleteSliderProgress >= 92) {
+    deleteActiveRestaurantMenu();
+    return;
+  }
+
+  setDeleteMenuSliderProgress(0);
+}
+
+function handleDeleteSliderKeydown(event) {
+  if (deleteMenuSlideStep.hidden) return;
+
+  if (event.key === "ArrowRight" || event.key === "ArrowUp") {
+    event.preventDefault();
+    setDeleteMenuSliderProgress(deleteSliderProgress + 10);
+  }
+
+  if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
+    event.preventDefault();
+    setDeleteMenuSliderProgress(deleteSliderProgress - 10);
+  }
+
+  if (event.key === "Home") {
+    event.preventDefault();
+    setDeleteMenuSliderProgress(0);
+  }
+
+  if (event.key === "End") {
+    event.preventDefault();
+    setDeleteMenuSliderProgress(100);
+  }
+
+  if ((event.key === "Enter" || event.key === " ") && deleteSliderProgress >= 92) {
+    event.preventDefault();
+    deleteActiveRestaurantMenu();
+  }
+}
+
 function createBlankRestaurantMenu() {
   const blankCount = restaurantMenus.filter((menu) => menu.id.startsWith("blank-menu-")).length + 1;
   const blankMenu = normalizeRestaurantMenu({
@@ -882,6 +1045,7 @@ function setEditMode(isEditing) {
   editModeButton.textContent = isEditing ? "Done" : "Edit";
   editModeButton.classList.toggle("is-active", isEditing);
   addItemButton.hidden = !isEditing || !canEditAnyCategory();
+  updateDeleteMenuButton();
   renderActiveMenuHeader();
   renderMenu();
 }
@@ -1300,14 +1464,18 @@ function renderAdminState() {
     ? `Signed in as ${activeUser.username}${isAdmin() ? " (admin)" : ""}`
     : "Signed out";
 
+  editModeButton.textContent = state.editing ? "Done" : "Edit menu";
+  editModeButton.classList.toggle("is-active", state.editing);
   editModeButton.hidden = !canEditAnyCategory();
   addItemButton.hidden = !state.editing || !canEditAnyCategory();
+  updateDeleteMenuButton();
 
   if (!activeUser || !canEditAnyCategory()) {
     state.editing = false;
     editModeButton.textContent = "Edit menu";
     editModeButton.classList.remove("is-active");
     addItemButton.hidden = true;
+    updateDeleteMenuButton();
   }
 
   renderRestaurantList();
@@ -1985,6 +2153,18 @@ addItemButton.addEventListener("click", () => {
   openItemDialog();
 });
 
+deleteMenuButton.addEventListener("click", openDeleteMenuDialog);
+closeDeleteMenuButton.addEventListener("click", closeDeleteMenuDialog);
+cancelDeleteMenuButton.addEventListener("click", closeDeleteMenuDialog);
+continueDeleteMenuButton.addEventListener("click", showDeleteMenuSlider);
+deleteMenuSlider.addEventListener("pointerdown", handleDeleteSliderPointerDown);
+deleteMenuSlider.addEventListener("pointermove", handleDeleteSliderPointerMove);
+deleteMenuSlider.addEventListener("pointerup", handleDeleteSliderPointerUp);
+deleteMenuSlider.addEventListener("pointercancel", () => {
+  deleteSliderDragging = false;
+  setDeleteMenuSliderProgress(0);
+});
+deleteMenuSlider.addEventListener("keydown", handleDeleteSliderKeydown);
 scanMenuButton.addEventListener("click", openScanDialog);
 closeScanButton.addEventListener("click", closeScanDialog);
 clearScanButton.addEventListener("click", clearScan);
