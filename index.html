@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Menu Matrix</title>
-    <link rel="stylesheet" href="styles.css?v=user-chip-dashboard" />
+    <link rel="stylesheet" href="styles.css?v=pdf-import-categories" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -167,7 +167,9 @@
       <section id="quickMenuActions" class="quick-menu-actions" aria-label="Menu actions">
         <button id="quickEditModeButton" class="quick-action-button" type="button" hidden>Edit menu</button>
         <button id="quickScanMenuButton" class="quick-action-button" type="button" hidden>Scan menu photo</button>
+        <button id="quickImportPdfButton" class="quick-action-button" type="button" hidden>Import PDF</button>
         <button id="quickPdfBuilderButton" class="quick-action-button" type="button" hidden>Create PDF</button>
+        <button id="quickCategoryButton" class="quick-action-button" type="button" hidden>Categories</button>
       </section>
 
       <section class="controls" aria-label="Menu filters">
@@ -175,11 +177,8 @@
           <span>Search</span>
           <input id="searchInput" type="search" placeholder="ramen, salad, vegan..." autocomplete="off" />
         </label>
-        <div class="tabs" role="tablist" aria-label="Menu categories">
+        <div id="categoryTabs" class="tabs" role="tablist" aria-label="Menu categories">
           <button class="tab is-active" type="button" data-category="all">All</button>
-          <button class="tab" type="button" data-category="starters">Start</button>
-          <button class="tab" type="button" data-category="mains">Mains</button>
-          <button class="tab" type="button" data-category="drinks">Drinks</button>
         </div>
       </section>
 
@@ -218,7 +217,9 @@
         <button id="addItemButton" class="action-button add-button" type="button" hidden>Add item</button>
         <button id="deleteMenuButton" class="danger-button delete-menu-button" type="button" hidden>Delete Menu</button>
         <button id="scanMenuButton" class="action-button" type="button" hidden>Scan menu photo</button>
+        <button id="importPdfButton" class="action-button" type="button" hidden>Import PDF</button>
         <button id="pdfBuilderButton" class="action-button" type="button" hidden>Create PDF</button>
+        <button id="categoryManagerButton" class="action-button" type="button" hidden>Categories</button>
         <button id="manageUsersButton" class="action-button" type="button" hidden>Dashboard</button>
         <button id="designButton" class="action-button" type="button" hidden>Customization</button>
         <button id="logoutButton" class="danger-button" type="button">Log out</button>
@@ -501,8 +502,6 @@
             Category
             <select id="itemCategory">
               <option value="starters">Starters</option>
-              <option value="mains">Mains</option>
-              <option value="drinks">Drinks</option>
             </select>
           </label>
           <label>
@@ -561,8 +560,6 @@
           Category
           <select id="scanCategory">
             <option value="starters">Starters</option>
-            <option value="mains">Mains</option>
-            <option value="drinks">Drinks</option>
           </select>
         </label>
         <p id="scanMessage" class="login-message" role="status"></p>
@@ -570,6 +567,69 @@
           <button class="danger-button" type="button" id="clearScanButton">Clear</button>
           <button class="save-button" type="button" id="createScannedItemButton">Create draft</button>
         </div>
+      </form>
+    </dialog>
+
+    <dialog id="pdfImportDialog" class="item-dialog" aria-labelledby="pdfImportTitle">
+      <form class="item-form" method="dialog">
+        <div class="dialog-head">
+          <div>
+            <p class="kicker">Bulk add</p>
+            <h2 id="pdfImportTitle">Import PDF menu</h2>
+          </div>
+          <button class="icon-button" type="button" aria-label="Close PDF importer" id="closePdfImportButton">x</button>
+        </div>
+
+        <label>
+          PDF file
+          <input id="pdfImportFile" type="file" accept="application/pdf" />
+        </label>
+        <div class="form-grid">
+          <label>
+            Import mode
+            <select id="pdfImportMode">
+              <option value="add">Add to current menu</option>
+              <option value="replace">Replace editable items</option>
+            </select>
+          </label>
+          <label>
+            Default category
+            <select id="pdfImportCategory">
+              <option value="auto">Auto detect</option>
+            </select>
+          </label>
+        </div>
+        <button id="extractPdfButton" class="action-button" type="button">Extract PDF text</button>
+        <label>
+          Extracted text
+          <textarea id="pdfImportText" rows="8" placeholder="PDF text will appear here. You can edit it before importing."></textarea>
+        </label>
+        <div id="pdfImportPreview" class="pdf-import-preview"></div>
+        <p id="pdfImportMessage" class="login-message" role="status"></p>
+        <div class="form-actions">
+          <button class="danger-button" type="button" id="clearPdfImportButton">Clear</button>
+          <button class="save-button" type="button" id="importPdfItemsButton">Import items</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="categoryDialog" class="item-dialog" aria-labelledby="categoryDialogTitle">
+      <form id="categoryForm" method="dialog" class="item-form">
+        <div class="dialog-head">
+          <div>
+            <p class="kicker">Menu setup</p>
+            <h2 id="categoryDialogTitle">Categories</h2>
+          </div>
+          <button class="icon-button" type="button" aria-label="Close categories" id="closeCategoryButton">x</button>
+        </div>
+
+        <label>
+          New category
+          <input id="newCategoryName" placeholder="Desserts, Soups, Dim Sum..." />
+        </label>
+        <button id="addCategoryButton" class="save-button" type="submit">Add category</button>
+        <div id="categoryList" class="category-list"></div>
+        <p id="categoryMessage" class="login-message" role="status"></p>
       </form>
     </dialog>
 
@@ -774,6 +834,7 @@
     <script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore-compat.js"></script>
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <script src="app.js?v=user-chip-dashboard"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+    <script src="app.js?v=pdf-import-categories"></script>
   </body>
 </html>

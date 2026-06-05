@@ -5,6 +5,7 @@ const usersStorageKey = "restaurant-menu-matrix-users";
 const currentUserKey = "restaurant-menu-matrix-current-user";
 const designStorageKey = "restaurant-menu-matrix-design";
 const menusStorageKey = "restaurant-menu-matrix-restaurant-menus";
+const categoriesStorageKey = "restaurant-menu-matrix-categories";
 const authFlowKey = "restaurant-menu-matrix-auth-flow";
 const currentAuthFlow = "login-first-menus";
 const firebaseMenuDocumentId = "main";
@@ -22,7 +23,8 @@ const defaultDesign = {
   panel: "#fbfaf6",
   heroImage: defaultHeroImage
 };
-const categories = ["starters", "mains", "drinks"];
+const defaultCategories = ["starters", "mains", "drinks", "soups", "dim-sum", "entrees", "desserts"];
+let categories = loadCategories();
 const defaultUsers = [
   {
     username: "admin",
@@ -145,6 +147,7 @@ let deleteSliderProgress = 0;
 let accountDeleteSliderDragging = false;
 let accountDeleteSliderProgress = 0;
 let accountDeletionBusy = false;
+let pdfImportDraftItems = [];
 
 const formatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -156,7 +159,8 @@ const menuGrid = document.querySelector("#menuGrid");
 const template = document.querySelector("#menuRowTemplate");
 const searchInput = document.querySelector("#searchInput");
 const allergyChips = document.querySelector("#allergyChips");
-const tabs = [...document.querySelectorAll(".tab")];
+const categoryTabs = document.querySelector("#categoryTabs");
+let tabs = [...document.querySelectorAll(".tab")];
 const drawerOpenButton = document.querySelector("#drawerOpenButton");
 const drawerCloseButton = document.querySelector("#drawerCloseButton");
 const drawerOverlay = document.querySelector("#drawerOverlay");
@@ -200,11 +204,15 @@ const editModeButton = document.querySelector("#editModeButton");
 const quickMenuActions = document.querySelector("#quickMenuActions");
 const quickEditModeButton = document.querySelector("#quickEditModeButton");
 const quickScanMenuButton = document.querySelector("#quickScanMenuButton");
+const quickImportPdfButton = document.querySelector("#quickImportPdfButton");
 const quickPdfBuilderButton = document.querySelector("#quickPdfBuilderButton");
+const quickCategoryButton = document.querySelector("#quickCategoryButton");
 const pdfBuilderButton = document.querySelector("#pdfBuilderButton");
 const addItemButton = document.querySelector("#addItemButton");
 const deleteMenuButton = document.querySelector("#deleteMenuButton");
 const scanMenuButton = document.querySelector("#scanMenuButton");
+const importPdfButton = document.querySelector("#importPdfButton");
+const categoryManagerButton = document.querySelector("#categoryManagerButton");
 const manageUsersButton = document.querySelector("#manageUsersButton");
 const designButton = document.querySelector("#designButton");
 const logoutButton = document.querySelector("#logoutButton");
@@ -295,6 +303,23 @@ const scanCategory = document.querySelector("#scanCategory");
 const scanMessage = document.querySelector("#scanMessage");
 const clearScanButton = document.querySelector("#clearScanButton");
 const createScannedItemButton = document.querySelector("#createScannedItemButton");
+const pdfImportDialog = document.querySelector("#pdfImportDialog");
+const closePdfImportButton = document.querySelector("#closePdfImportButton");
+const pdfImportFile = document.querySelector("#pdfImportFile");
+const pdfImportMode = document.querySelector("#pdfImportMode");
+const pdfImportCategory = document.querySelector("#pdfImportCategory");
+const extractPdfButton = document.querySelector("#extractPdfButton");
+const pdfImportText = document.querySelector("#pdfImportText");
+const pdfImportPreview = document.querySelector("#pdfImportPreview");
+const pdfImportMessage = document.querySelector("#pdfImportMessage");
+const clearPdfImportButton = document.querySelector("#clearPdfImportButton");
+const importPdfItemsButton = document.querySelector("#importPdfItemsButton");
+const categoryDialog = document.querySelector("#categoryDialog");
+const categoryForm = document.querySelector("#categoryForm");
+const closeCategoryButton = document.querySelector("#closeCategoryButton");
+const newCategoryName = document.querySelector("#newCategoryName");
+const categoryList = document.querySelector("#categoryList");
+const categoryMessage = document.querySelector("#categoryMessage");
 const heroImage = document.querySelector("#heroImage");
 const editHeroButton = document.querySelector("#editHeroButton");
 const currentMenuTitle = document.querySelector("#currentMenuTitle");
@@ -342,6 +367,119 @@ const dashboardMenuList = document.querySelector("#dashboardMenuList");
 const dashboardCustomizationSummary = document.querySelector("#dashboardCustomizationSummary");
 const dashboardCustomizationButton = document.querySelector("#dashboardCustomizationButton");
 
+function normalizeCategoryValue(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function getUniqueCategories(values = []) {
+  return getUniqueCategoryValues([...defaultCategories, ...values]);
+}
+
+function getUniqueCategoryValues(values = []) {
+  const unique = [];
+  values.forEach((value) => {
+    const normalized = normalizeCategoryValue(value);
+    if (normalized && !unique.includes(normalized)) unique.push(normalized);
+  });
+  return unique;
+}
+
+function loadCategories() {
+  const savedCategories = localStorage.getItem(categoriesStorageKey);
+  if (!savedCategories) return getUniqueCategories();
+
+  try {
+    const parsed = JSON.parse(savedCategories);
+    return Array.isArray(parsed) ? getUniqueCategories(parsed) : getUniqueCategories();
+  } catch {
+    return getUniqueCategories();
+  }
+}
+
+function saveCategories({ sync = true } = {}) {
+  categories = getUniqueCategories(categories);
+  localStorage.setItem(categoriesStorageKey, JSON.stringify(categories));
+  if (sync) scheduleCloudSave();
+}
+
+function mergeCategories(values = [], options = {}) {
+  const before = categories.join("|");
+  categories = getUniqueCategories(values);
+  const changed = categories.join("|") !== before;
+  if (changed) saveCategories(options);
+  return changed;
+}
+
+function renderCategoryTabs() {
+  if (!categoryTabs) return;
+
+  categoryTabs.replaceChildren();
+  const allTab = createCategoryTab("all", "All");
+  categoryTabs.append(allTab);
+  categories.forEach((category) => {
+    categoryTabs.append(createCategoryTab(category, getCategoryLabel(category)));
+  });
+  tabs = [...categoryTabs.querySelectorAll(".tab")];
+  setActiveCategoryTab();
+}
+
+function createCategoryTab(category, label) {
+  const button = document.createElement("button");
+  button.className = "tab";
+  button.type = "button";
+  button.dataset.category = category;
+  button.textContent = label;
+  button.addEventListener("click", () => {
+    state.category = category;
+    setActiveCategoryTab();
+    renderMenu();
+  });
+  return button;
+}
+
+function setActiveCategoryTab() {
+  if (!categories.includes(state.category) && state.category !== "all") {
+    state.category = "all";
+  }
+  tabs.forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.category === state.category);
+  });
+}
+
+function renderCategorySelect(select, { includeAuto = false, editableOnly = false, selectedValue = "" } = {}) {
+  if (!select) return;
+
+  const allowedCategories = editableOnly ? getEditableCategories() : categories;
+  select.replaceChildren();
+
+  if (includeAuto) {
+    const auto = document.createElement("option");
+    auto.value = "auto";
+    auto.textContent = "Auto detect";
+    select.append(auto);
+  }
+
+  allowedCategories.forEach((category) => {
+    const option = document.createElement("option");
+    option.value = category;
+    option.textContent = getCategoryLabel(category);
+    select.append(option);
+  });
+
+  if (selectedValue && [...select.options].some((option) => option.value === selectedValue)) {
+    select.value = selectedValue;
+  } else if (includeAuto) {
+    select.value = "auto";
+  } else if (allowedCategories.length) {
+    select.value = allowedCategories[0];
+  }
+}
+
 function loadMenuItems() {
   if (localStorage.getItem(menuSeedKey) !== currentMenuSeed) {
     localStorage.setItem(menuSeedKey, currentMenuSeed);
@@ -388,7 +526,7 @@ function createDefaultRestaurantMenu() {
     restaurantName: "Mott 32 Las Vegas",
     owner: primaryAdminUsername,
     label: "Chinese menu training",
-    categories: ["Starters", "Mains", "Drinks"],
+    categories: [...categories],
     items: loadMenuItems(),
     designSettings: loadDesignSettings()
   };
@@ -410,7 +548,7 @@ function normalizeRestaurantMenu(menu, index = 0) {
     restaurantName: menu.restaurantName || menu.restaurant || (isDefaultMenu ? "Mott 32 Las Vegas" : ""),
     owner: menu.owner || primaryAdminUsername,
     label: menu.label || (isDefaultMenu ? "Chinese menu training" : "Blank menu"),
-    categories: Array.isArray(menu.categories) && menu.categories.length ? menu.categories : ["Starters", "Mains", "Drinks"],
+    categories: getUniqueCategories(menu.categories || categories),
     items: items.map(normalizeMenuItem),
     stats: normalizeMenuStats(menu.stats),
     designSettings: normalizedDesign
@@ -443,9 +581,11 @@ function normalizeDesignSettings(settings = {}) {
 
 function normalizeMenuItem(item) {
   const defaultMatch = defaultMenuItems.find((defaultItem) => defaultItem.id === item.id);
+  const category = normalizeCategoryValue(item.category);
 
   return {
     ...item,
+    category: categories.includes(category) ? category : categories[0] || "starters",
     details: item.details || defaultMatch?.details || "Key ingredients, flavor notes, and service talking points can go here.",
     image: item.image || defaultMatch?.image || "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80"
   };
@@ -659,7 +799,10 @@ function normalizeUser(user = {}) {
     email: user.email || "",
     password: user.role === "owner" ? "" : user.password || "",
     role: ["admin", "owner", "editor"].includes(user.role) ? user.role : "editor",
-    permissions: Array.isArray(user.permissions) && user.permissions.length ? user.permissions.filter((permission) => categories.includes(permission)) : [],
+    permissions:
+      Array.isArray(user.permissions) && user.permissions.length
+        ? getUniqueCategoryValues(user.permissions.map(normalizeCategoryValue)).filter((permission) => categories.includes(permission))
+        : [],
     status,
     firebaseUid: user.firebaseUid || "",
     createdAt: user.createdAt || "",
@@ -853,6 +996,10 @@ function ownsMenu(menu) {
 
 function ownsActiveMenu() {
   return ownsMenu(getActiveRestaurantMenu());
+}
+
+function canManageCategories() {
+  return Boolean(getActiveUser() && getActiveRestaurantMenu() && (isAdmin() || ownsActiveMenu()));
 }
 
 function getEditableCategories() {
@@ -1100,6 +1247,9 @@ function applyCloudSnapshot(data) {
 
   try {
     const workspaceOwner = getWorkspaceOwner();
+    if (Array.isArray(data.categories)) {
+      mergeCategories(data.categories, { sync: false });
+    }
     if (Array.isArray(data.menus) && data.menus.length) {
       restaurantMenus = data.menus.map((menu, index) =>
         normalizeRestaurantMenu({ ...menu, owner: menu.owner || workspaceOwner }, index)
@@ -1153,6 +1303,7 @@ async function uploadCloudSnapshot(reason) {
   try {
     await cloudSync.ref.set(
       {
+        categories,
         menus: restaurantMenus.map(sanitizeRestaurantMenuForStorage),
         source: reason,
         updatedAt: new Date().toISOString()
@@ -1166,11 +1317,12 @@ async function uploadCloudSnapshot(reason) {
 }
 
 function sanitizeMenuItemForCloud(item) {
+  const category = normalizeCategoryValue(item.category);
   return {
     id: item.id || `item-${Date.now()}`,
     name: item.name || "",
     description: item.description || "",
-    category: categories.includes(item.category) ? item.category : "starters",
+    category: categories.includes(category) ? category : categories[0] || "starters",
     diet: item.diet || "NA",
     style: item.style || "",
     heat: Number(item.heat) || 0,
@@ -1188,7 +1340,7 @@ function sanitizeRestaurantMenuForStorage(menu) {
     restaurantName: menu.restaurantName || "",
     owner: menu.owner || primaryAdminUsername,
     label: menu.label || "Menu training",
-    categories: Array.isArray(menu.categories) && menu.categories.length ? menu.categories : ["Starters", "Mains", "Drinks"],
+    categories: getUniqueCategories(menu.categories || categories),
     items: Array.isArray(menu.items) ? menu.items.map(sanitizeMenuItemForCloud) : [],
     stats: normalizeMenuStats(menu.stats),
     designSettings: sanitizeDesignSettings(menu.designSettings || defaultDesign)
@@ -1400,6 +1552,7 @@ function renderActiveMenuHeader() {
   const activeMenu = getActiveRestaurantMenu();
   const canEditMenu = Boolean(activeMenu) && canEditAnyCategory();
   const canUsePdf = Boolean(activeMenu && getActiveUser());
+  const canManageMenuCategories = canManageCategories();
   currentMenuTitle.textContent = activeMenu?.name || "No menu selected";
   topAddItemButton.hidden = !canEditMenu;
   renameMenuButton.hidden = !state.editing || !canEditMenu;
@@ -1407,8 +1560,15 @@ function renderActiveMenuHeader() {
   quickEditModeButton.classList.toggle("is-active", state.editing);
   quickEditModeButton.hidden = !canEditMenu;
   quickScanMenuButton.hidden = !canEditMenu;
+  quickImportPdfButton.hidden = !canEditMenu;
   quickPdfBuilderButton.hidden = !canUsePdf;
-  quickMenuActions.hidden = quickEditModeButton.hidden && quickScanMenuButton.hidden && quickPdfBuilderButton.hidden;
+  quickCategoryButton.hidden = !canManageMenuCategories;
+  quickMenuActions.hidden =
+    quickEditModeButton.hidden &&
+    quickScanMenuButton.hidden &&
+    quickImportPdfButton.hidden &&
+    quickPdfBuilderButton.hidden &&
+    quickCategoryButton.hidden;
 }
 
 function openRestaurantMenu(menuId) {
@@ -1421,7 +1581,7 @@ function openRestaurantMenu(menuId) {
   state.openItems.clear();
   state.allergies.clear();
   searchInput.value = "";
-  tabs.forEach((button) => button.classList.toggle("is-active", button.dataset.category === "all"));
+  setActiveCategoryTab();
   syncActiveRestaurantMenuData();
   applyDesignSettings();
   renderAllergyChips();
@@ -1538,7 +1698,7 @@ function deleteActiveRestaurantMenu() {
   state.openItems.clear();
   state.allergies.clear();
   searchInput.value = "";
-  tabs.forEach((button) => button.classList.toggle("is-active", button.dataset.category === "all"));
+  setActiveCategoryTab();
   state.editing = false;
 
   syncActiveRestaurantMenuData();
@@ -1618,7 +1778,7 @@ function createBlankRestaurantMenu() {
     restaurantName: "",
     owner: activeUser.username,
     label: "Blank menu",
-    categories: ["Starters", "Mains", "Drinks"],
+    categories: [...categories],
     items: [],
     stats: normalizeMenuStats(),
     designSettings: {
@@ -1794,6 +1954,7 @@ function openItemDialog(id) {
       price: 0
     };
 
+  renderCategorySelect(itemCategory, { editableOnly: true, selectedValue: currentItem.category });
   dialogTitle.textContent = isNew ? "Add item" : "Edit item";
   itemId.value = currentItem.id;
   itemName.value = currentItem.name;
@@ -1810,9 +1971,6 @@ function openItemDialog(id) {
     message: currentItem.image ? "Current item photo. Choose a file to replace it." : "No item photo selected yet."
   });
   itemCategory.value = currentItem.category;
-  [...itemCategory.options].forEach((option) => {
-    option.disabled = !canEditCategory(option.value);
-  });
   itemDiet.value = currentItem.diet;
   itemHeat.value = currentItem.heat;
   itemPrice.value = currentItem.price;
@@ -2847,6 +3005,7 @@ function renderAdminState() {
   const activeUser = getActiveUser();
   const invitedUser = getInvitedUser();
   normalizeScreen(activeUser, invitedUser);
+  renderCategoryTabs();
   const showingInviteSetup = Boolean(invitedUser) && !activeUser;
 
   authPage.hidden = Boolean(activeUser) || state.screen === "register";
@@ -2862,6 +3021,8 @@ function renderAdminState() {
   adminControls.hidden = !activeUser;
   pdfBuilderButton.hidden = !activeUser;
   scanMenuButton.hidden = !canEditAnyCategory();
+  importPdfButton.hidden = !canEditAnyCategory();
+  categoryManagerButton.hidden = !canManageCategories();
   manageUsersButton.hidden = !activeUser;
   designButton.hidden = true;
   editHeroButton.hidden = !isAdmin();
@@ -3105,7 +3266,7 @@ function resetMenuViewForCurrentUser() {
   state.openItems.clear();
   state.allergies.clear();
   searchInput.value = "";
-  tabs.forEach((button) => button.classList.toggle("is-active", button.dataset.category === "all"));
+  setActiveCategoryTab();
   syncActiveRestaurantMenuData();
   applyDesignSettings();
   renderAllergyChips();
@@ -3383,11 +3544,21 @@ function getPrivilegeLabel(user) {
 }
 
 function getCategoryLabel(category) {
-  return {
+  const knownLabel = {
     starters: "Starters",
     mains: "Mains",
-    drinks: "Drinks"
-  }[category] || category;
+    drinks: "Drinks",
+    soups: "Soups",
+    "dim-sum": "Dim Sum",
+    entrees: "Entrees",
+    desserts: "Desserts"
+  }[category];
+  if (knownLabel) return knownLabel;
+  return String(category || "")
+    .split("-")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
 
 function createPasswordLabel(user) {
@@ -3573,6 +3744,86 @@ function updateUser(event, username) {
   renderUserList();
 }
 
+function openCategoryDialog() {
+  if (!canManageCategories()) return;
+
+  closeDrawer();
+  categoryMessage.textContent = "";
+  newCategoryName.value = "";
+  renderCategoryList();
+  categoryDialog.showModal();
+  newCategoryName.focus();
+}
+
+function closeCategoryDialog() {
+  categoryDialog.close();
+  categoryForm.reset();
+}
+
+function renderCategoryList() {
+  categoryList.replaceChildren();
+
+  categories.forEach((category) => {
+    const row = document.createElement("div");
+    row.className = "category-list-row";
+
+    const copy = document.createElement("span");
+    const title = document.createElement("strong");
+    const detail = document.createElement("small");
+    title.textContent = getCategoryLabel(category);
+    detail.textContent = `${menuItems.filter((item) => item.category === category).length} items in this menu`;
+    copy.append(title, detail);
+
+    const badge = document.createElement("span");
+    badge.className = "dashboard-badge";
+    badge.textContent = category;
+
+    row.append(copy, badge);
+    categoryList.append(row);
+  });
+}
+
+function addCategory(event) {
+  event.preventDefault();
+  if (!canManageCategories()) return;
+
+  const category = normalizeCategoryValue(newCategoryName.value);
+  if (!category) {
+    categoryMessage.textContent = "Enter a category name.";
+    return;
+  }
+
+  if (categories.includes(category)) {
+    categoryMessage.textContent = `${getCategoryLabel(category)} already exists.`;
+    newCategoryName.select();
+    return;
+  }
+
+  categories = getUniqueCategories([...categories, category]);
+  restaurantMenus = restaurantMenus.map((menu) => ({
+    ...menu,
+    categories: getUniqueCategories([...(menu.categories || []), category])
+  }));
+  users = users.map((user) => {
+    if (user.role !== "admin" && user.role !== "owner") return user;
+    return {
+      ...user,
+      permissions: getUniqueCategories([...(user.permissions || []), category])
+    };
+  });
+
+  saveCategories();
+  saveRestaurantMenus();
+  saveUsers();
+  renderCategoryTabs();
+  renderCategoryList();
+  renderAllergyChips();
+  renderMenu();
+  renderUserList();
+  newCategoryName.value = "";
+  categoryMessage.textContent = `${getCategoryLabel(category)} added.`;
+}
+
 function closeItemDialog() {
   itemDialog.close();
   itemForm.reset();
@@ -3585,9 +3836,7 @@ function openScanDialog() {
   scanText.value = "";
   scanImageFile.value = "";
   scanMessage.textContent = "";
-  [...scanCategory.options].forEach((option) => {
-    option.disabled = !canEditCategory(option.value);
-  });
+  renderCategorySelect(scanCategory, { editableOnly: true });
   scanCategory.value = editableCategories[0];
   scanDialog.showModal();
 }
@@ -3736,6 +3985,317 @@ function createScannedItemDraft() {
   openItemDialogWithDraft(draft);
 }
 
+function openPdfImportDialog() {
+  if (!canEditAnyCategory()) return;
+
+  closeDrawer();
+  clearPdfImport();
+  renderCategorySelect(pdfImportCategory, { includeAuto: true, editableOnly: true, selectedValue: "auto" });
+  pdfImportMode.value = "add";
+  pdfImportDialog.showModal();
+}
+
+function closePdfImportDialog() {
+  pdfImportDialog.close();
+}
+
+function clearPdfImport() {
+  pdfImportDraftItems = [];
+  pdfImportFile.value = "";
+  pdfImportText.value = "";
+  pdfImportPreview.replaceChildren();
+  pdfImportMessage.textContent = "";
+}
+
+async function extractPdfImportText() {
+  const file = pdfImportFile.files?.[0];
+  if (!file) {
+    pdfImportMessage.textContent = "Choose a PDF file first.";
+    return;
+  }
+
+  if (!window.pdfjsLib) {
+    pdfImportMessage.textContent = "PDF reader did not load. Check internet connection and try again.";
+    return;
+  }
+
+  extractPdfButton.disabled = true;
+  importPdfItemsButton.disabled = true;
+  pdfImportMessage.textContent = "Reading PDF...";
+
+  try {
+    const text = await readPdfText(file);
+    pdfImportText.value = text;
+    updatePdfImportPreview();
+    pdfImportMessage.textContent = pdfImportDraftItems.length
+      ? `Found ${pdfImportDraftItems.length} possible menu items. Review, then import.`
+      : "No menu items found yet. Edit the text and try importing.";
+  } catch {
+    pdfImportMessage.textContent = "Could not read that PDF. Try another file or copy/paste the menu text.";
+  } finally {
+    extractPdfButton.disabled = false;
+    importPdfItemsButton.disabled = false;
+  }
+}
+
+async function readPdfText(file) {
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+    "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+  const data = new Uint8Array(await file.arrayBuffer());
+  const pdf = await window.pdfjsLib.getDocument({ data }).promise;
+  const pageTexts = [];
+
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    pdfImportMessage.textContent = `Reading PDF page ${pageNumber} of ${pdf.numPages}...`;
+    const page = await pdf.getPage(pageNumber);
+    const content = await page.getTextContent();
+    pageTexts.push(getPdfPageText(content.items));
+  }
+
+  return pageTexts.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function getPdfPageText(items) {
+  const rows = [];
+  items
+    .map((item) => ({
+      text: String(item.str || "").trim(),
+      x: item.transform?.[4] || 0,
+      y: Math.round(item.transform?.[5] || 0)
+    }))
+    .filter((item) => item.text)
+    .sort((a, b) => b.y - a.y || a.x - b.x)
+    .forEach((item) => {
+      const row = rows.find((candidate) => Math.abs(candidate.y - item.y) <= 4);
+      if (row) {
+        row.items.push(item);
+      } else {
+        rows.push({ y: item.y, items: [item] });
+      }
+    });
+
+  return rows
+    .map((row) =>
+      row.items
+        .sort((a, b) => a.x - b.x)
+        .map((item) => item.text)
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim()
+    )
+    .filter(Boolean)
+    .join("\n");
+}
+
+function updatePdfImportPreview() {
+  pdfImportDraftItems = parseImportedMenuItems(pdfImportText.value);
+  pdfImportPreview.replaceChildren();
+
+  if (!pdfImportDraftItems.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state restaurant-empty";
+    empty.textContent = "No preview items yet.";
+    pdfImportPreview.append(empty);
+    return;
+  }
+
+  pdfImportDraftItems.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "pdf-import-row";
+
+    const copy = document.createElement("span");
+    const title = document.createElement("strong");
+    const detail = document.createElement("small");
+    title.textContent = item.name;
+    detail.textContent = `${getCategoryLabel(item.category)} - ${item.description}`;
+    copy.append(title, detail);
+
+    const badge = document.createElement("span");
+    badge.className = "dashboard-badge";
+    badge.textContent = item.price ? formatter.format(item.price) : "No price";
+
+    row.append(copy, badge);
+    pdfImportPreview.append(row);
+  });
+}
+
+function parseImportedMenuItems(text) {
+  const editableCategories = getEditableCategories();
+  const selectedCategory = pdfImportCategory.value;
+  const defaultCategory =
+    selectedCategory && selectedCategory !== "auto" && editableCategories.includes(selectedCategory)
+      ? selectedCategory
+      : editableCategories[0];
+  let currentCategory = defaultCategory;
+  const lines = getImportLines(text);
+  const items = [];
+  let pendingLines = [];
+
+  lines.forEach((line) => {
+    const headingCategory = selectedCategory === "auto" ? getCategoryFromHeading(line) : "";
+    if (headingCategory && editableCategories.includes(headingCategory)) {
+      currentCategory = headingCategory;
+      pendingLines = [];
+      return;
+    }
+
+    if (isImportNoiseLine(line)) return;
+
+    const price = getLinePrice(line);
+    const lineWithoutPrice = cleanImportedLine(line.replace(/\$\s*\d+(?:\.\d{1,2})?/g, "").replace(/\b\d{1,3}(?:\.\d{2})\b\s*$/g, ""));
+
+    if (price !== null) {
+      const parts = [...pendingLines, lineWithoutPrice].filter(Boolean);
+      const item = createImportedMenuItem(parts, currentCategory, price, items.length);
+      if (item) items.push(item);
+      pendingLines = [];
+      return;
+    }
+
+    pendingLines.push(line);
+    if (pendingLines.length > 3) {
+      const item = createImportedMenuItem(pendingLines.splice(0, 2), currentCategory, 0, items.length);
+      if (item) items.push(item);
+    }
+  });
+
+  if (pendingLines.length) {
+    const chunks = items.length ? [pendingLines] : chunkImportLines(pendingLines);
+    chunks.forEach((chunk) => {
+      const item = createImportedMenuItem(chunk, currentCategory, 0, items.length);
+      if (item) items.push(item);
+    });
+  }
+
+  return items.filter((item) => canEditCategory(item.category)).slice(0, 80);
+}
+
+function getImportLines(text) {
+  return text
+    .split(/\r?\n/)
+    .map(cleanImportedLine)
+    .filter((line) => line.length > 2)
+    .filter((line) => /[A-Za-z]{2,}/.test(line));
+}
+
+function cleanImportedLine(line) {
+  return String(line || "")
+    .replace(/[•·]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isImportNoiseLine(line) {
+  const normalized = line.toLowerCase();
+  return /^(menu|price|description|item|items|page \d+|subtotal|total)$/.test(normalized);
+}
+
+function getLinePrice(line) {
+  const match = line.match(/\$\s*(\d+(?:\.\d{1,2})?)/) || line.match(/\b(\d{1,3}(?:\.\d{2})?)\b\s*$/);
+  if (!match) return null;
+  const price = Number(match[1]);
+  return Number.isFinite(price) && price < 10000 ? price : null;
+}
+
+function getCategoryFromHeading(line) {
+  const normalized = normalizeCategoryValue(line.replace(/\b(menu|items|section)\b/gi, ""));
+  if (!normalized) return "";
+  return categories.find((category) => {
+    const label = normalizeCategoryValue(getCategoryLabel(category));
+    return normalized === category || normalized === label || normalized.includes(category) || normalized.includes(label);
+  }) || "";
+}
+
+function chunkImportLines(lines) {
+  const chunks = [];
+  for (let index = 0; index < lines.length; index += 2) {
+    chunks.push(lines.slice(index, index + 2));
+  }
+  return chunks;
+}
+
+function createImportedMenuItem(parts, fallbackCategory, price, index) {
+  const cleanedParts = parts.map(cleanImportedLine).filter((part) => part && !isImportNoiseLine(part));
+  if (!cleanedParts.length) return null;
+
+  const fullText = cleanedParts.join(" ");
+  const category = inferImportedCategory(fullText, fallbackCategory);
+  const name = cleanImportedLine(cleanedParts[0]).slice(0, 90) || "Imported Menu Item";
+  const description = cleanImportedLine(cleanedParts.slice(1).join(" ")) || "Imported from PDF. Review details before publishing.";
+  const heat = /spicy|chili|chilli|szechuan|sichuan|hot/i.test(fullText) ? 2 : 0;
+
+  return {
+    id: `pdf-${Date.now()}-${index}-${normalizeCategoryValue(name).slice(0, 24)}`,
+    name,
+    description,
+    category,
+    diet: getImportedDiet(fullText),
+    style: getStyleForItem(category, heat),
+    heat,
+    allergens: getImportedAllergens(fullText),
+    details: description,
+    image: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    price
+  };
+}
+
+function inferImportedCategory(text, fallbackCategory) {
+  if (pdfImportCategory.value !== "auto") return fallbackCategory;
+
+  const normalized = text.toLowerCase();
+  const guesses = [
+    { category: "desserts", words: ["dessert", "cake", "ice cream", "sweet", "pudding", "tart"] },
+    { category: "soups", words: ["soup", "broth", "consomme"] },
+    { category: "dim-sum", words: ["dumpling", "bao", "bun", "siu mai", "har gow", "dim sum"] },
+    { category: "drinks", words: ["cocktail", "wine", "beer", "tea", "coffee", "mocktail", "soda", "juice"] },
+    { category: "entrees", words: ["chicken", "beef", "pork", "fish", "lobster", "duck", "rice", "noodle"] }
+  ];
+  const guess = guesses.find((entry) => categories.includes(entry.category) && entry.words.some((word) => normalized.includes(word)));
+  return guess?.category && canEditCategory(guess.category) ? guess.category : fallbackCategory;
+}
+
+function getImportedDiet(text) {
+  if (/vegan/i.test(text)) return "VG";
+  if (/vegetarian/i.test(text)) return "V";
+  if (/gluten.?free/i.test(text)) return "GF";
+  return "NA";
+}
+
+function getImportedAllergens(text) {
+  const allergenChecks = [
+    ["Shellfish", /shrimp|prawn|lobster|crab|shellfish/i],
+    ["Fish", /fish|cod|salmon|tuna|sea bass/i],
+    ["Egg", /\begg\b/i],
+    ["Dairy", /milk|cream|cheese|butter|dairy/i],
+    ["Sesame", /sesame/i],
+    ["Soy", /soy|tofu|miso/i],
+    ["Wheat", /wheat|noodle|dumpling|bun|bao|flour/i]
+  ];
+  return allergenChecks.filter(([, pattern]) => pattern.test(text)).map(([allergen]) => allergen);
+}
+
+function importPdfItems() {
+  if (!canEditAnyCategory()) return;
+
+  updatePdfImportPreview();
+  if (!pdfImportDraftItems.length) {
+    pdfImportMessage.textContent = "No items ready to import.";
+    return;
+  }
+
+  if (pdfImportMode.value === "replace") {
+    menuItems = menuItems.filter((item) => !canEditCategory(item.category));
+  }
+
+  menuItems = [...menuItems, ...pdfImportDraftItems.map(normalizeMenuItem)];
+  saveMenuItems();
+  renderAllergyChips();
+  renderMenu();
+  renderPdfItemList();
+  pdfImportMessage.textContent = `${pdfImportDraftItems.length} items imported.`;
+  closePdfImportDialog();
+}
+
 function parseScannedItem(text, category) {
   const lines = text
     .split(/\r?\n/)
@@ -3768,6 +4328,7 @@ function cleanScannedLine(line) {
 }
 
 function openItemDialogWithDraft(currentItem) {
+  renderCategorySelect(itemCategory, { editableOnly: true, selectedValue: currentItem.category });
   dialogTitle.textContent = "Add item";
   itemId.value = currentItem.id;
   itemName.value = currentItem.name;
@@ -3784,9 +4345,6 @@ function openItemDialogWithDraft(currentItem) {
     message: currentItem.image ? "Current item photo. Choose a file to replace it." : "No item photo selected yet."
   });
   itemCategory.value = currentItem.category;
-  [...itemCategory.options].forEach((option) => {
-    option.disabled = !canEditCategory(option.value);
-  });
   itemDiet.value = currentItem.diet;
   itemHeat.value = currentItem.heat;
   itemPrice.value = currentItem.price;
@@ -3907,14 +4465,6 @@ function deleteItem() {
   renderMenu();
 }
 
-tabs.forEach((tab) => {
-  tab.addEventListener("click", () => {
-    state.category = tab.dataset.category;
-    tabs.forEach((button) => button.classList.toggle("is-active", button === tab));
-    renderMenu();
-  });
-});
-
 searchInput.addEventListener("input", (event) => {
   state.query = event.target.value;
   renderMenu();
@@ -3952,6 +4502,18 @@ closeScanButton.addEventListener("click", closeScanDialog);
 clearScanButton.addEventListener("click", clearScan);
 runScanButton.addEventListener("click", runMenuPhotoScan);
 createScannedItemButton.addEventListener("click", createScannedItemDraft);
+importPdfButton.addEventListener("click", openPdfImportDialog);
+quickImportPdfButton.addEventListener("click", openPdfImportDialog);
+closePdfImportButton.addEventListener("click", closePdfImportDialog);
+clearPdfImportButton.addEventListener("click", clearPdfImport);
+extractPdfButton.addEventListener("click", extractPdfImportText);
+pdfImportText.addEventListener("input", updatePdfImportPreview);
+pdfImportCategory.addEventListener("change", updatePdfImportPreview);
+importPdfItemsButton.addEventListener("click", importPdfItems);
+categoryManagerButton.addEventListener("click", openCategoryDialog);
+quickCategoryButton.addEventListener("click", openCategoryDialog);
+closeCategoryButton.addEventListener("click", closeCategoryDialog);
+categoryForm.addEventListener("submit", addCategory);
 pdfBuilderButton.addEventListener("click", openPdfPage);
 quickPdfBuilderButton.addEventListener("click", openPdfPage);
 backFromPdfButton.addEventListener("click", closePdfPage);
@@ -4018,6 +4580,8 @@ resetDesignButton.addEventListener("click", resetDesign);
 closeDialogButton.addEventListener("click", closeItemDialog);
 deleteItemButton.addEventListener("click", deleteItem);
 itemForm.addEventListener("submit", saveItem);
+
+renderCategoryTabs();
 
 if (getActiveUser()) {
   activateWorkspaceForCurrentUser();
