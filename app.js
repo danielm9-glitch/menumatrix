@@ -178,6 +178,7 @@ const registerMessage = document.querySelector("#registerMessage");
 const registerLinkButton = document.querySelector("#registerLinkButton");
 const loginLinkButton = document.querySelector("#loginLinkButton");
 const restaurantList = document.querySelector("#restaurantList");
+const menusUserStatus = document.querySelector("#menusUserStatus");
 const menusLogoutButton = document.querySelector("#menusLogoutButton");
 const backToMenusButton = document.querySelector("#backToMenusButton");
 const createMenuButton = document.querySelector("#createMenuButton");
@@ -1302,7 +1303,8 @@ function renderAdminHomeSummary() {
 
   homeSummaryKicker.textContent = isAdminUser ? "Admin dashboard" : "Menu analytics";
   homeSummaryTitle.textContent = isAdminUser ? "Quick summary" : "Your summary";
-  adminHomeDashboardButton.hidden = !isAdminUser;
+  adminHomeDashboardButton.hidden = false;
+  adminHomeDashboardButton.textContent = isAdminUser ? "Open dashboard" : "Dashboard";
 
   const menus = isAdminUser ? restaurantMenus : visibleMenus;
   const sortedByClicks = [...menus].sort((a, b) => {
@@ -2870,6 +2872,10 @@ function renderAdminState() {
   }
   adminStatus.textContent = activeUser
     ? `Signed in as ${activeUser.username}${isAdmin() ? " (admin)" : ""}`
+    : "Signed out";
+  menusUserStatus.hidden = !activeUser;
+  menusUserStatus.textContent = activeUser
+    ? `Logged in: ${activeUser.username}${isAdmin() ? " (admin)" : ""}`
     : "Signed out";
 
   editModeButton.textContent = state.editing ? "Done" : "Edit menu";

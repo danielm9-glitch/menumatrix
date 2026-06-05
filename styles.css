@@ -208,6 +208,18 @@ textarea {
   min-width: 68px;
 }
 
+.user-status-chip {
+  max-width: min(46vw, 240px);
+  border-color: rgba(47, 125, 86, 0.18);
+  background: rgba(255, 255, 255, 0.68);
+  color: var(--muted);
+  cursor: default;
+  opacity: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .top-bar-actions {
   display: flex;
   gap: 8px;
