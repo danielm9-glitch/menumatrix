@@ -129,11 +129,15 @@ const state = {
 
 const cloudSync = {
   applying: false,
+  applyingUsers: false,
   client: null,
   docId: "",
   ref: null,
   saveTimer: null,
-  unsubscribe: null
+  unsubscribe: null,
+  usersRef: null,
+  usersSaveTimer: null,
+  usersUnsubscribe: null
 };
 
 let deleteSliderDragging = false;
@@ -598,22 +602,59 @@ function compressImageDataUrl(dataUrl, { maxWidth, quality }) {
 
 function loadUsers() {
   const savedUsers = localStorage.getItem(usersStorageKey);
-  if (!savedUsers) return [...defaultUsers];
+  if (!savedUsers) return ensureDefaultAdmin(defaultUsers);
 
   try {
     const parsed = JSON.parse(savedUsers);
-    if (!Array.isArray(parsed) || !parsed.length) return [...defaultUsers];
-
-    const hasAdmin = parsed.some((user) => user.username === "admin" && user.role === "admin");
-    return hasAdmin ? parsed : [...defaultUsers, ...parsed];
+    if (!Array.isArray(parsed) || !parsed.length) return ensureDefaultAdmin(defaultUsers);
+    return ensureDefaultAdmin(parsed);
   } catch {
-    return [...defaultUsers];
+    return ensureDefaultAdmin(defaultUsers);
   }
 }
 
-function saveUsers() {
+function normalizeUser(user = {}) {
+  const username = String(user.username || "").trim();
+  return {
+    username,
+    email: user.email || "",
+    password: user.role === "owner" ? "" : user.password || "",
+    role: ["admin", "owner", "editor"].includes(user.role) ? user.role : "editor",
+    permissions: Array.isArray(user.permissions) && user.permissions.length ? user.permissions.filter((permission) => categories.includes(permission)) : [],
+    status: user.status || "active",
+    firebaseUid: user.firebaseUid || "",
+    createdAt: user.createdAt || "",
+    updatedAt: user.updatedAt || ""
+  };
+}
+
+function sanitizeUserForCloud(user) {
+  const normalized = normalizeUser(user);
+  return {
+    username: normalized.username,
+    email: normalized.email,
+    password: normalized.password,
+    role: normalized.role,
+    permissions: normalized.permissions,
+    status: normalized.status,
+    firebaseUid: normalized.firebaseUid,
+    createdAt: normalized.createdAt,
+    updatedAt: normalized.updatedAt
+  };
+}
+
+function ensureDefaultAdmin(userList) {
+  const normalizedUsers = userList
+    .map(normalizeUser)
+    .filter((user) => user.username);
+  const hasAdmin = normalizedUsers.some((user) => user.username === primaryAdminUsername && user.role === "admin");
+  return hasAdmin ? normalizedUsers : [...defaultUsers.map(normalizeUser), ...normalizedUsers];
+}
+
+function saveUsers({ sync = true } = {}) {
+  users = ensureDefaultAdmin(users);
   localStorage.setItem(usersStorageKey, JSON.stringify(users));
-  scheduleCloudSave();
+  if (sync) scheduleCloudUsersSave();
 }
 
 function loadCurrentUser() {
@@ -841,7 +882,75 @@ async function initializeCloudSync() {
   setSyncStatus("Connecting to Firebase...");
   await client.authReady;
   cloudSync.client = client;
+  connectCloudUsers();
   connectCloudWorkspaceForCurrentUser();
+}
+
+function connectCloudUsers() {
+  const client = cloudSync.client;
+  if (!client?.db || cloudSync.usersRef) return;
+
+  cloudSync.usersRef = client.db.collection("app").doc("users");
+  cloudSync.usersUnsubscribe = cloudSync.usersRef.onSnapshot(
+    (snapshot) => {
+      if (!snapshot.exists) {
+        uploadCloudUsersSnapshot("initial");
+        return;
+      }
+
+      applyCloudUsersSnapshot(snapshot.data());
+    },
+    () => {
+      setSyncStatus("Firebase user sync needs Firestore rules", "error");
+    }
+  );
+}
+
+function applyCloudUsersSnapshot(data) {
+  if (!data || !Array.isArray(data.users)) return;
+
+  cloudSync.applyingUsers = true;
+  try {
+    const merged = new Map();
+    ensureDefaultAdmin(defaultUsers).forEach((user) => merged.set(user.username.toLowerCase(), user));
+    data.users.map(normalizeUser).forEach((user) => {
+      if (!user.username) return;
+      merged.set(user.username.toLowerCase(), user);
+    });
+    users.map(normalizeUser).forEach((user) => {
+      if (!user.username || merged.has(user.username.toLowerCase())) return;
+      merged.set(user.username.toLowerCase(), user);
+    });
+    users = [...merged.values()].sort(sortUsersByPrivileges);
+    saveUsers({ sync: false });
+    renderAdminState();
+  } finally {
+    cloudSync.applyingUsers = false;
+  }
+}
+
+function scheduleCloudUsersSave() {
+  if (!cloudSync.usersRef || cloudSync.applyingUsers) return;
+
+  window.clearTimeout(cloudSync.usersSaveTimer);
+  cloudSync.usersSaveTimer = window.setTimeout(() => uploadCloudUsersSnapshot("update"), 700);
+}
+
+async function uploadCloudUsersSnapshot(reason) {
+  if (!cloudSync.usersRef || cloudSync.applyingUsers) return;
+
+  try {
+    await cloudSync.usersRef.set(
+      {
+        users: ensureDefaultAdmin(users).map(sanitizeUserForCloud),
+        source: reason,
+        updatedAt: new Date().toISOString()
+      },
+      { merge: true }
+    );
+  } catch {
+    setSyncStatus("Firebase user save failed - check rules/Auth", "error");
+  }
 }
 
 function connectCloudWorkspaceForCurrentUser() {
@@ -2155,7 +2264,9 @@ function upsertFirebaseOwner(firebaseUser, fallbackUsername = "") {
     role: existingIndex >= 0 && users[existingIndex].role !== "owner" ? users[existingIndex].role : "owner",
     permissions: existingIndex >= 0 && users[existingIndex].permissions?.length ? users[existingIndex].permissions : [...categories],
     status: "active",
-    firebaseUid: firebaseUser.uid
+    firebaseUid: firebaseUser.uid,
+    createdAt: existingIndex >= 0 ? users[existingIndex].createdAt || "" : new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   };
 
   if (existingIndex >= 0) {
@@ -2369,10 +2480,12 @@ async function registerAccount(event) {
       email,
       password: "",
       role: "owner",
-      permissions: [...categories],
-      status: "unverified",
-      firebaseUid: credential.user.uid
-    };
+    permissions: [...categories],
+    status: "unverified",
+    firebaseUid: credential.user.uid,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
 
     users.push(user);
     saveUsers();
@@ -2401,6 +2514,33 @@ async function registerAccount(event) {
         : "Verification email sent. Open it, then log in.";
     return;
   } catch (error) {
+    if (error?.code === "auth/email-already-in-use") {
+      const existingIndex = users.findIndex((user) => (user.email || "").toLowerCase() === normalizedEmail);
+      const recoveredUser = {
+        ...(existingIndex >= 0 ? users[existingIndex] : {}),
+        username: existingIndex >= 0 ? users[existingIndex].username : username,
+        email,
+        password: "",
+        role: "owner",
+        permissions: [...categories],
+        status: existingIndex >= 0 ? users[existingIndex].status || "unverified" : "unverified",
+        firebaseUid: existingIndex >= 0 ? users[existingIndex].firebaseUid || "" : "",
+        createdAt: existingIndex >= 0 ? users[existingIndex].createdAt || "" : new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      if (existingIndex >= 0) {
+        users[existingIndex] = recoveredUser;
+      } else {
+        users.push(recoveredUser);
+      }
+      saveUsers();
+      renderUserList();
+      registerMessage.textContent =
+        "That email already exists in Firebase. I added it to the dashboard as unverified; try logging in or resend verification later.";
+      await restoreAnonymousAuth();
+      return;
+    }
     registerMessage.textContent = getAuthErrorMessage(error);
     await restoreAnonymousAuth();
     return;
@@ -2420,7 +2560,8 @@ function setupInvitedPassword(event) {
   users[userIndex] = {
     ...users[userIndex],
     password: setupPassword.value,
-    status: "active"
+    status: "active",
+    updatedAt: new Date().toISOString()
   };
 
   saveUsers();
@@ -2617,7 +2758,9 @@ function saveUser(event) {
     password: isInvite ? "" : newPassword.value,
     role: "editor",
     permissions,
-    status: isInvite ? "pending" : "active"
+    status: isInvite ? "pending" : "active",
+    createdAt: existingIndex >= 0 ? users[existingIndex].createdAt || "" : new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   };
 
   if (existingIndex >= 0 && users[existingIndex].role === "admin") {
@@ -2678,7 +2821,8 @@ function updateUser(event, username) {
     ...users[userIndex],
     email: form.elements.email.value,
     password: form.elements.password.value,
-    permissions
+    permissions,
+    updatedAt: new Date().toISOString()
   };
 
   saveUsers();
