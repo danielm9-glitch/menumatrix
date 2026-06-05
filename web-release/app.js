@@ -615,16 +615,18 @@ function loadUsers() {
 
 function normalizeUser(user = {}) {
   const username = String(user.username || "").trim();
+  const status = ["active", "pending", "unverified", "deleted"].includes(user.status) ? user.status : "active";
   return {
     username,
     email: user.email || "",
     password: user.role === "owner" ? "" : user.password || "",
     role: ["admin", "owner", "editor"].includes(user.role) ? user.role : "editor",
     permissions: Array.isArray(user.permissions) && user.permissions.length ? user.permissions.filter((permission) => categories.includes(permission)) : [],
-    status: user.status || "active",
+    status,
     firebaseUid: user.firebaseUid || "",
     createdAt: user.createdAt || "",
-    updatedAt: user.updatedAt || ""
+    updatedAt: user.updatedAt || "",
+    deletedAt: user.deletedAt || ""
   };
 }
 
@@ -639,8 +641,55 @@ function sanitizeUserForCloud(user) {
     status: normalized.status,
     firebaseUid: normalized.firebaseUid,
     createdAt: normalized.createdAt,
-    updatedAt: normalized.updatedAt
+    updatedAt: normalized.updatedAt,
+    deletedAt: normalized.deletedAt
   };
+}
+
+function isDeletedUser(user) {
+  return user?.status === "deleted";
+}
+
+function getVisibleUsers() {
+  return users.filter((user) => !isDeletedUser(user));
+}
+
+function findUserByIdentity(identity, { includeDeleted = false } = {}) {
+  const normalizedIdentity = String(identity || "").trim().toLowerCase();
+  if (!normalizedIdentity) return null;
+
+  return (
+    users.find((user) => {
+      if (!includeDeleted && isDeletedUser(user)) return false;
+      return user.username.toLowerCase() === normalizedIdentity || (user.email || "").toLowerCase() === normalizedIdentity;
+    }) || null
+  );
+}
+
+function findUserByEmail(email, { includeDeleted = false } = {}) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (!normalizedEmail) return null;
+
+  return (
+    users.find((user) => {
+      if (!includeDeleted && isDeletedUser(user)) return false;
+      return (user.email || "").toLowerCase() === normalizedEmail;
+    }) || null
+  );
+}
+
+function getUserUpdatedTime(user) {
+  return Date.parse(user?.updatedAt || user?.deletedAt || user?.createdAt || "") || 0;
+}
+
+function mergeUserCandidate(userMap, user) {
+  if (!user.username) return;
+
+  const key = user.username.toLowerCase();
+  const existing = userMap.get(key);
+  if (!existing || getUserUpdatedTime(user) >= getUserUpdatedTime(existing)) {
+    userMap.set(key, user);
+  }
 }
 
 function ensureDefaultAdmin(userList) {
@@ -660,7 +709,7 @@ function saveUsers({ sync = true } = {}) {
 function loadCurrentUser() {
   const username = localStorage.getItem(currentUserKey);
   if (!username) return null;
-  return users.find((user) => user.username === username) ? username : null;
+  return users.find((user) => user.username === username && !isDeletedUser(user)) ? username : null;
 }
 
 function getInviteUsername() {
@@ -671,11 +720,11 @@ function getInviteUsername() {
 function getInvitedUser() {
   const username = getInviteUsername();
   if (!username) return null;
-  return users.find((user) => user.username === username && user.status === "pending") || null;
+  return users.find((user) => user.username === username && user.status === "pending" && !isDeletedUser(user)) || null;
 }
 
 function getActiveUser() {
-  return users.find((user) => user.username === state.currentUser) || null;
+  return users.find((user) => user.username === state.currentUser && !isDeletedUser(user)) || null;
 }
 
 function isAdmin() {
@@ -867,6 +916,17 @@ async function sendVerificationEmail(firebaseUser) {
   }
 }
 
+async function sendPasswordResetForExistingEmail(auth, email) {
+  try {
+    await auth.sendPasswordResetEmail(email, getVerificationActionSettings());
+    return "current-domain";
+  } catch (error) {
+    if (error?.code !== "auth/unauthorized-continue-uri") throw error;
+    await auth.sendPasswordResetEmail(email);
+    return "firebase-default";
+  }
+}
+
 function setResendVerificationVisible(isVisible) {
   resendVerificationButton.hidden = !isVisible;
 }
@@ -912,14 +972,12 @@ function applyCloudUsersSnapshot(data) {
   cloudSync.applyingUsers = true;
   try {
     const merged = new Map();
-    ensureDefaultAdmin(defaultUsers).forEach((user) => merged.set(user.username.toLowerCase(), user));
+    ensureDefaultAdmin(defaultUsers).forEach((user) => mergeUserCandidate(merged, user));
     data.users.map(normalizeUser).forEach((user) => {
-      if (!user.username) return;
-      merged.set(user.username.toLowerCase(), user);
+      mergeUserCandidate(merged, user);
     });
     users.map(normalizeUser).forEach((user) => {
-      if (!user.username || merged.has(user.username.toLowerCase())) return;
-      merged.set(user.username.toLowerCase(), user);
+      mergeUserCandidate(merged, user);
     });
     users = [...merged.values()].sort(sortUsersByPrivileges);
     saveUsers({ sync: false });
@@ -1202,7 +1260,7 @@ function renderAdminHomeSummary() {
   });
   const totalItems = menus.reduce((sum, menu) => sum + menu.items.length, 0);
   const totalClicks = menus.reduce((sum, menu) => sum + getMenuStats(menu).clicks, 0);
-  const activeAccounts = users.filter((user) => user.status !== "pending").length;
+  const activeAccounts = getVisibleUsers().filter((user) => user.status !== "pending").length;
 
   adminHomeMetrics.replaceChildren(
     createDashboardMetric("Menus", String(menus.length), "Created restaurants"),
@@ -1758,19 +1816,20 @@ function createDashboardMetric(label, value, note = "") {
 }
 
 function renderDashboardAuthSummary() {
+  const visibleUsers = getVisibleUsers();
   dashboardAuthSummary.replaceChildren(
-    createDashboardMetric("Total accounts", String(users.length), "Local app accounts"),
+    createDashboardMetric("Total accounts", String(visibleUsers.length), "Local app accounts"),
     createDashboardMetric(
       "Verified owners",
-      String(users.filter((user) => user.role === "owner" && user.status === "active").length),
+      String(visibleUsers.filter((user) => user.role === "owner" && user.status === "active").length),
       "Email verified restaurant owners"
     ),
     createDashboardMetric(
       "Need attention",
-      String(users.filter((user) => ["pending", "unverified"].includes(user.status)).length),
+      String(visibleUsers.filter((user) => ["pending", "unverified"].includes(user.status)).length),
       "Pending invites or unverified emails"
     ),
-    createDashboardMetric("Admins", String(users.filter((user) => user.role === "admin").length), "Full access")
+    createDashboardMetric("Admins", String(visibleUsers.filter((user) => user.role === "admin").length), "Full access")
   );
 }
 
@@ -2286,9 +2345,12 @@ async function loginWithFirebaseAccount(identity, password) {
     return false;
   }
 
-  const existingUser = users.find((user) => {
-    return user.username.toLowerCase() === identity || (user.email || "").toLowerCase() === identity;
-  });
+  const existingUser = findUserByIdentity(identity, { includeDeleted: true });
+  if (isDeletedUser(existingUser)) {
+    loginMessage.textContent = "This account was removed by an admin. Register it again to restore access.";
+    return true;
+  }
+
   const email = identity.includes("@") ? identity : existingUser?.email || "";
   if (!email) return false;
 
@@ -2330,9 +2392,13 @@ async function resendVerificationFromLogin() {
 
   const identity = adminUsername.value.trim().toLowerCase();
   const password = adminPassword.value;
-  const existingUser = users.find((user) => {
-    return user.username.toLowerCase() === identity || (user.email || "").toLowerCase() === identity;
-  });
+  const existingUser = findUserByIdentity(identity, { includeDeleted: true });
+  if (isDeletedUser(existingUser)) {
+    loginMessage.textContent = "This account was removed by an admin. Register it again to restore access.";
+    resendVerificationButton.disabled = false;
+    return;
+  }
+
   const email = identity.includes("@") ? identity : existingUser?.email || "";
 
   if (!email || !password) {
@@ -2380,7 +2446,7 @@ async function loginAdmin(event) {
   const identity = adminUsername.value.trim().toLowerCase();
   const password = adminPassword.value;
   setResendVerificationVisible(false);
-  const user = users.find((savedUser) => {
+  const user = getVisibleUsers().find((savedUser) => {
     const username = savedUser.username.toLowerCase();
     const email = (savedUser.email || "").toLowerCase();
     return (
@@ -2454,7 +2520,14 @@ async function registerAccount(event) {
   const password = registerPassword.value;
   const normalizedUsername = username.toLowerCase();
   const normalizedEmail = email.toLowerCase();
+  const reusableDeletedIndex = users.findIndex((user) => {
+    return (
+      isDeletedUser(user) &&
+      (user.username.toLowerCase() === normalizedUsername || (user.email || "").toLowerCase() === normalizedEmail)
+    );
+  });
   const userExists = users.some((user) => {
+    if (isDeletedUser(user)) return false;
     return user.username.toLowerCase() === normalizedUsername || (user.email || "").toLowerCase() === normalizedEmail;
   });
 
@@ -2464,9 +2537,10 @@ async function registerAccount(event) {
   }
 
   registerMessage.textContent = "Creating account...";
+  let auth = null;
 
   try {
-    const auth = await getFirebaseAuth();
+    auth = await getFirebaseAuth();
     if (!auth) {
       registerMessage.textContent = "Firebase Auth is not connected.";
       return;
@@ -2480,14 +2554,19 @@ async function registerAccount(event) {
       email,
       password: "",
       role: "owner",
-    permissions: [...categories],
-    status: "unverified",
-    firebaseUid: credential.user.uid,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
+      permissions: [...categories],
+      status: "unverified",
+      firebaseUid: credential.user.uid,
+      createdAt: reusableDeletedIndex >= 0 ? users[reusableDeletedIndex].createdAt || "" : new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      deletedAt: ""
+    };
 
-    users.push(user);
+    if (reusableDeletedIndex >= 0) {
+      users[reusableDeletedIndex] = user;
+    } else {
+      users.push(user);
+    }
     saveUsers();
     let verificationMode = "";
     try {
@@ -2516,17 +2595,28 @@ async function registerAccount(event) {
   } catch (error) {
     if (error?.code === "auth/email-already-in-use") {
       const existingIndex = users.findIndex((user) => (user.email || "").toLowerCase() === normalizedEmail);
+      const usernameConflict = users.some((user, index) => {
+        return index !== existingIndex && !isDeletedUser(user) && user.username.toLowerCase() === normalizedUsername;
+      });
+
+      if (usernameConflict) {
+        registerMessage.textContent = "That username is already registered. Choose a different username.";
+        await restoreAnonymousAuth();
+        return;
+      }
+
       const recoveredUser = {
         ...(existingIndex >= 0 ? users[existingIndex] : {}),
-        username: existingIndex >= 0 ? users[existingIndex].username : username,
+        username,
         email,
         password: "",
         role: "owner",
         permissions: [...categories],
-        status: existingIndex >= 0 ? users[existingIndex].status || "unverified" : "unverified",
+        status: "unverified",
         firebaseUid: existingIndex >= 0 ? users[existingIndex].firebaseUid || "" : "",
         createdAt: existingIndex >= 0 ? users[existingIndex].createdAt || "" : new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
+        deletedAt: ""
       };
 
       if (existingIndex >= 0) {
@@ -2536,8 +2626,17 @@ async function registerAccount(event) {
       }
       saveUsers();
       renderUserList();
-      registerMessage.textContent =
-        "That email already exists in Firebase. I added it to the dashboard as unverified; try logging in or resend verification later.";
+      try {
+        const resetMode = await sendPasswordResetForExistingEmail(auth, email);
+        selfRegisterForm.reset();
+        registerMessage.textContent =
+          resetMode === "firebase-default"
+            ? "That email was still in Firebase, so I restored the account and sent a password reset with Firebase's default link. Check inbox and spam."
+            : "That email was still in Firebase, so I restored the account and sent a password reset. Check inbox and spam, then log in.";
+      } catch (resetError) {
+        registerMessage.textContent =
+          `That email was still in Firebase, so I restored the account. Password reset could not be sent yet: ${getAuthErrorMessage(resetError)}`;
+      }
       await restoreAnonymousAuth();
       return;
     }
@@ -2592,7 +2691,7 @@ async function logoutAdmin() {
 function renderUserList() {
   userList.replaceChildren();
 
-  [...users].sort(sortUsersByPrivileges).forEach((user) => {
+  [...getVisibleUsers()].sort(sortUsersByPrivileges).forEach((user) => {
     const row = document.createElement("div");
     row.className = "user-row";
 
@@ -2806,7 +2905,26 @@ function sendInviteEmail(user) {
 
 function removeUser(username) {
   if (!isAdmin()) return;
-  users = users.filter((user) => user.username !== username || user.role === "admin");
+
+  const userIndex = users.findIndex((user) => user.username === username);
+  if (userIndex < 0 || users[userIndex].role === "admin") return;
+
+  const user = users[userIndex];
+  if (user.role === "owner" && (user.email || user.firebaseUid)) {
+    users[userIndex] = {
+      ...user,
+      status: "deleted",
+      password: "",
+      deletedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    userMessage.textContent =
+      "Account removed from the dashboard. If that email registers again, the app will restore it and send a password reset.";
+  } else {
+    users = users.filter((savedUser) => savedUser.username !== username || savedUser.role === "admin");
+    userMessage.textContent = "User removed.";
+  }
+
   saveUsers();
   renderUserList();
 }
