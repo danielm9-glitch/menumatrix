@@ -124,7 +124,8 @@ const state = {
   screen: loadCurrentUser() ? "menus" : "login",
   activeRestaurantMenu: initialRestaurantMenu?.id || defaultRestaurantMenuId,
   dashboardTab: "users",
-  dashboardReturnScreen: "menus"
+  dashboardReturnScreen: "menus",
+  accountReturnScreen: "menus"
 };
 
 const cloudSync = {
@@ -200,11 +201,29 @@ const addItemButton = document.querySelector("#addItemButton");
 const deleteMenuButton = document.querySelector("#deleteMenuButton");
 const scanMenuButton = document.querySelector("#scanMenuButton");
 const manageUsersButton = document.querySelector("#manageUsersButton");
+const accountDashboardButton = document.querySelector("#accountDashboardButton");
 const designButton = document.querySelector("#designButton");
 const logoutButton = document.querySelector("#logoutButton");
 const menuPage = document.querySelector("#menuPage");
+const accountPage = document.querySelector("#accountPage");
 const usersPage = document.querySelector("#usersPage");
 const pdfPage = document.querySelector("#pdfPage");
+const menusAccountButton = document.querySelector("#menusAccountButton");
+const backFromAccountButton = document.querySelector("#backFromAccountButton");
+const accountProfileSummary = document.querySelector("#accountProfileSummary");
+const accountEmailForm = document.querySelector("#accountEmailForm");
+const accountEmailInput = document.querySelector("#accountEmailInput");
+const accountVerifyEmailButton = document.querySelector("#accountVerifyEmailButton");
+const accountEmailMessage = document.querySelector("#accountEmailMessage");
+const accountPasswordForm = document.querySelector("#accountPasswordForm");
+const accountPasswordInput = document.querySelector("#accountPasswordInput");
+const accountPasswordResetButton = document.querySelector("#accountPasswordResetButton");
+const accountPasswordMessage = document.querySelector("#accountPasswordMessage");
+const accountRestaurantForm = document.querySelector("#accountRestaurantForm");
+const accountMenuSelect = document.querySelector("#accountMenuSelect");
+const accountRestaurantName = document.querySelector("#accountRestaurantName");
+const accountRestaurantMessage = document.querySelector("#accountRestaurantMessage");
+const accountRestaurantLinks = document.querySelector("#accountRestaurantLinks");
 const backToMenuButton = document.querySelector("#backToMenuButton");
 const backFromPdfButton = document.querySelector("#backFromPdfButton");
 const pdfItemList = document.querySelector("#pdfItemList");
@@ -349,6 +368,7 @@ function createDefaultRestaurantMenu() {
   return {
     id: defaultRestaurantMenuId,
     name: "Mott 32 Las Vegas",
+    restaurantName: "Mott 32 Las Vegas",
     owner: primaryAdminUsername,
     label: "Chinese menu training",
     categories: ["Starters", "Mains", "Drinks"],
@@ -370,6 +390,7 @@ function normalizeRestaurantMenu(menu, index = 0) {
   return {
     id: menu.id || `menu-${Date.now()}-${index}`,
     name: menu.name || (isDefaultMenu ? "Mott 32 Las Vegas" : `Blank Menu ${index + 1}`),
+    restaurantName: menu.restaurantName || menu.restaurant || (isDefaultMenu ? "Mott 32 Las Vegas" : ""),
     owner: menu.owner || primaryAdminUsername,
     label: menu.label || (isDefaultMenu ? "Chinese menu training" : "Blank menu"),
     categories: Array.isArray(menu.categories) && menu.categories.length ? menu.categories : ["Starters", "Mains", "Drinks"],
@@ -865,6 +886,13 @@ async function getFirebaseAuth() {
   return client.auth;
 }
 
+async function getSignedInFirebaseUser() {
+  const auth = await getFirebaseAuth();
+  if (!auth?.currentUser || auth.currentUser.isAnonymous) return null;
+  await auth.currentUser.reload();
+  return auth.currentUser;
+}
+
 async function restoreAnonymousAuth() {
   const client = await waitForFirebaseClient();
   if (!client?.enabled || !client.auth) return;
@@ -880,9 +908,10 @@ async function restoreAnonymousAuth() {
 
 function getAuthErrorMessage(error) {
   const code = error?.code || "";
-  if (code === "auth/email-already-in-use") return "That email is already registered. Log in instead.";
+  if (code === "auth/email-already-in-use") return "That email is already registered to another Firebase account.";
   if (code === "auth/invalid-email") return "Enter a valid email address.";
   if (code === "auth/weak-password") return "Use at least 6 characters for the password.";
+  if (code === "auth/requires-recent-login") return "For security, log out and log back in, then try this again.";
   if (code === "auth/unauthorized-continue-uri") {
     return "Firebase needs this domain added under Authentication > Settings > Authorized domains.";
   }
@@ -1139,6 +1168,7 @@ function sanitizeRestaurantMenuForStorage(menu) {
   return {
     id: menu.id || `menu-${Date.now()}`,
     name: menu.name || "Untitled Menu",
+    restaurantName: menu.restaurantName || "",
     owner: menu.owner || primaryAdminUsername,
     label: menu.label || "Menu training",
     categories: Array.isArray(menu.categories) && menu.categories.length ? menu.categories : ["Starters", "Mains", "Drinks"],
@@ -1223,7 +1253,7 @@ function renderRestaurantList() {
     const name = document.createElement("strong");
     const details = document.createElement("span");
     name.textContent = menu.name;
-    details.textContent = `${menu.label} - ${menu.items.length} items`;
+    details.textContent = `${menu.restaurantName ? `${menu.restaurantName} - ` : ""}${menu.label} - ${menu.items.length} items`;
     info.append(name, details);
 
     if (isAdmin()) {
@@ -1534,6 +1564,7 @@ function createBlankRestaurantMenu() {
   const blankMenu = normalizeRestaurantMenu({
     id: `blank-menu-${Date.now()}`,
     name: `Blank Menu ${blankCount}`,
+    restaurantName: "",
     owner: activeUser.username,
     label: "Blank menu",
     categories: ["Starters", "Mains", "Drinks"],
@@ -1768,6 +1799,308 @@ function closeUsersPage() {
   showScreen(state.dashboardReturnScreen || "menus");
 }
 
+function openAccountDashboard() {
+  if (!getActiveUser()) return;
+
+  closeDrawer();
+  state.accountReturnScreen = state.screen === "menu" ? "menu" : "menus";
+  showScreen("account");
+  refreshAccountEmailStatus();
+}
+
+function closeAccountDashboard() {
+  accountEmailMessage.textContent = "";
+  accountPasswordMessage.textContent = "";
+  accountRestaurantMessage.textContent = "";
+  showScreen(state.accountReturnScreen || "menus");
+}
+
+function getLinkableRestaurantMenus() {
+  if (isAdmin()) return restaurantMenus;
+  return getVisibleRestaurantMenus().filter((menu) => ownsMenu(menu));
+}
+
+function renderAccountDashboard() {
+  const activeUser = getActiveUser();
+  if (!activeUser || !accountPage) return;
+
+  const visibleMenus = getVisibleRestaurantMenus();
+  const linkableMenus = getLinkableRestaurantMenus();
+  const linkedMenus = visibleMenus.filter((menu) => menu.restaurantName);
+  const emailStatus =
+    activeUser.role === "owner"
+      ? activeUser.status === "active"
+        ? "Verified"
+        : activeUser.status === "unverified"
+          ? "Needs verification"
+          : activeUser.status
+      : "Local account";
+
+  accountProfileSummary.replaceChildren(
+    createDashboardMetric("Signed in as", activeUser.username, getPrivilegeLabel(activeUser)),
+    createDashboardMetric("Email", activeUser.email || "Not set", emailStatus),
+    createDashboardMetric("Menus", String(visibleMenus.length), "Visible in your workspace"),
+    createDashboardMetric("Linked restaurants", String(linkedMenus.length), "Menus assigned to a restaurant")
+  );
+
+  if (document.activeElement !== accountEmailInput) {
+    accountEmailInput.value = activeUser.email || "";
+  }
+
+  const previousMenuId = accountMenuSelect.value;
+  accountMenuSelect.replaceChildren();
+
+  if (!linkableMenus.length) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "Create a menu first";
+    accountMenuSelect.append(option);
+    accountMenuSelect.disabled = true;
+    accountRestaurantName.disabled = true;
+  } else {
+    linkableMenus.forEach((menu) => {
+      const option = document.createElement("option");
+      option.value = menu.id;
+      option.textContent = menu.name;
+      accountMenuSelect.append(option);
+    });
+    accountMenuSelect.disabled = false;
+    accountRestaurantName.disabled = false;
+    accountMenuSelect.value = linkableMenus.some((menu) => menu.id === previousMenuId) ? previousMenuId : linkableMenus[0].id;
+  }
+
+  syncSelectedRestaurantName();
+  renderAccountRestaurantLinks();
+}
+
+function renderAccountRestaurantLinks() {
+  accountRestaurantLinks.replaceChildren();
+  const visibleMenus = getVisibleRestaurantMenus();
+
+  if (!visibleMenus.length) {
+    accountRestaurantLinks.append(createDashboardEmpty("No menus have been created yet."));
+    return;
+  }
+
+  visibleMenus.forEach((menu) => {
+    accountRestaurantLinks.append(
+      createDashboardListRow({
+        title: menu.name,
+        meta: menu.restaurantName ? `Linked restaurant: ${menu.restaurantName}` : "Not linked to a restaurant yet",
+        badge: `${menu.items.length} items`,
+        onClick: () => openRestaurantMenu(menu.id)
+      })
+    );
+  });
+}
+
+function syncSelectedRestaurantName() {
+  const menu = getLinkableRestaurantMenus().find((candidate) => candidate.id === accountMenuSelect.value);
+  if (!menu) {
+    accountRestaurantName.value = "";
+    return;
+  }
+
+  if (document.activeElement !== accountRestaurantName) {
+    accountRestaurantName.value = menu.restaurantName || "";
+  }
+}
+
+function getActiveUserIndex() {
+  const activeUser = getActiveUser();
+  if (!activeUser) return -1;
+  return users.findIndex((user) => user.username === activeUser.username);
+}
+
+function updateActiveUserProfile(updates) {
+  const userIndex = getActiveUserIndex();
+  if (userIndex < 0) return null;
+
+  users[userIndex] = {
+    ...users[userIndex],
+    ...updates,
+    updatedAt: new Date().toISOString()
+  };
+  saveUsers();
+  return users[userIndex];
+}
+
+async function refreshAccountEmailStatus() {
+  const activeUser = getActiveUser();
+  if (!activeUser || activeUser.role !== "owner") return;
+
+  const firebaseUser = await getSignedInFirebaseUser();
+  if (!firebaseUser || !firebaseUser.email) return;
+
+  const updatedUser = updateActiveUserProfile({
+    email: firebaseUser.email,
+    firebaseUid: firebaseUser.uid,
+    status: firebaseUser.emailVerified ? "active" : "unverified"
+  });
+
+  if (updatedUser) renderAdminState();
+}
+
+async function changeAccountEmail(event) {
+  event.preventDefault();
+
+  const activeUser = getActiveUser();
+  const email = accountEmailInput.value.trim().toLowerCase();
+  if (!activeUser || !email) return;
+
+  accountEmailMessage.textContent = "Updating email...";
+
+  if (activeUser.role !== "owner" && !activeUser.firebaseUid) {
+    updateActiveUserProfile({ email });
+    accountEmailMessage.textContent = "Email updated.";
+    renderAdminState();
+    return;
+  }
+
+  try {
+    const firebaseUser = await getSignedInFirebaseUser();
+    if (!firebaseUser) {
+      accountEmailMessage.textContent = "Log out and log back in with this account before changing email.";
+      return;
+    }
+
+    if ((firebaseUser.email || "").toLowerCase() !== email) {
+      await firebaseUser.updateEmail(email);
+      await firebaseUser.reload();
+    }
+
+    updateActiveUserProfile({
+      email: firebaseUser.email || email,
+      firebaseUid: firebaseUser.uid,
+      status: firebaseUser.emailVerified ? "active" : "unverified"
+    });
+
+    if (!firebaseUser.emailVerified) {
+      await sendVerificationEmail(firebaseUser);
+      accountEmailMessage.textContent = "Email updated. Verification email sent. Check inbox and spam.";
+    } else {
+      accountEmailMessage.textContent = "Email updated.";
+    }
+    renderAdminState();
+  } catch (error) {
+    accountEmailMessage.textContent = getAuthErrorMessage(error);
+  }
+}
+
+async function verifyAccountEmail() {
+  const activeUser = getActiveUser();
+  if (!activeUser) return;
+
+  accountEmailMessage.textContent = "Checking email status...";
+
+  if (activeUser.role !== "owner" && !activeUser.firebaseUid) {
+    accountEmailMessage.textContent = "This local account does not need Firebase email verification.";
+    return;
+  }
+
+  try {
+    const firebaseUser = await getSignedInFirebaseUser();
+    if (!firebaseUser) {
+      accountEmailMessage.textContent = "Log out and log back in with this account before verifying email.";
+      return;
+    }
+
+    await firebaseUser.reload();
+    if (firebaseUser.emailVerified) {
+      updateActiveUserProfile({
+        email: firebaseUser.email || activeUser.email,
+        firebaseUid: firebaseUser.uid,
+        status: "active"
+      });
+      accountEmailMessage.textContent = "Email is verified.";
+      renderAdminState();
+      return;
+    }
+
+    await sendVerificationEmail(firebaseUser);
+    accountEmailMessage.textContent = "Verification email sent. Check inbox and spam.";
+  } catch (error) {
+    accountEmailMessage.textContent = getAuthErrorMessage(error);
+  }
+}
+
+async function changeAccountPassword(event) {
+  event.preventDefault();
+
+  const activeUser = getActiveUser();
+  const password = accountPasswordInput.value;
+  if (!activeUser || !password) return;
+
+  accountPasswordMessage.textContent = "Updating password...";
+
+  if (activeUser.role !== "owner" && !activeUser.firebaseUid) {
+    updateActiveUserProfile({ password });
+    accountPasswordInput.value = "";
+    accountPasswordMessage.textContent = "Password updated.";
+    renderAdminState();
+    return;
+  }
+
+  try {
+    const firebaseUser = await getSignedInFirebaseUser();
+    if (!firebaseUser) {
+      accountPasswordMessage.textContent = "Log out and log back in with this account before changing password.";
+      return;
+    }
+
+    await firebaseUser.updatePassword(password);
+    accountPasswordInput.value = "";
+    accountPasswordMessage.textContent = "Password updated.";
+  } catch (error) {
+    accountPasswordMessage.textContent = getAuthErrorMessage(error);
+  }
+}
+
+async function sendAccountPasswordReset() {
+  const activeUser = getActiveUser();
+  const email = (accountEmailInput.value.trim() || activeUser?.email || "").toLowerCase();
+  if (!activeUser || !email) {
+    accountPasswordMessage.textContent = "Add an email first.";
+    return;
+  }
+
+  accountPasswordMessage.textContent = "Sending reset email...";
+
+  try {
+    const auth = await getFirebaseAuth();
+    if (!auth) {
+      accountPasswordMessage.textContent = "Firebase Auth is not connected.";
+      return;
+    }
+    await sendPasswordResetForExistingEmail(auth, email);
+    accountPasswordMessage.textContent = "Password reset email sent. Check inbox and spam.";
+  } catch (error) {
+    accountPasswordMessage.textContent = getAuthErrorMessage(error);
+  }
+}
+
+function linkMenuToRestaurant(event) {
+  event.preventDefault();
+
+  const menuId = accountMenuSelect.value;
+  const restaurantName = accountRestaurantName.value.trim();
+  const menu = getLinkableRestaurantMenus().find((candidate) => candidate.id === menuId);
+  if (!menu || !restaurantName) {
+    accountRestaurantMessage.textContent = "Choose a menu and enter a restaurant name.";
+    return;
+  }
+
+  menu.restaurantName = restaurantName;
+  if (menu.label === "Blank menu") {
+    menu.label = "Menu training";
+  }
+
+  saveRestaurantMenus();
+  accountRestaurantMessage.textContent = `${menu.name} is linked to ${restaurantName}.`;
+  renderAccountDashboard();
+  renderRestaurantList();
+}
+
 function showDashboardTab(tabName) {
   state.dashboardTab = tabName;
 
@@ -1871,7 +2204,7 @@ function renderDashboardRestaurants() {
     dashboardRestaurantList.append(
       createDashboardListRow({
         title: menu.name,
-        meta: `${menu.label} - ${menu.items.length} items`,
+        meta: `${menu.restaurantName ? `${menu.restaurantName} - ` : ""}${menu.label} - ${menu.items.length} items`,
         badge: `Owner: ${getMenuOwner(menu)}`,
         onClick: () => openRestaurantMenu(menu.id)
       })
@@ -1895,7 +2228,7 @@ function renderDashboardMenus() {
     dashboardMenuList.append(
       createDashboardListRow({
         title: menu.name,
-        meta: itemCategories,
+        meta: `${menu.restaurantName ? `${menu.restaurantName} - ` : ""}${itemCategories}`,
         badge: `${menu.items.length} items`,
         onClick: () => openRestaurantMenu(menu.id)
       })
@@ -2259,6 +2592,7 @@ function renderAdminState() {
   registerPage.hidden = Boolean(activeUser) || showingInviteSetup || state.screen !== "register";
   menusPage.hidden = !activeUser || state.screen !== "menus";
   menuPage.hidden = !activeUser || state.screen !== "menu";
+  accountPage.hidden = !activeUser || state.screen !== "account";
   usersPage.hidden = !activeUser || state.screen !== "users" || !isAdmin();
   pdfPage.hidden = !activeUser || state.screen !== "pdf";
 
@@ -2297,6 +2631,7 @@ function renderAdminState() {
   renderRestaurantList();
   renderAdminHomeSummary();
   renderActiveMenuHeader();
+  renderAccountDashboard();
   renderDashboard();
   renderUserList();
   renderMenu();
@@ -3367,6 +3702,15 @@ dashboardTabs.forEach((tab) => {
   tab.addEventListener("click", () => showDashboardTab(tab.dataset.dashboardTab));
 });
 manageUsersButton.addEventListener("click", openUsersPage);
+menusAccountButton.addEventListener("click", openAccountDashboard);
+accountDashboardButton.addEventListener("click", openAccountDashboard);
+backFromAccountButton.addEventListener("click", closeAccountDashboard);
+accountEmailForm.addEventListener("submit", changeAccountEmail);
+accountVerifyEmailButton.addEventListener("click", verifyAccountEmail);
+accountPasswordForm.addEventListener("submit", changeAccountPassword);
+accountPasswordResetButton.addEventListener("click", sendAccountPasswordReset);
+accountRestaurantForm.addEventListener("submit", linkMenuToRestaurant);
+accountMenuSelect.addEventListener("change", syncSelectedRestaurantName);
 designButton.addEventListener("click", openDesignDialog);
 adminHomeDashboardButton.addEventListener("click", openUsersPage);
 dashboardCustomizationButton.addEventListener("click", openDesignDialog);

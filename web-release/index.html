@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Menu Matrix</title>
-    <link rel="stylesheet" href="styles.css?v=privacy-footer" />
+    <link rel="stylesheet" href="styles.css?v=user-dashboard" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -91,7 +91,10 @@
             <h1>Menus</h1>
           </div>
         </div>
-        <button id="menusLogoutButton" class="action-button compact-nav-button" type="button">Log out</button>
+        <div class="top-bar-actions">
+          <button id="menusAccountButton" class="action-button compact-nav-button" type="button">Dashboard</button>
+          <button id="menusLogoutButton" class="action-button compact-nav-button" type="button">Log out</button>
+        </div>
       </header>
       <p id="syncStatus" class="sync-status" role="status">Local mode</p>
 
@@ -216,11 +219,86 @@
         <button id="deleteMenuButton" class="danger-button delete-menu-button" type="button" hidden>Delete Menu</button>
         <button id="scanMenuButton" class="action-button" type="button" hidden>Scan menu photo</button>
         <button id="pdfBuilderButton" class="action-button" type="button" hidden>Create PDF</button>
+        <button id="accountDashboardButton" class="action-button" type="button">My Dashboard</button>
         <button id="manageUsersButton" class="action-button" type="button" hidden>Admin Dashboard</button>
         <button id="designButton" class="action-button" type="button" hidden>Customization</button>
         <button id="logoutButton" class="danger-button" type="button">Log out</button>
       </section>
     </aside>
+
+    <main id="accountPage" class="app-shell dashboard-page" aria-label="Account dashboard" hidden>
+      <header class="page-top-bar">
+        <button id="backFromAccountButton" class="action-button" type="button">Back</button>
+        <div>
+          <p class="kicker">Account</p>
+          <h1>My Dashboard</h1>
+        </div>
+      </header>
+
+      <section class="dashboard-panel">
+        <div class="section-heading">
+          <p class="kicker">Overview</p>
+          <strong>Account summary</strong>
+        </div>
+        <div id="accountProfileSummary" class="dashboard-metric-grid"></div>
+      </section>
+
+      <section class="user-manager">
+        <div class="section-heading">
+          <p class="kicker">Login email</p>
+          <strong>Email and verification</strong>
+        </div>
+        <form id="accountEmailForm" class="user-form">
+          <label>
+            Email
+            <input id="accountEmailInput" type="email" autocomplete="email" required />
+          </label>
+          <div class="account-action-row">
+            <button class="save-button" type="submit">Change email</button>
+            <button id="accountVerifyEmailButton" class="action-button" type="button">Verify email</button>
+          </div>
+          <p id="accountEmailMessage" class="login-message" role="status"></p>
+        </form>
+      </section>
+
+      <section class="user-manager">
+        <div class="section-heading">
+          <p class="kicker">Security</p>
+          <strong>Password</strong>
+        </div>
+        <form id="accountPasswordForm" class="user-form">
+          <label>
+            New password
+            <input id="accountPasswordInput" type="password" autocomplete="new-password" minlength="6" required />
+          </label>
+          <div class="account-action-row">
+            <button class="save-button" type="submit">Change password</button>
+            <button id="accountPasswordResetButton" class="action-button" type="button">Email reset link</button>
+          </div>
+          <p id="accountPasswordMessage" class="login-message" role="status"></p>
+        </form>
+      </section>
+
+      <section class="user-manager">
+        <div class="section-heading">
+          <p class="kicker">Restaurants</p>
+          <strong>Link menus</strong>
+        </div>
+        <form id="accountRestaurantForm" class="user-form">
+          <label>
+            Menu
+            <select id="accountMenuSelect" required></select>
+          </label>
+          <label>
+            Restaurant name
+            <input id="accountRestaurantName" placeholder="Restaurant name" required />
+          </label>
+          <button class="save-button" type="submit">Link menu to restaurant</button>
+          <p id="accountRestaurantMessage" class="login-message" role="status"></p>
+        </form>
+        <div id="accountRestaurantLinks" class="dashboard-list"></div>
+      </section>
+    </main>
 
     <main id="usersPage" class="app-shell dashboard-page" aria-label="Admin dashboard" hidden>
       <header class="page-top-bar">
@@ -650,6 +728,6 @@
     <script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore-compat.js"></script>
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <script src="app.js?v=privacy-footer"></script>
+    <script src="app.js?v=user-dashboard"></script>
   </body>
 </html>
