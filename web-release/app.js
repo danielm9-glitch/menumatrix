@@ -178,6 +178,7 @@ const registerMessage = document.querySelector("#registerMessage");
 const registerLinkButton = document.querySelector("#registerLinkButton");
 const loginLinkButton = document.querySelector("#loginLinkButton");
 const restaurantList = document.querySelector("#restaurantList");
+const menusDashboardButton = document.querySelector("#menusDashboardButton");
 const menusLogoutButton = document.querySelector("#menusLogoutButton");
 const backToMenusButton = document.querySelector("#backToMenusButton");
 const createMenuButton = document.querySelector("#createMenuButton");
@@ -1804,7 +1805,8 @@ function openUsersPage(tabName = "") {
   closeDrawer();
   state.dashboardReturnScreen = state.screen === "menu" ? "menu" : "menus";
   showScreen("users");
-  showDashboardTab(isAdmin() ? tabName || state.dashboardTab || "users" : "account");
+  const adminTab = tabName || (state.dashboardTab && state.dashboardTab !== "account" ? state.dashboardTab : "users");
+  showDashboardTab(isAdmin() ? adminTab : "account");
   refreshAccountEmailStatus();
   renderDashboard();
   if (isAdmin()) renderUserList();
@@ -3924,6 +3926,7 @@ dashboardTabs.forEach((tab) => {
   tab.addEventListener("click", () => showDashboardTab(tab.dataset.dashboardTab));
 });
 manageUsersButton.addEventListener("click", () => openUsersPage());
+menusDashboardButton.addEventListener("click", () => openUsersPage());
 accountEmailForm.addEventListener("submit", changeAccountEmail);
 accountVerifyEmailButton.addEventListener("click", verifyAccountEmail);
 accountPasswordForm.addEventListener("submit", changeAccountPassword);
