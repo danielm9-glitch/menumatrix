@@ -997,7 +997,7 @@ h1 {
 
 .user-actions {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
   gap: 10px;
 }
 
@@ -1015,6 +1015,17 @@ h1 {
   padding: 0 10px;
   background: #fbebe8;
   color: var(--tomato);
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.small-success {
+  min-height: 32px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 10px;
+  background: #edf5ef;
+  color: var(--leaf);
   font-size: 0.76rem;
   font-weight: 900;
 }

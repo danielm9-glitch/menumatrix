@@ -2296,7 +2296,7 @@ async function loginWithFirebaseAccount(identity, password) {
     const credential = await auth.signInWithEmailAndPassword(email, password);
     await credential.user.reload();
 
-    if (!credential.user.emailVerified) {
+    if (!credential.user.emailVerified && existingUser?.status !== "active") {
       loginMessage.textContent =
         "Verify your email first. Check your inbox and spam folder. Use resend only after waiting a few minutes.";
       setResendVerificationVisible(true);
@@ -2636,7 +2636,16 @@ function renderUserList() {
       removeButton.textContent = "Remove";
       removeButton.addEventListener("click", () => removeUser(user.username));
 
-      actions.append(saveButton, removeButton);
+      actions.append(saveButton);
+      if (user.role === "owner" && user.status === "unverified") {
+        const activateButton = document.createElement("button");
+        activateButton.className = "small-success";
+        activateButton.type = "button";
+        activateButton.textContent = "Activate account";
+        activateButton.addEventListener("click", () => activateUser(user.username));
+        actions.append(activateButton);
+      }
+      actions.append(removeButton);
       details.append(actions);
       details.addEventListener("submit", (event) => updateUser(event, user.username));
     } else {
@@ -2799,6 +2808,23 @@ function removeUser(username) {
   if (!isAdmin()) return;
   users = users.filter((user) => user.username !== username || user.role === "admin");
   saveUsers();
+  renderUserList();
+}
+
+function activateUser(username) {
+  if (!isAdmin()) return;
+
+  const userIndex = users.findIndex((user) => user.username === username);
+  if (userIndex < 0 || users[userIndex].role === "admin") return;
+
+  users[userIndex] = {
+    ...users[userIndex],
+    status: "active",
+    updatedAt: new Date().toISOString()
+  };
+
+  saveUsers();
+  userMessage.textContent = `${users[userIndex].username} can now log in with email and password.`;
   renderUserList();
 }
 
