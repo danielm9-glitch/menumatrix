@@ -178,7 +178,6 @@ const registerMessage = document.querySelector("#registerMessage");
 const registerLinkButton = document.querySelector("#registerLinkButton");
 const loginLinkButton = document.querySelector("#loginLinkButton");
 const restaurantList = document.querySelector("#restaurantList");
-const menusDashboardButton = document.querySelector("#menusDashboardButton");
 const menusLogoutButton = document.querySelector("#menusLogoutButton");
 const backToMenusButton = document.querySelector("#backToMenusButton");
 const createMenuButton = document.querySelector("#createMenuButton");
@@ -186,6 +185,8 @@ const adminHomeSummary = document.querySelector("#adminHomeSummary");
 const adminHomeDashboardButton = document.querySelector("#adminHomeDashboardButton");
 const adminHomeMetrics = document.querySelector("#adminHomeMetrics");
 const adminHomeHighlights = document.querySelector("#adminHomeHighlights");
+const homeSummaryKicker = document.querySelector("#homeSummaryKicker");
+const homeSummaryTitle = document.querySelector("#homeSummaryTitle");
 const menusDirectoryKicker = document.querySelector("#menusDirectoryKicker");
 const menusDirectoryTitle = document.querySelector("#menusDirectoryTitle");
 const syncStatus = document.querySelector("#syncStatus");
@@ -1284,20 +1285,35 @@ function renderRestaurantList() {
 }
 
 function renderAdminHomeSummary() {
-  const showAdminHome = isAdmin();
-  menusPage.classList.toggle("is-admin-home", showAdminHome);
-  adminHomeSummary.hidden = !showAdminHome;
-  menusDirectoryKicker.textContent = showAdminHome ? "Sorted by activity" : "Restaurants";
-  menusDirectoryTitle.textContent = showAdminHome ? "Menus by clicks and fullness" : "Menus";
+  const activeUser = getActiveUser();
+  const visibleMenus = getVisibleRestaurantMenus();
+  const isAdminUser = isAdmin();
+  const showHomeAnalytics = Boolean(activeUser);
+  menusPage.classList.toggle("is-admin-home", showHomeAnalytics);
+  adminHomeSummary.hidden = !showHomeAnalytics;
+  menusDirectoryKicker.textContent = isAdminUser ? "Sorted by activity" : "Created menus";
+  menusDirectoryTitle.textContent = isAdminUser ? "Menus by clicks and fullness" : "Your menus";
 
-  if (!showAdminHome) {
+  if (!showHomeAnalytics) {
     adminHomeMetrics.replaceChildren();
     adminHomeHighlights.replaceChildren();
     return;
   }
 
-  const menus = restaurantMenus;
-  const sortedByClicks = getSortedRestaurantMenus(menus);
+  homeSummaryKicker.textContent = isAdminUser ? "Admin dashboard" : "Menu analytics";
+  homeSummaryTitle.textContent = isAdminUser ? "Quick summary" : "Your summary";
+  adminHomeDashboardButton.hidden = !isAdminUser;
+
+  const menus = isAdminUser ? restaurantMenus : visibleMenus;
+  const sortedByClicks = [...menus].sort((a, b) => {
+    const clickDifference = getMenuStats(b).clicks - getMenuStats(a).clicks;
+    if (clickDifference) return clickDifference;
+
+    const fullnessDifference = getMenuFullnessScore(b) - getMenuFullnessScore(a);
+    if (fullnessDifference) return fullnessDifference;
+
+    return a.name.localeCompare(b.name);
+  });
   const sortedByFullness = [...menus].sort((a, b) => {
     const fullnessDifference = getMenuFullnessScore(b) - getMenuFullnessScore(a);
     if (fullnessDifference) return fullnessDifference;
@@ -1305,27 +1321,40 @@ function renderAdminHomeSummary() {
   });
   const totalItems = menus.reduce((sum, menu) => sum + menu.items.length, 0);
   const totalClicks = menus.reduce((sum, menu) => sum + getMenuStats(menu).clicks, 0);
-  const activeAccounts = getVisibleUsers().filter((user) => user.status !== "pending").length;
 
-  adminHomeMetrics.replaceChildren(
-    createDashboardMetric("Menus", String(menus.length), "Created restaurants"),
-    createDashboardMetric("Items", String(totalItems), "Across every menu"),
-    createDashboardMetric("Clicks", String(totalClicks), "Menu opens tracked"),
-    createDashboardMetric("Users", String(activeAccounts), "Active accounts")
-  );
+  if (isAdminUser) {
+    const activeAccounts = getVisibleUsers().filter((user) => user.status !== "pending").length;
+    adminHomeMetrics.replaceChildren(
+      createDashboardMetric("Menus", String(menus.length), "Created restaurants"),
+      createDashboardMetric("Items", String(totalItems), "Across every menu"),
+      createDashboardMetric("Clicks", String(totalClicks), "Menu opens tracked"),
+      createDashboardMetric("Users", String(activeAccounts), "Active accounts")
+    );
+  } else {
+    const linkedMenus = menus.filter((menu) => menu.restaurantName).length;
+    const averageFullness = menus.length
+      ? Math.round(menus.reduce((sum, menu) => sum + getMenuFullnessPercent(menu), 0) / menus.length)
+      : 0;
+    adminHomeMetrics.replaceChildren(
+      createDashboardMetric("Menus", String(menus.length), "Created by you"),
+      createDashboardMetric("Items", String(totalItems), "Across your menus"),
+      createDashboardMetric("Linked", String(linkedMenus), "Menus tied to restaurants"),
+      createDashboardMetric("Fullness", `${averageFullness}%`, menus.length ? "Average completion" : "Create a menu to start")
+    );
+  }
 
   adminHomeHighlights.replaceChildren(
     createAdminHomeHighlight({
       label: "Most clicked",
       menu: sortedByClicks[0],
       badge: sortedByClicks[0] ? `${getMenuStats(sortedByClicks[0]).clicks} clicks` : "",
-      emptyText: "No menus have been clicked yet."
+      emptyText: isAdminUser ? "No menus have been clicked yet." : "Create a blank menu to start tracking menu opens."
     }),
     createAdminHomeHighlight({
       label: "Fullest menu",
       menu: sortedByFullness[0],
       badge: sortedByFullness[0] ? `${getMenuFullnessPercent(sortedByFullness[0])}% full` : "",
-      emptyText: "No menus have items yet."
+      emptyText: isAdminUser ? "No menus have items yet." : "Add items to a menu to track completion."
     })
   );
 }
@@ -1349,7 +1378,12 @@ function createAdminHomeHighlight({ label, menu, badge, emptyText }) {
   const metaElement = document.createElement("span");
   labelElement.textContent = label;
   titleElement.textContent = menu.name;
-  metaElement.textContent = `${menu.items.length} items - Owner: ${getMenuOwner(menu)}`;
+  const menuContext = isAdmin()
+    ? `Owner: ${getMenuOwner(menu)}`
+    : menu.restaurantName
+      ? `Restaurant: ${menu.restaurantName}`
+      : "No restaurant linked";
+  metaElement.textContent = `${menu.items.length} items - ${menuContext}`;
   copy.append(labelElement, titleElement, metaElement);
 
   const badgeElement = document.createElement("span");
@@ -3926,7 +3960,6 @@ dashboardTabs.forEach((tab) => {
   tab.addEventListener("click", () => showDashboardTab(tab.dataset.dashboardTab));
 });
 manageUsersButton.addEventListener("click", () => openUsersPage());
-menusDashboardButton.addEventListener("click", () => openUsersPage());
 accountEmailForm.addEventListener("submit", changeAccountEmail);
 accountVerifyEmailButton.addEventListener("click", verifyAccountEmail);
 accountPasswordForm.addEventListener("submit", changeAccountPassword);

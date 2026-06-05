@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Menu Matrix</title>
-    <link rel="stylesheet" href="styles.css?v=user-dashboard" />
+    <link rel="stylesheet" href="styles.css?v=regular-home" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -91,19 +91,16 @@
             <h1>Menus</h1>
           </div>
         </div>
-        <div class="top-bar-actions">
-          <button id="menusDashboardButton" class="action-button compact-nav-button" type="button">Dashboard</button>
-          <button id="menusLogoutButton" class="action-button compact-nav-button" type="button">Log out</button>
-        </div>
+        <button id="menusLogoutButton" class="action-button compact-nav-button" type="button">Log out</button>
       </header>
       <p id="syncStatus" class="sync-status" role="status">Local mode</p>
 
       <div class="menus-home-layout">
-        <section id="adminHomeSummary" class="admin-home-summary" aria-label="Admin dashboard summary" hidden>
+        <section id="adminHomeSummary" class="admin-home-summary" aria-label="Dashboard summary" hidden>
           <div class="section-heading with-action">
             <div>
-              <p class="kicker">Admin dashboard</p>
-              <h2>Quick summary</h2>
+              <p id="homeSummaryKicker" class="kicker">Dashboard</p>
+              <h2 id="homeSummaryTitle">Quick summary</h2>
             </div>
             <button id="adminHomeDashboardButton" class="action-button compact-action-button" type="button">Open dashboard</button>
           </div>
@@ -774,6 +771,6 @@
     <script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore-compat.js"></script>
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <script src="app.js?v=user-dashboard"></script>
+    <script src="app.js?v=regular-home"></script>
   </body>
 </html>
