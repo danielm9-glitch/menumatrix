@@ -143,6 +143,9 @@ const cloudSync = {
 
 let deleteSliderDragging = false;
 let deleteSliderProgress = 0;
+let accountDeleteSliderDragging = false;
+let accountDeleteSliderProgress = 0;
+let accountDeletionBusy = false;
 
 const formatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -224,6 +227,20 @@ const accountMenuSelect = document.querySelector("#accountMenuSelect");
 const accountRestaurantName = document.querySelector("#accountRestaurantName");
 const accountRestaurantMessage = document.querySelector("#accountRestaurantMessage");
 const accountRestaurantLinks = document.querySelector("#accountRestaurantLinks");
+const deleteAccountButton = document.querySelector("#deleteAccountButton");
+const accountDeleteStatus = document.querySelector("#accountDeleteStatus");
+const deleteAccountDialog = document.querySelector("#deleteAccountDialog");
+const closeDeleteAccountButton = document.querySelector("#closeDeleteAccountButton");
+const cancelDeleteAccountButton = document.querySelector("#cancelDeleteAccountButton");
+const continueDeleteAccountButton = document.querySelector("#continueDeleteAccountButton");
+const deleteAccountName = document.querySelector("#deleteAccountName");
+const deleteAccountQuestion = document.querySelector("#deleteAccountQuestion");
+const deleteAccountWarning = document.querySelector("#deleteAccountWarning");
+const deleteAccountSlideStep = document.querySelector("#deleteAccountSlideStep");
+const deleteAccountSlider = document.querySelector("#deleteAccountSlider");
+const deleteAccountSliderThumb = document.querySelector("#deleteAccountSliderThumb");
+const deleteAccountSliderText = document.querySelector("#deleteAccountSliderText");
+const deleteAccountMessage = document.querySelector("#deleteAccountMessage");
 const backToMenuButton = document.querySelector("#backToMenuButton");
 const backFromPdfButton = document.querySelector("#backFromPdfButton");
 const pdfItemList = document.querySelector("#pdfItemList");
@@ -1827,6 +1844,12 @@ function renderAccountDashboard() {
   const visibleMenus = getVisibleRestaurantMenus();
   const linkableMenus = getLinkableRestaurantMenus();
   const linkedMenus = visibleMenus.filter((menu) => menu.restaurantName);
+  deleteAccountButton.disabled = !canDeleteOwnAccount(activeUser);
+  if (!canDeleteOwnAccount(activeUser) && !accountDeleteStatus.textContent) {
+    accountDeleteStatus.textContent = "The primary admin account cannot be deleted here.";
+  } else if (canDeleteOwnAccount(activeUser) && accountDeleteStatus.textContent === "The primary admin account cannot be deleted here.") {
+    accountDeleteStatus.textContent = "";
+  }
   const emailStatus =
     activeUser.role === "owner"
       ? activeUser.status === "active"
@@ -2099,6 +2122,207 @@ function linkMenuToRestaurant(event) {
   accountRestaurantMessage.textContent = `${menu.name} is linked to ${restaurantName}.`;
   renderAccountDashboard();
   renderRestaurantList();
+}
+
+function canDeleteOwnAccount(user = getActiveUser()) {
+  return Boolean(user && user.role !== "admin");
+}
+
+function resetDeleteAccountSlider() {
+  accountDeleteSliderDragging = false;
+  setDeleteAccountSliderProgress(0);
+  deleteAccountMessage.textContent = "";
+}
+
+function setDeleteAccountSliderProgress(value) {
+  accountDeleteSliderProgress = Math.max(0, Math.min(100, value));
+  const maxOffset = Math.max(0, deleteAccountSlider.clientWidth - deleteAccountSliderThumb.offsetWidth - 10);
+
+  deleteAccountSlider.style.setProperty("--confirm-progress", `${accountDeleteSliderProgress}%`);
+  deleteAccountSlider.setAttribute("aria-valuenow", String(Math.round(accountDeleteSliderProgress)));
+  deleteAccountSliderThumb.style.transform = `translateX(${(maxOffset * accountDeleteSliderProgress) / 100}px)`;
+  deleteAccountSliderThumb.textContent = accountDeleteSliderProgress >= 92 ? "Release" : "Grab";
+  deleteAccountSliderText.textContent = accountDeleteSliderProgress >= 92 ? "Release to delete" : "Slide to delete";
+}
+
+function getDeleteAccountSliderValue(event) {
+  const rect = deleteAccountSlider.getBoundingClientRect();
+  const position = Math.max(0, Math.min(event.clientX - rect.left, rect.width));
+  return (position / rect.width) * 100;
+}
+
+function openDeleteAccountDialog() {
+  const activeUser = getActiveUser();
+  if (!activeUser) return;
+
+  if (!canDeleteOwnAccount(activeUser)) {
+    accountDeleteStatus.textContent = "The primary admin account cannot be deleted here.";
+    return;
+  }
+
+  deleteAccountName.textContent = activeUser.username;
+  deleteAccountQuestion.hidden = false;
+  deleteAccountSlideStep.hidden = true;
+  deleteAccountWarning.textContent = "This cannot be undone.";
+  accountDeleteStatus.textContent = "";
+  resetDeleteAccountSlider();
+  deleteAccountDialog.showModal();
+}
+
+function closeDeleteAccountDialog() {
+  if (accountDeletionBusy) return;
+
+  deleteAccountDialog.close();
+  deleteAccountQuestion.hidden = false;
+  deleteAccountSlideStep.hidden = true;
+  resetDeleteAccountSlider();
+}
+
+function showDeleteAccountSlider() {
+  deleteAccountQuestion.hidden = true;
+  deleteAccountSlideStep.hidden = false;
+  resetDeleteAccountSlider();
+  window.requestAnimationFrame(() => deleteAccountSlider.focus());
+}
+
+async function deleteOwnerWorkspaceData(user) {
+  const workspaceStorageKey = getRestaurantMenusStorageKey(user);
+  const workspaceDocId = getWorkspaceDocumentId(user);
+  localStorage.removeItem(workspaceStorageKey);
+
+  if (isOwnerWorkspace(user) && workspaceDocId !== firebaseMenuDocumentId && cloudSync.client?.db) {
+    await cloudSync.client.db.collection("menus").doc(workspaceDocId).delete();
+  }
+}
+
+async function markUserDeletedAfterSelfDelete(user) {
+  const userIndex = users.findIndex((savedUser) => savedUser.username === user.username);
+  if (userIndex >= 0) {
+    users[userIndex] = {
+      username: user.username,
+      email: "",
+      password: "",
+      role: user.role,
+      permissions: [],
+      status: "deleted",
+      firebaseUid: "",
+      createdAt: user.createdAt || "",
+      updatedAt: new Date().toISOString(),
+      deletedAt: new Date().toISOString()
+    };
+  }
+
+  saveUsers();
+  await uploadCloudUsersSnapshot("account-delete");
+}
+
+function finishSelfAccountDeletion() {
+  state.currentUser = null;
+  state.screen = "login";
+  state.editing = false;
+  localStorage.removeItem(currentUserKey);
+  restaurantMenus = loadRestaurantMenus(null);
+  state.activeRestaurantMenu = restaurantMenus[0]?.id || defaultRestaurantMenuId;
+  syncActiveRestaurantMenuData();
+  applyDesignSettings();
+  closeDrawer();
+  deleteAccountDialog.close();
+  accountDeletionBusy = false;
+  renderAdminState();
+}
+
+async function deleteOwnAccount() {
+  if (accountDeletionBusy || accountDeleteSliderProgress < 92) return;
+
+  const activeUser = getActiveUser();
+  if (!activeUser || !canDeleteOwnAccount(activeUser)) return;
+
+  accountDeletionBusy = true;
+  deleteAccountMessage.textContent = "Deleting account...";
+
+  try {
+    if (activeUser.role === "owner" || activeUser.firebaseUid) {
+      const firebaseUser = await getSignedInFirebaseUser();
+      if (!firebaseUser) {
+        deleteAccountMessage.textContent = "Log out and log back in with this account before deleting it.";
+        accountDeletionBusy = false;
+        return;
+      }
+
+      if (activeUser.firebaseUid && firebaseUser.uid !== activeUser.firebaseUid) {
+        deleteAccountMessage.textContent = "The signed-in Firebase account does not match this dashboard user.";
+        accountDeletionBusy = false;
+        return;
+      }
+
+      await firebaseUser.delete();
+      await restoreAnonymousAuth();
+    }
+
+    await deleteOwnerWorkspaceData(activeUser);
+    await markUserDeletedAfterSelfDelete(activeUser);
+    finishSelfAccountDeletion();
+  } catch (error) {
+    accountDeletionBusy = false;
+    deleteAccountMessage.textContent = getAuthErrorMessage(error);
+  }
+}
+
+function handleDeleteAccountSliderPointerDown(event) {
+  if (deleteAccountSlideStep.hidden || accountDeletionBusy) return;
+
+  accountDeleteSliderDragging = true;
+  deleteAccountSlider.setPointerCapture?.(event.pointerId);
+  setDeleteAccountSliderProgress(getDeleteAccountSliderValue(event));
+}
+
+function handleDeleteAccountSliderPointerMove(event) {
+  if (!accountDeleteSliderDragging || accountDeletionBusy) return;
+
+  setDeleteAccountSliderProgress(getDeleteAccountSliderValue(event));
+}
+
+function handleDeleteAccountSliderPointerUp(event) {
+  if (!accountDeleteSliderDragging || accountDeletionBusy) return;
+
+  accountDeleteSliderDragging = false;
+  setDeleteAccountSliderProgress(getDeleteAccountSliderValue(event));
+
+  if (accountDeleteSliderProgress >= 92) {
+    deleteOwnAccount();
+    return;
+  }
+
+  setDeleteAccountSliderProgress(0);
+}
+
+function handleDeleteAccountSliderKeydown(event) {
+  if (deleteAccountSlideStep.hidden || accountDeletionBusy) return;
+
+  if (event.key === "ArrowRight" || event.key === "ArrowUp") {
+    event.preventDefault();
+    setDeleteAccountSliderProgress(accountDeleteSliderProgress + 10);
+  }
+
+  if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
+    event.preventDefault();
+    setDeleteAccountSliderProgress(accountDeleteSliderProgress - 10);
+  }
+
+  if (event.key === "Home") {
+    event.preventDefault();
+    setDeleteAccountSliderProgress(0);
+  }
+
+  if (event.key === "End") {
+    event.preventDefault();
+    setDeleteAccountSliderProgress(100);
+  }
+
+  if ((event.key === "Enter" || event.key === " ") && accountDeleteSliderProgress >= 92) {
+    event.preventDefault();
+    deleteOwnAccount();
+  }
 }
 
 function showDashboardTab(tabName) {
@@ -3711,6 +3935,18 @@ accountPasswordForm.addEventListener("submit", changeAccountPassword);
 accountPasswordResetButton.addEventListener("click", sendAccountPasswordReset);
 accountRestaurantForm.addEventListener("submit", linkMenuToRestaurant);
 accountMenuSelect.addEventListener("change", syncSelectedRestaurantName);
+deleteAccountButton.addEventListener("click", openDeleteAccountDialog);
+closeDeleteAccountButton.addEventListener("click", closeDeleteAccountDialog);
+cancelDeleteAccountButton.addEventListener("click", closeDeleteAccountDialog);
+continueDeleteAccountButton.addEventListener("click", showDeleteAccountSlider);
+deleteAccountSlider.addEventListener("pointerdown", handleDeleteAccountSliderPointerDown);
+deleteAccountSlider.addEventListener("pointermove", handleDeleteAccountSliderPointerMove);
+deleteAccountSlider.addEventListener("pointerup", handleDeleteAccountSliderPointerUp);
+deleteAccountSlider.addEventListener("pointercancel", () => {
+  accountDeleteSliderDragging = false;
+  setDeleteAccountSliderProgress(0);
+});
+deleteAccountSlider.addEventListener("keydown", handleDeleteAccountSliderKeydown);
 designButton.addEventListener("click", openDesignDialog);
 adminHomeDashboardButton.addEventListener("click", openUsersPage);
 dashboardCustomizationButton.addEventListener("click", openDesignDialog);

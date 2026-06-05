@@ -743,6 +743,14 @@ h1 {
   width: 100%;
 }
 
+.account-danger-zone {
+  border-top-color: rgba(201, 79, 61, 0.34);
+}
+
+.account-danger-zone .danger-button {
+  width: 100%;
+}
+
 .dashboard-page {
   display: grid;
   align-content: start;

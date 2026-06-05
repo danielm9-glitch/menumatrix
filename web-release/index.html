@@ -298,6 +298,18 @@
         </form>
         <div id="accountRestaurantLinks" class="dashboard-list"></div>
       </section>
+
+      <section class="user-manager account-danger-zone">
+        <div class="section-heading">
+          <p class="kicker">Danger zone</p>
+          <strong>Delete account</strong>
+        </div>
+        <p class="dashboard-note">
+          Delete your account profile and remove your own menu workspace. This action cannot be undone.
+        </p>
+        <button id="deleteAccountButton" class="danger-button" type="button">Delete my account</button>
+        <p id="accountDeleteStatus" class="login-message" role="status"></p>
+      </section>
     </main>
 
     <main id="usersPage" class="app-shell dashboard-page" aria-label="Admin dashboard" hidden>
@@ -688,6 +700,48 @@
             <span id="deleteMenuSliderThumb" class="confirm-slider-thumb" aria-hidden="true">Grab</span>
           </div>
           <p id="deleteMenuMessage" class="login-message" role="status"></p>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="deleteAccountDialog" class="item-dialog danger-dialog" aria-labelledby="deleteAccountTitle">
+      <form class="item-form" method="dialog">
+        <div class="dialog-head">
+          <div>
+            <p class="kicker">Account</p>
+            <h2 id="deleteAccountTitle">Delete Account</h2>
+          </div>
+          <button class="icon-button" type="button" aria-label="Close delete account" id="closeDeleteAccountButton">x</button>
+        </div>
+
+        <p class="delete-menu-copy">
+          Delete <strong id="deleteAccountName">this account</strong> and its own menu workspace?
+        </p>
+
+        <div id="deleteAccountQuestion" class="delete-confirm-step">
+          <p id="deleteAccountWarning" class="delete-menu-warning">This cannot be undone.</p>
+          <div class="form-actions">
+            <button id="cancelDeleteAccountButton" class="action-button" type="button">No</button>
+            <button id="continueDeleteAccountButton" class="danger-button" type="button">Yes</button>
+          </div>
+        </div>
+
+        <div id="deleteAccountSlideStep" class="delete-slide-step" hidden>
+          <p class="delete-menu-warning">Grab and slide all the way across to verify Yes.</p>
+          <div
+            id="deleteAccountSlider"
+            class="confirm-slider"
+            role="slider"
+            aria-label="Slide to confirm account delete"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow="0"
+            tabindex="0"
+          >
+            <span id="deleteAccountSliderText" class="confirm-slider-text">Slide to delete</span>
+            <span id="deleteAccountSliderThumb" class="confirm-slider-thumb" aria-hidden="true">Grab</span>
+          </div>
+          <p id="deleteAccountMessage" class="login-message" role="status"></p>
         </div>
       </form>
     </dialog>
