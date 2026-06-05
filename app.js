@@ -124,8 +124,7 @@ const state = {
   screen: loadCurrentUser() ? "menus" : "login",
   activeRestaurantMenu: initialRestaurantMenu?.id || defaultRestaurantMenuId,
   dashboardTab: "users",
-  dashboardReturnScreen: "menus",
-  accountReturnScreen: "menus"
+  dashboardReturnScreen: "menus"
 };
 
 const cloudSync = {
@@ -204,15 +203,13 @@ const addItemButton = document.querySelector("#addItemButton");
 const deleteMenuButton = document.querySelector("#deleteMenuButton");
 const scanMenuButton = document.querySelector("#scanMenuButton");
 const manageUsersButton = document.querySelector("#manageUsersButton");
-const accountDashboardButton = document.querySelector("#accountDashboardButton");
 const designButton = document.querySelector("#designButton");
 const logoutButton = document.querySelector("#logoutButton");
 const menuPage = document.querySelector("#menuPage");
-const accountPage = document.querySelector("#accountPage");
 const usersPage = document.querySelector("#usersPage");
 const pdfPage = document.querySelector("#pdfPage");
-const menusAccountButton = document.querySelector("#menusAccountButton");
-const backFromAccountButton = document.querySelector("#backFromAccountButton");
+const dashboardKicker = document.querySelector("#dashboardKicker");
+const dashboardTitle = document.querySelector("#dashboardTitle");
 const accountProfileSummary = document.querySelector("#accountProfileSummary");
 const accountEmailForm = document.querySelector("#accountEmailForm");
 const accountEmailInput = document.querySelector("#accountEmailInput");
@@ -1231,8 +1228,8 @@ function normalizeScreen(activeUser, invitedUser) {
     state.screen = "menus";
   }
 
-  if (state.screen === "users" && !isAdmin()) {
-    state.screen = "menus";
+  if (state.screen === "users" && !activeUser) {
+    state.screen = "login";
   }
 }
 
@@ -1801,35 +1798,23 @@ function closeDrawer() {
   adminDrawer.setAttribute("aria-hidden", "true");
 }
 
-function openUsersPage() {
-  if (!isAdmin()) return;
+function openUsersPage(tabName = "") {
+  if (!getActiveUser()) return;
 
   closeDrawer();
   state.dashboardReturnScreen = state.screen === "menu" ? "menu" : "menus";
   showScreen("users");
-  showDashboardTab(state.dashboardTab || "users");
+  showDashboardTab(isAdmin() ? tabName || state.dashboardTab || "users" : "account");
+  refreshAccountEmailStatus();
   renderDashboard();
-  renderUserList();
+  if (isAdmin()) renderUserList();
 }
 
 function closeUsersPage() {
-  showScreen(state.dashboardReturnScreen || "menus");
-}
-
-function openAccountDashboard() {
-  if (!getActiveUser()) return;
-
-  closeDrawer();
-  state.accountReturnScreen = state.screen === "menu" ? "menu" : "menus";
-  showScreen("account");
-  refreshAccountEmailStatus();
-}
-
-function closeAccountDashboard() {
   accountEmailMessage.textContent = "";
   accountPasswordMessage.textContent = "";
   accountRestaurantMessage.textContent = "";
-  showScreen(state.accountReturnScreen || "menus");
+  showScreen(state.dashboardReturnScreen || "menus");
 }
 
 function getLinkableRestaurantMenus() {
@@ -1839,7 +1824,7 @@ function getLinkableRestaurantMenus() {
 
 function renderAccountDashboard() {
   const activeUser = getActiveUser();
-  if (!activeUser || !accountPage) return;
+  if (!activeUser || !usersPage) return;
 
   const visibleMenus = getVisibleRestaurantMenus();
   const linkableMenus = getLinkableRestaurantMenus();
@@ -2326,9 +2311,14 @@ function handleDeleteAccountSliderKeydown(event) {
 }
 
 function showDashboardTab(tabName) {
+  if (!isAdmin() && tabName !== "account") {
+    tabName = "account";
+  }
+
   state.dashboardTab = tabName;
 
   dashboardTabs.forEach((tab) => {
+    tab.hidden = !isAdmin() && tab.dataset.dashboardTab !== "account";
     const isActive = tab.dataset.dashboardTab === tabName;
     tab.classList.toggle("is-active", isActive);
     tab.setAttribute("aria-selected", String(isActive));
@@ -2342,8 +2332,17 @@ function showDashboardTab(tabName) {
 }
 
 function renderDashboard() {
-  if (!isAdmin()) return;
+  const activeUser = getActiveUser();
+  if (!activeUser) return;
 
+  dashboardKicker.textContent = isAdmin() ? "Admin" : "Account";
+  dashboardTitle.textContent = "Dashboard";
+  dashboardTabs.forEach((tab) => {
+    tab.hidden = !isAdmin() && tab.dataset.dashboardTab !== "account";
+  });
+
+  renderAccountDashboard();
+  if (!isAdmin()) return;
   renderDashboardAuthSummary();
   renderDashboardPaymentsSummary();
   renderDashboardCustomizationSummary();
@@ -2816,8 +2815,7 @@ function renderAdminState() {
   registerPage.hidden = Boolean(activeUser) || showingInviteSetup || state.screen !== "register";
   menusPage.hidden = !activeUser || state.screen !== "menus";
   menuPage.hidden = !activeUser || state.screen !== "menu";
-  accountPage.hidden = !activeUser || state.screen !== "account";
-  usersPage.hidden = !activeUser || state.screen !== "users" || !isAdmin();
+  usersPage.hidden = !activeUser || state.screen !== "users";
   pdfPage.hidden = !activeUser || state.screen !== "pdf";
 
   adminLoginForm.hidden = Boolean(activeUser) || showingInviteSetup;
@@ -2826,7 +2824,7 @@ function renderAdminState() {
   adminControls.hidden = !activeUser;
   pdfBuilderButton.hidden = !activeUser;
   scanMenuButton.hidden = !canEditAnyCategory();
-  manageUsersButton.hidden = !isAdmin();
+  manageUsersButton.hidden = !activeUser;
   designButton.hidden = true;
   editHeroButton.hidden = !isAdmin();
   loginMessage.textContent = "";
@@ -2857,7 +2855,7 @@ function renderAdminState() {
   renderActiveMenuHeader();
   renderAccountDashboard();
   renderDashboard();
-  renderUserList();
+  if (isAdmin()) renderUserList();
   renderMenu();
 }
 
@@ -3925,10 +3923,7 @@ methodTabs.forEach((tab) => {
 dashboardTabs.forEach((tab) => {
   tab.addEventListener("click", () => showDashboardTab(tab.dataset.dashboardTab));
 });
-manageUsersButton.addEventListener("click", openUsersPage);
-menusAccountButton.addEventListener("click", openAccountDashboard);
-accountDashboardButton.addEventListener("click", openAccountDashboard);
-backFromAccountButton.addEventListener("click", closeAccountDashboard);
+manageUsersButton.addEventListener("click", () => openUsersPage());
 accountEmailForm.addEventListener("submit", changeAccountEmail);
 accountVerifyEmailButton.addEventListener("click", verifyAccountEmail);
 accountPasswordForm.addEventListener("submit", changeAccountPassword);
@@ -3948,7 +3943,7 @@ deleteAccountSlider.addEventListener("pointercancel", () => {
 });
 deleteAccountSlider.addEventListener("keydown", handleDeleteAccountSliderKeydown);
 designButton.addEventListener("click", openDesignDialog);
-adminHomeDashboardButton.addEventListener("click", openUsersPage);
+adminHomeDashboardButton.addEventListener("click", () => openUsersPage());
 dashboardCustomizationButton.addEventListener("click", openDesignDialog);
 editHeroButton.addEventListener("click", openDesignDialog);
 renameMenuButton.addEventListener("click", openRenameMenuDialog);
