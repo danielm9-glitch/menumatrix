@@ -6,6 +6,7 @@ const currentUserKey = "restaurant-menu-matrix-current-user";
 const designStorageKey = "restaurant-menu-matrix-design";
 const menusStorageKey = "restaurant-menu-matrix-restaurant-menus";
 const categoriesStorageKey = "restaurant-menu-matrix-categories";
+const savedShareCodesStorageKey = "restaurant-menu-matrix-saved-share-codes";
 const authFlowKey = "restaurant-menu-matrix-auth-flow";
 const currentAuthFlow = "login-first-menus";
 const firebaseMenuDocumentId = "main";
@@ -122,6 +123,8 @@ const state = {
   allergies: new Set(),
   openItems: new Set(),
   currentUser: loadCurrentUser(),
+  sharedMenu: null,
+  sharedCode: "",
   editing: false,
   screen: loadCurrentUser() ? "menus" : "login",
   activeRestaurantMenu: initialRestaurantMenu?.id || defaultRestaurantMenuId,
@@ -181,6 +184,11 @@ const registerPassword = document.querySelector("#registerPassword");
 const registerMessage = document.querySelector("#registerMessage");
 const registerLinkButton = document.querySelector("#registerLinkButton");
 const loginLinkButton = document.querySelector("#loginLinkButton");
+const showCodeLoginButton = document.querySelector("#showCodeLoginButton");
+const codeLoginForm = document.querySelector("#codeLoginForm");
+const shareCodeInput = document.querySelector("#shareCodeInput");
+const savedShareCodes = document.querySelector("#savedShareCodes");
+const codeLoginMessage = document.querySelector("#codeLoginMessage");
 const restaurantList = document.querySelector("#restaurantList");
 const menusUserStatus = document.querySelector("#menusUserStatus");
 const menusLogoutButton = document.querySelector("#menusLogoutButton");
@@ -207,12 +215,14 @@ const quickScanMenuButton = document.querySelector("#quickScanMenuButton");
 const quickImportPdfButton = document.querySelector("#quickImportPdfButton");
 const quickPdfBuilderButton = document.querySelector("#quickPdfBuilderButton");
 const quickCategoryButton = document.querySelector("#quickCategoryButton");
+const quickShareMenuButton = document.querySelector("#quickShareMenuButton");
 const pdfBuilderButton = document.querySelector("#pdfBuilderButton");
 const addItemButton = document.querySelector("#addItemButton");
 const deleteMenuButton = document.querySelector("#deleteMenuButton");
 const scanMenuButton = document.querySelector("#scanMenuButton");
 const importPdfButton = document.querySelector("#importPdfButton");
 const categoryManagerButton = document.querySelector("#categoryManagerButton");
+const shareMenuButton = document.querySelector("#shareMenuButton");
 const manageUsersButton = document.querySelector("#manageUsersButton");
 const designButton = document.querySelector("#designButton");
 const logoutButton = document.querySelector("#logoutButton");
@@ -320,6 +330,13 @@ const closeCategoryButton = document.querySelector("#closeCategoryButton");
 const newCategoryName = document.querySelector("#newCategoryName");
 const categoryList = document.querySelector("#categoryList");
 const categoryMessage = document.querySelector("#categoryMessage");
+const shareMenuDialog = document.querySelector("#shareMenuDialog");
+const closeShareMenuButton = document.querySelector("#closeShareMenuButton");
+const shareCodeValue = document.querySelector("#shareCodeValue");
+const copyShareCodeButton = document.querySelector("#copyShareCodeButton");
+const refreshShareCodeButton = document.querySelector("#refreshShareCodeButton");
+const saveShareCodeButton = document.querySelector("#saveShareCodeButton");
+const shareMenuMessage = document.querySelector("#shareMenuMessage");
 const heroImage = document.querySelector("#heroImage");
 const editHeroButton = document.querySelector("#editHeroButton");
 const currentMenuTitle = document.querySelector("#currentMenuTitle");
@@ -548,6 +565,7 @@ function normalizeRestaurantMenu(menu, index = 0) {
     restaurantName: menu.restaurantName || menu.restaurant || (isDefaultMenu ? "Mott 32 Las Vegas" : ""),
     owner: menu.owner || primaryAdminUsername,
     label: menu.label || (isDefaultMenu ? "Chinese menu training" : "Blank menu"),
+    shareCode: typeof menu.shareCode === "string" ? menu.shareCode : "",
     categories: getUniqueCategories(menu.categories || categories),
     items: items.map(normalizeMenuItem),
     stats: normalizeMenuStats(menu.stats),
@@ -614,12 +632,22 @@ function saveDesignSettings() {
 }
 
 function getActiveRestaurantMenu() {
+  if (state.sharedMenu) return state.sharedMenu;
+
   const visibleMenus = getVisibleRestaurantMenus();
   return visibleMenus.find((menu) => menu.id === state.activeRestaurantMenu) || visibleMenus[0] || null;
 }
 
 function syncActiveRestaurantMenuData() {
   const activeMenu = getActiveRestaurantMenu();
+  if (state.sharedMenu) {
+    menuItems = activeMenu?.items?.map(normalizeMenuItem) || [];
+    designSettings = normalizeDesignSettings(activeMenu?.designSettings || { ...defaultDesign, heroImage: "" });
+    localStorage.setItem(storageKey, JSON.stringify(menuItems));
+    localStorage.setItem(designStorageKey, JSON.stringify(designSettings));
+    return;
+  }
+
   if (!activeMenu) {
     menuItems = [];
     designSettings = { ...defaultDesign, heroImage: "" };
@@ -643,6 +671,8 @@ function syncActiveRestaurantMenuData() {
 }
 
 function persistActiveRestaurantMenuData() {
+  if (state.sharedMenu) return;
+
   const activeMenu = getActiveRestaurantMenu();
   if (!activeMenu) return;
 
@@ -945,6 +975,222 @@ function getVisibleRestaurantMenus() {
     const owner = getMenuOwner(menu);
     return owner === user.username || (user.role === "editor" && owner === primaryAdminUsername);
   });
+}
+
+function loadSavedShareCodes() {
+  const savedCodes = localStorage.getItem(savedShareCodesStorageKey);
+  if (!savedCodes) return [];
+
+  try {
+    const parsed = JSON.parse(savedCodes);
+    return Array.isArray(parsed) ? parsed.filter((entry) => entry?.code) : [];
+  } catch {
+    return [];
+  }
+}
+
+function getSavedShareCodeEntry(code) {
+  const normalizedCode = normalizeShareCode(code);
+  return loadSavedShareCodes().find((entry) => normalizeShareCode(entry.code) === normalizedCode) || null;
+}
+
+function saveSharedCodeLocally(code, menuName = "Shared menu", menuSnapshot = null) {
+  const normalizedCode = normalizeShareCode(code);
+  if (!normalizedCode) return;
+
+  const currentCodes = loadSavedShareCodes().filter((entry) => normalizeShareCode(entry.code) !== normalizedCode);
+  const nextCodes = [
+    {
+      code: normalizedCode,
+      menuName,
+      categories,
+      menu: menuSnapshot ? sanitizeRestaurantMenuForStorage(menuSnapshot) : null,
+      savedAt: new Date().toISOString()
+    },
+    ...currentCodes
+  ].slice(0, 12);
+  localStorage.setItem(savedShareCodesStorageKey, JSON.stringify(nextCodes));
+  renderSavedShareCodes();
+}
+
+function renderSavedShareCodes() {
+  if (!savedShareCodes) return;
+
+  savedShareCodes.replaceChildren();
+  const codes = loadSavedShareCodes();
+  if (!codes.length) return;
+
+  codes.forEach((entry) => {
+    const button = document.createElement("button");
+    button.className = "saved-share-code-button";
+    button.type = "button";
+    button.textContent = `${entry.menuName || "Shared menu"} - ${normalizeShareCode(entry.code)}`;
+    button.addEventListener("click", () => {
+      shareCodeInput.value = normalizeShareCode(entry.code);
+      loadSharedMenuFromCode(entry.code);
+    });
+    savedShareCodes.append(button);
+  });
+}
+
+function normalizeShareCode(code) {
+  return String(code || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function generateShareCode() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = new Uint8Array(8);
+  window.crypto?.getRandomValues?.(bytes);
+  return [...bytes].map((byte) => alphabet[byte % alphabet.length]).join("");
+}
+
+function canShareActiveMenu() {
+  return Boolean(getActiveUser() && getActiveRestaurantMenu() && (isAdmin() || ownsActiveMenu()));
+}
+
+function getShareCollection() {
+  return cloudSync.client?.db?.collection("menuShares") || null;
+}
+
+function getShareDocument(code) {
+  const collection = getShareCollection();
+  const normalizedCode = normalizeShareCode(code);
+  return collection && normalizedCode ? collection.doc(normalizedCode) : null;
+}
+
+function openSharedMenuSnapshot({ code, menu, categories: sharedCategories = [] }) {
+  const normalizedCode = normalizeShareCode(code);
+  if (Array.isArray(sharedCategories)) {
+    mergeCategories(sharedCategories, { sync: false });
+  }
+
+  const sharedMenu = normalizeRestaurantMenu({
+    ...(menu || {}),
+    id: menu?.id || `shared-${normalizedCode}`,
+    name: menu?.name || "Shared menu",
+    shareCode: normalizedCode
+  });
+
+  state.sharedMenu = sharedMenu;
+  state.sharedCode = normalizedCode;
+  state.currentUser = null;
+  state.screen = "shared";
+  state.editing = false;
+  state.category = "all";
+  state.query = "";
+  state.openItems.clear();
+  state.allergies.clear();
+  searchInput.value = "";
+  saveSharedCodeLocally(normalizedCode, sharedMenu.name, sharedMenu);
+  syncActiveRestaurantMenuData();
+  applyDesignSettings();
+  renderAllergyChips();
+  showScreen("shared");
+}
+
+async function publishMenuShare(code) {
+  const activeMenu = getActiveRestaurantMenu();
+  const activeUser = getActiveUser();
+  const doc = getShareDocument(code);
+  if (!activeMenu || !activeUser || !doc) {
+    throw new Error("Firebase share storage is not ready.");
+  }
+
+  const normalizedCode = normalizeShareCode(code);
+  await doc.set(
+    {
+      code: normalizedCode,
+      owner: activeUser.username,
+      menuId: activeMenu.id,
+      menuName: activeMenu.name,
+      categories,
+      menu: sanitizeRestaurantMenuForStorage({ ...activeMenu, shareCode: normalizedCode }),
+      updatedAt: new Date().toISOString()
+    },
+    { merge: true }
+  );
+
+  activeMenu.shareCode = normalizedCode;
+  saveRestaurantMenus();
+}
+
+async function syncSharedMenuSnapshots() {
+  const sharedMenus = restaurantMenus.filter((menu) => normalizeShareCode(menu.shareCode));
+  if (!sharedMenus.length || !getShareCollection() || !getActiveUser()) return;
+
+  await Promise.all(
+    sharedMenus.map((menu) =>
+      getShareDocument(menu.shareCode).set(
+        {
+          code: normalizeShareCode(menu.shareCode),
+          owner: getActiveUser().username,
+          menuId: menu.id,
+          menuName: menu.name,
+          categories,
+          menu: sanitizeRestaurantMenuForStorage(menu),
+          updatedAt: new Date().toISOString()
+        },
+        { merge: true }
+      )
+    )
+  );
+}
+
+async function loadSharedMenuFromCode(code) {
+  const normalizedCode = normalizeShareCode(code);
+  if (!normalizedCode) {
+    codeLoginMessage.textContent = "Enter a share code.";
+    return;
+  }
+
+  const doc = getShareDocument(normalizedCode);
+  if (!doc) {
+    const savedEntry = getSavedShareCodeEntry(normalizedCode);
+    if (savedEntry?.menu) {
+      openSharedMenuSnapshot(savedEntry);
+      return;
+    }
+    codeLoginMessage.textContent = "Firebase is still connecting. Try again in a moment.";
+    return;
+  }
+
+  codeLoginMessage.textContent = "Loading shared menu...";
+
+  try {
+    const snapshot = await doc.get();
+    if (!snapshot.exists) {
+      const savedEntry = getSavedShareCodeEntry(normalizedCode);
+      if (savedEntry?.menu) {
+        openSharedMenuSnapshot(savedEntry);
+        return;
+      }
+      codeLoginMessage.textContent = "That code was not found.";
+      return;
+    }
+
+    const data = snapshot.data();
+    if (Array.isArray(data.categories)) {
+      mergeCategories(data.categories, { sync: false });
+    }
+
+    openSharedMenuSnapshot({
+      code: normalizedCode,
+      menu: {
+        ...(data.menu || {}),
+        id: data.menuId || data.menu?.id || `shared-${normalizedCode}`,
+        name: data.menuName || data.menu?.name || "Shared menu",
+        shareCode: normalizedCode
+      },
+      categories: data.categories
+    });
+  } catch {
+    const savedEntry = getSavedShareCodeEntry(normalizedCode);
+    if (savedEntry?.menu) {
+      openSharedMenuSnapshot(savedEntry);
+      return;
+    }
+    codeLoginMessage.textContent = "Could not load that code. Check Firebase rules or try again.";
+  }
 }
 
 function getMenuStats(menu) {
@@ -1310,6 +1556,7 @@ async function uploadCloudSnapshot(reason) {
       },
       { merge: true }
     );
+    await syncSharedMenuSnapshots();
     setSyncStatus("Synced with Firebase", "connected");
   } catch {
     setSyncStatus("Firebase save failed - check rules/Auth", "error");
@@ -1340,6 +1587,7 @@ function sanitizeRestaurantMenuForStorage(menu) {
     restaurantName: menu.restaurantName || "",
     owner: menu.owner || primaryAdminUsername,
     label: menu.label || "Menu training",
+    shareCode: typeof menu.shareCode === "string" ? menu.shareCode : "",
     categories: getUniqueCategories(menu.categories || categories),
     items: Array.isArray(menu.items) ? menu.items.map(sanitizeMenuItemForCloud) : [],
     stats: normalizeMenuStats(menu.stats),
@@ -1365,6 +1613,10 @@ function showScreen(screen) {
 }
 
 function normalizeScreen(activeUser, invitedUser) {
+  if (state.screen === "shared" && state.sharedMenu) {
+    return;
+  }
+
   if (invitedUser && !activeUser) {
     state.screen = "login";
     return;
@@ -1553,7 +1805,11 @@ function renderActiveMenuHeader() {
   const canEditMenu = Boolean(activeMenu) && canEditAnyCategory();
   const canUsePdf = Boolean(activeMenu && getActiveUser());
   const canManageMenuCategories = canManageCategories();
+  const canShareMenu = canShareActiveMenu();
+  const isSharedView = state.screen === "shared";
   currentMenuTitle.textContent = activeMenu?.name || "No menu selected";
+  backToMenusButton.textContent = isSharedView ? "Exit" : "Menus";
+  drawerOpenButton.hidden = isSharedView || !getActiveUser();
   topAddItemButton.hidden = !canEditMenu;
   renameMenuButton.hidden = !state.editing || !canEditMenu;
   quickEditModeButton.textContent = state.editing ? "Done editing" : "Edit menu";
@@ -1563,12 +1819,14 @@ function renderActiveMenuHeader() {
   quickImportPdfButton.hidden = !canEditMenu;
   quickPdfBuilderButton.hidden = !canUsePdf;
   quickCategoryButton.hidden = !canManageMenuCategories;
+  quickShareMenuButton.hidden = !canShareMenu;
   quickMenuActions.hidden =
     quickEditModeButton.hidden &&
     quickScanMenuButton.hidden &&
     quickImportPdfButton.hidden &&
     quickPdfBuilderButton.hidden &&
-    quickCategoryButton.hidden;
+    quickCategoryButton.hidden &&
+    quickShareMenuButton.hidden;
 }
 
 function openRestaurantMenu(menuId) {
@@ -3008,21 +3266,25 @@ function renderAdminState() {
   renderCategoryTabs();
   const showingInviteSetup = Boolean(invitedUser) && !activeUser;
 
-  authPage.hidden = Boolean(activeUser) || state.screen === "register";
+  const showingSharedMenu = state.screen === "shared" && Boolean(state.sharedMenu);
+  authPage.hidden = Boolean(activeUser) || state.screen === "register" || showingSharedMenu;
   registerPage.hidden = Boolean(activeUser) || showingInviteSetup || state.screen !== "register";
   menusPage.hidden = !activeUser || state.screen !== "menus";
-  menuPage.hidden = !activeUser || state.screen !== "menu";
+  menuPage.hidden = !(activeUser && state.screen === "menu") && !showingSharedMenu;
   usersPage.hidden = !activeUser || state.screen !== "users";
   pdfPage.hidden = !activeUser || state.screen !== "pdf";
 
   adminLoginForm.hidden = Boolean(activeUser) || showingInviteSetup;
   passwordSetupForm.hidden = !showingInviteSetup;
   registerLinkButton.hidden = showingInviteSetup;
+  showCodeLoginButton.hidden = showingInviteSetup;
+  if (showingInviteSetup) codeLoginForm.hidden = true;
   adminControls.hidden = !activeUser;
   pdfBuilderButton.hidden = !activeUser;
   scanMenuButton.hidden = !canEditAnyCategory();
   importPdfButton.hidden = !canEditAnyCategory();
   categoryManagerButton.hidden = !canManageCategories();
+  shareMenuButton.hidden = !canShareActiveMenu();
   manageUsersButton.hidden = !activeUser;
   designButton.hidden = true;
   editHeroButton.hidden = !isAdmin();
@@ -3056,6 +3318,7 @@ function renderAdminState() {
   renderRestaurantList();
   renderAdminHomeSummary();
   renderActiveMenuHeader();
+  renderSavedShareCodes();
   renderAccountDashboard();
   renderDashboard();
   if (isAdmin()) renderUserList();
@@ -3250,6 +3513,92 @@ function openLoginPage() {
   state.screen = "login";
   renderAdminState();
   adminUsername.focus();
+}
+
+function toggleCodeLoginPanel() {
+  codeLoginForm.hidden = !codeLoginForm.hidden;
+  codeLoginMessage.textContent = "";
+  renderSavedShareCodes();
+  if (!codeLoginForm.hidden) {
+    shareCodeInput.focus();
+  }
+}
+
+function handleCodeLogin(event) {
+  event.preventDefault();
+  loadSharedMenuFromCode(shareCodeInput.value);
+}
+
+function openShareMenuDialog() {
+  if (!canShareActiveMenu()) return;
+
+  closeDrawer();
+  const activeMenu = getActiveRestaurantMenu();
+  const code = normalizeShareCode(activeMenu.shareCode) || generateShareCode();
+  setShareCodeDisplay(code);
+  shareMenuMessage.textContent = activeMenu.shareCode
+    ? "This menu already has a saved share code."
+    : "Save this code before sharing it.";
+  shareMenuDialog.showModal();
+}
+
+function closeShareMenuDialog() {
+  shareMenuDialog.close();
+}
+
+function setShareCodeDisplay(code) {
+  shareCodeValue.textContent = normalizeShareCode(code) || "No code yet";
+}
+
+function refreshShareCode() {
+  setShareCodeDisplay(generateShareCode());
+  shareMenuMessage.textContent = "New code ready. Save it before sharing.";
+}
+
+async function saveShareCode() {
+  const code = normalizeShareCode(shareCodeValue.textContent);
+  if (!code || !canShareActiveMenu()) return;
+
+  saveShareCodeButton.disabled = true;
+  shareMenuMessage.textContent = "Saving share code...";
+  try {
+    await publishMenuShare(code);
+    shareMenuMessage.textContent = `Share code saved: ${code}`;
+    renderActiveMenuHeader();
+  } catch {
+    shareMenuMessage.textContent = "Could not save the share code. Check Firebase connection.";
+  } finally {
+    saveShareCodeButton.disabled = false;
+  }
+}
+
+async function copyShareCode() {
+  const code = normalizeShareCode(shareCodeValue.textContent);
+  if (!code) return;
+
+  try {
+    await navigator.clipboard.writeText(code);
+    shareMenuMessage.textContent = "Code copied.";
+  } catch {
+    shareMenuMessage.textContent = `Code: ${code}`;
+  }
+}
+
+function exitSharedMenu() {
+  state.sharedMenu = null;
+  state.sharedCode = "";
+  state.screen = getActiveUser() ? "menus" : "login";
+  state.category = "all";
+  state.query = "";
+  state.openItems.clear();
+  state.allergies.clear();
+  searchInput.value = "";
+  restaurantMenus = loadRestaurantMenus(getActiveUser());
+  state.activeRestaurantMenu = getVisibleRestaurantMenus()[0]?.id || "";
+  syncActiveRestaurantMenuData();
+  applyDesignSettings();
+  renderAllergyChips();
+  renderAdminState();
 }
 
 function activateWorkspaceForCurrentUser() {
@@ -4514,6 +4863,12 @@ categoryManagerButton.addEventListener("click", openCategoryDialog);
 quickCategoryButton.addEventListener("click", openCategoryDialog);
 closeCategoryButton.addEventListener("click", closeCategoryDialog);
 categoryForm.addEventListener("submit", addCategory);
+shareMenuButton.addEventListener("click", openShareMenuDialog);
+quickShareMenuButton.addEventListener("click", openShareMenuDialog);
+closeShareMenuButton.addEventListener("click", closeShareMenuDialog);
+refreshShareCodeButton.addEventListener("click", refreshShareCode);
+saveShareCodeButton.addEventListener("click", saveShareCode);
+copyShareCodeButton.addEventListener("click", copyShareCode);
 pdfBuilderButton.addEventListener("click", openPdfPage);
 quickPdfBuilderButton.addEventListener("click", openPdfPage);
 backFromPdfButton.addEventListener("click", closePdfPage);
@@ -4564,12 +4919,19 @@ logoutButton.addEventListener("click", logoutAdmin);
 menusLogoutButton.addEventListener("click", logoutAdmin);
 createMenuButton.addEventListener("click", createBlankRestaurantMenu);
 backToMenusButton.addEventListener("click", () => {
+  if (state.screen === "shared") {
+    exitSharedMenu();
+    return;
+  }
+
   closeDrawer();
   setEditMode(false);
   showScreen("menus");
 });
 registerLinkButton.addEventListener("click", openRegisterPage);
 loginLinkButton.addEventListener("click", openLoginPage);
+showCodeLoginButton.addEventListener("click", toggleCodeLoginPanel);
+codeLoginForm.addEventListener("submit", handleCodeLogin);
 selfRegisterForm.addEventListener("submit", registerAccount);
 userForm.addEventListener("submit", saveUser);
 itemImageFile.addEventListener("change", updateItemImageFromFile);

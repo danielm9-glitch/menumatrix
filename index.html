@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Menu Matrix</title>
-    <link rel="stylesheet" href="styles.css?v=pdf-import-categories" />
+    <link rel="stylesheet" href="styles.css?v=share-codes" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -49,6 +49,16 @@
         </form>
 
         <button id="registerLinkButton" class="link-button" type="button">Register</button>
+        <button id="showCodeLoginButton" class="link-button" type="button">I have a code</button>
+        <form id="codeLoginForm" class="auth-form code-login-form" hidden>
+          <label>
+            Share code
+            <input id="shareCodeInput" autocomplete="off" placeholder="ABCD1234" />
+          </label>
+          <button class="save-button" type="submit">View menu</button>
+          <div id="savedShareCodes" class="saved-share-codes"></div>
+          <p id="codeLoginMessage" class="login-message" role="status"></p>
+        </form>
       </section>
     </main>
 
@@ -170,6 +180,7 @@
         <button id="quickImportPdfButton" class="quick-action-button" type="button" hidden>Import PDF</button>
         <button id="quickPdfBuilderButton" class="quick-action-button" type="button" hidden>Create PDF</button>
         <button id="quickCategoryButton" class="quick-action-button" type="button" hidden>Categories</button>
+        <button id="quickShareMenuButton" class="quick-action-button" type="button" hidden>Share</button>
       </section>
 
       <section class="controls" aria-label="Menu filters">
@@ -220,6 +231,7 @@
         <button id="importPdfButton" class="action-button" type="button" hidden>Import PDF</button>
         <button id="pdfBuilderButton" class="action-button" type="button" hidden>Create PDF</button>
         <button id="categoryManagerButton" class="action-button" type="button" hidden>Categories</button>
+        <button id="shareMenuButton" class="action-button" type="button" hidden>Share menu</button>
         <button id="manageUsersButton" class="action-button" type="button" hidden>Dashboard</button>
         <button id="designButton" class="action-button" type="button" hidden>Customization</button>
         <button id="logoutButton" class="danger-button" type="button">Log out</button>
@@ -633,6 +645,29 @@
       </form>
     </dialog>
 
+    <dialog id="shareMenuDialog" class="item-dialog" aria-labelledby="shareMenuTitle">
+      <form class="item-form" method="dialog">
+        <div class="dialog-head">
+          <div>
+            <p class="kicker">Viewer access</p>
+            <h2 id="shareMenuTitle">Share menu</h2>
+          </div>
+          <button class="icon-button" type="button" aria-label="Close share menu" id="closeShareMenuButton">x</button>
+        </div>
+
+        <p class="scan-hint">Give this code to someone so they can view this menu without creating an account.</p>
+        <div class="share-code-box">
+          <span id="shareCodeValue">No code yet</span>
+          <button id="copyShareCodeButton" class="action-button" type="button">Copy</button>
+        </div>
+        <div class="form-actions">
+          <button id="refreshShareCodeButton" class="danger-button" type="button">New code</button>
+          <button id="saveShareCodeButton" class="save-button" type="button">Save code</button>
+        </div>
+        <p id="shareMenuMessage" class="login-message" role="status"></p>
+      </form>
+    </dialog>
+
     <dialog id="designDialog" class="item-dialog" aria-labelledby="designTitle">
       <form id="designForm" method="dialog" class="item-form">
         <div class="dialog-head">
@@ -835,6 +870,6 @@
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js?v=pdf-import-categories"></script>
+    <script src="app.js?v=share-codes"></script>
   </body>
 </html>
