@@ -1,4 +1,4 @@
-package com.mott32.menumatrix;
+package com.mymenumatrix.app;
 
 import com.getcapacitor.BridgeActivity;
 
