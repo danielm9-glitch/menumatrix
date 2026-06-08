@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Menu Matrix</title>
-    <link rel="stylesheet" href="styles.css?v=mott32-dinner-v4" />
+    <link rel="stylesheet" href="styles.css?v=study-tools" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -181,6 +181,8 @@
         <button id="quickPdfBuilderButton" class="quick-action-button" type="button" hidden>Create PDF</button>
         <button id="quickCategoryButton" class="quick-action-button" type="button" hidden>Categories</button>
         <button id="quickShareMenuButton" class="quick-action-button" type="button" hidden>Share</button>
+        <button id="quickFlashcardButton" class="quick-action-button" type="button" hidden>Flash cards</button>
+        <button id="quickQuizButton" class="quick-action-button" type="button" hidden>Quiz</button>
       </section>
 
       <section class="controls" aria-label="Menu filters">
@@ -210,6 +212,61 @@
         <div id="menuGrid" class="menu-grid"></div>
       </section>
 
+    </main>
+
+    <main id="flashcardPage" class="app-shell study-page" aria-label="Menu flash cards" hidden>
+      <header class="page-top-bar">
+        <button id="backFromFlashcardsButton" class="action-button" type="button">Back</button>
+        <div>
+          <p class="kicker">Training</p>
+          <h1>Flash Cards</h1>
+        </div>
+      </header>
+
+      <section class="study-toolbar" aria-label="Flash card controls">
+        <button id="flashcardShuffleButton" class="quick-action-button" type="button">Shuffle</button>
+        <button id="flashcardModeButton" class="quick-action-button" type="button">Mixed</button>
+        <button id="flashcardNextButton" class="quick-action-button is-active" type="button">Next card</button>
+      </section>
+
+      <section class="study-card flashcard-card" aria-live="polite">
+        <div>
+          <p id="flashcardType" class="kicker">Menu item</p>
+          <h2 id="flashcardPrompt">Choose a card to start.</h2>
+          <p id="flashcardHint" class="study-muted">Cards can ask for ingredients or allergy notes.</p>
+        </div>
+        <div id="flashcardAnswer" class="flashcard-answer" hidden></div>
+        <button id="flashcardFlipButton" class="save-button" type="button">Show answer</button>
+      </section>
+    </main>
+
+    <main id="quizPage" class="app-shell study-page" aria-label="Menu quiz" hidden>
+      <header class="page-top-bar">
+        <button id="backFromQuizButton" class="action-button" type="button">Back</button>
+        <div>
+          <p class="kicker">Training</p>
+          <h1>Quiz</h1>
+        </div>
+      </header>
+
+      <section class="study-score-panel">
+        <div>
+          <p class="kicker">Current score</p>
+          <strong id="quizScore">0 / 0</strong>
+        </div>
+        <button id="quizNewQuestionButton" class="quick-action-button is-active" type="button">New question</button>
+      </section>
+
+      <section class="study-card quiz-card" aria-live="polite">
+        <p id="quizType" class="kicker">Randomized</p>
+        <h2 id="quizQuestion">Start a quiz question.</h2>
+        <div id="quizOptions" class="quiz-options"></div>
+        <div class="form-actions">
+          <button id="quizCheckButton" class="save-button" type="button">Check answer</button>
+          <button id="quizResetButton" class="action-button" type="button">Reset score</button>
+        </div>
+        <p id="quizMessage" class="login-message" role="status"></p>
+      </section>
     </main>
 
     <div id="drawerOverlay" class="drawer-overlay" hidden></div>
@@ -660,8 +717,13 @@
           <span id="shareCodeValue">No code yet</span>
           <button id="copyShareCodeButton" class="action-button" type="button">Copy</button>
         </div>
+        <label>
+          Custom code
+          <input id="customShareCodeInput" autocomplete="off" maxlength="24" placeholder="MYRESTAURANT2026" />
+        </label>
         <div class="form-actions">
           <button id="refreshShareCodeButton" class="danger-button" type="button">New code</button>
+          <button id="useCustomShareCodeButton" class="action-button" type="button">Use custom code</button>
           <button id="saveShareCodeButton" class="save-button" type="button">Save code</button>
         </div>
         <p id="shareMenuMessage" class="login-message" role="status"></p>
@@ -870,6 +932,6 @@
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js?v=mott32-dinner-v4"></script>
+    <script src="app.js?v=study-tools"></script>
   </body>
 </html>

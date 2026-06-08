@@ -1942,7 +1942,14 @@ const state = {
   screen: loadCurrentUser() ? "menus" : "login",
   activeRestaurantMenu: initialRestaurantMenu?.id || defaultRestaurantMenuId,
   dashboardTab: "users",
-  dashboardReturnScreen: "menus"
+  dashboardReturnScreen: "menus",
+  flashcardMode: "mixed",
+  flashcard: null,
+  quiz: null,
+  quizScore: {
+    correct: 0,
+    total: 0
+  }
 };
 
 const cloudSync = {
@@ -1970,6 +1977,50 @@ const formatter = new Intl.NumberFormat("en-US", {
   currency: "USD",
   maximumFractionDigits: 0
 });
+
+const flashcardModes = ["mixed", "allergies", "ingredients"];
+const ingredientVocabulary = [
+  "Abalone",
+  "Almond",
+  "Asparagus",
+  "Beef",
+  "Black cod",
+  "Broccoli",
+  "Cashew",
+  "Chicken",
+  "Chili",
+  "Chocolate",
+  "Coconut",
+  "Crab",
+  "Cucumber",
+  "Duck",
+  "Egg",
+  "Garlic",
+  "Ginger",
+  "Honey",
+  "Iberico pork",
+  "Lobster",
+  "Maltose",
+  "Mango",
+  "Mushroom",
+  "Noodle",
+  "Oyster sauce",
+  "Peanut",
+  "Pork",
+  "Prawn",
+  "Rice",
+  "Scallion",
+  "Scallop",
+  "Sea cucumber",
+  "Sesame",
+  "Shrimp",
+  "Soy sauce",
+  "Spring onion",
+  "Tofu",
+  "Truffle",
+  "Vinegar",
+  "Wagyu"
+];
 
 function formatMenuPrice(price) {
   const value = Number(price);
@@ -2034,6 +2085,8 @@ const quickImportPdfButton = document.querySelector("#quickImportPdfButton");
 const quickPdfBuilderButton = document.querySelector("#quickPdfBuilderButton");
 const quickCategoryButton = document.querySelector("#quickCategoryButton");
 const quickShareMenuButton = document.querySelector("#quickShareMenuButton");
+const quickFlashcardButton = document.querySelector("#quickFlashcardButton");
+const quickQuizButton = document.querySelector("#quickQuizButton");
 const pdfBuilderButton = document.querySelector("#pdfBuilderButton");
 const addItemButton = document.querySelector("#addItemButton");
 const deleteMenuButton = document.querySelector("#deleteMenuButton");
@@ -2047,6 +2100,8 @@ const logoutButton = document.querySelector("#logoutButton");
 const menuPage = document.querySelector("#menuPage");
 const usersPage = document.querySelector("#usersPage");
 const pdfPage = document.querySelector("#pdfPage");
+const flashcardPage = document.querySelector("#flashcardPage");
+const quizPage = document.querySelector("#quizPage");
 const dashboardKicker = document.querySelector("#dashboardKicker");
 const dashboardTitle = document.querySelector("#dashboardTitle");
 const accountProfileSummary = document.querySelector("#accountProfileSummary");
@@ -2153,6 +2208,8 @@ const closeShareMenuButton = document.querySelector("#closeShareMenuButton");
 const shareCodeValue = document.querySelector("#shareCodeValue");
 const copyShareCodeButton = document.querySelector("#copyShareCodeButton");
 const refreshShareCodeButton = document.querySelector("#refreshShareCodeButton");
+const customShareCodeInput = document.querySelector("#customShareCodeInput");
+const useCustomShareCodeButton = document.querySelector("#useCustomShareCodeButton");
 const saveShareCodeButton = document.querySelector("#saveShareCodeButton");
 const shareMenuMessage = document.querySelector("#shareMenuMessage");
 const heroImage = document.querySelector("#heroImage");
@@ -2201,6 +2258,24 @@ const dashboardRestaurantList = document.querySelector("#dashboardRestaurantList
 const dashboardMenuList = document.querySelector("#dashboardMenuList");
 const dashboardCustomizationSummary = document.querySelector("#dashboardCustomizationSummary");
 const dashboardCustomizationButton = document.querySelector("#dashboardCustomizationButton");
+const backFromFlashcardsButton = document.querySelector("#backFromFlashcardsButton");
+const flashcardShuffleButton = document.querySelector("#flashcardShuffleButton");
+const flashcardModeButton = document.querySelector("#flashcardModeButton");
+const flashcardNextButton = document.querySelector("#flashcardNextButton");
+const flashcardFlipButton = document.querySelector("#flashcardFlipButton");
+const flashcardType = document.querySelector("#flashcardType");
+const flashcardPrompt = document.querySelector("#flashcardPrompt");
+const flashcardHint = document.querySelector("#flashcardHint");
+const flashcardAnswer = document.querySelector("#flashcardAnswer");
+const backFromQuizButton = document.querySelector("#backFromQuizButton");
+const quizScore = document.querySelector("#quizScore");
+const quizNewQuestionButton = document.querySelector("#quizNewQuestionButton");
+const quizType = document.querySelector("#quizType");
+const quizQuestion = document.querySelector("#quizQuestion");
+const quizOptions = document.querySelector("#quizOptions");
+const quizCheckButton = document.querySelector("#quizCheckButton");
+const quizResetButton = document.querySelector("#quizResetButton");
+const quizMessage = document.querySelector("#quizMessage");
 
 function normalizeCategoryValue(value) {
   return String(value || "")
@@ -2855,6 +2930,14 @@ function normalizeShareCode(code) {
   return String(code || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
+function getShareCodeValidationMessage(code) {
+  const normalizedCode = normalizeShareCode(code);
+  if (!normalizedCode) return "Enter a share code.";
+  if (normalizedCode.length < 4) return "Use at least 4 letters or numbers.";
+  if (normalizedCode.length > 24) return "Use 24 letters or numbers or fewer.";
+  return "";
+}
+
 function generateShareCode() {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   const bytes = new Uint8Array(8);
@@ -2874,6 +2957,26 @@ function getShareDocument(code) {
   const collection = getShareCollection();
   const normalizedCode = normalizeShareCode(code);
   return collection && normalizedCode ? collection.doc(normalizedCode) : null;
+}
+
+async function validateShareCodeAvailability(code) {
+  const activeMenu = getActiveRestaurantMenu();
+  const activeUser = getActiveUser();
+  const doc = getShareDocument(code);
+  if (!activeMenu || !activeUser || !doc) {
+    throw new Error("Firebase share storage is not ready.");
+  }
+
+  const snapshot = await doc.get();
+  if (!snapshot.exists) return;
+
+  const data = snapshot.data();
+  const existingMenuId = data.menuId || data.menu?.id || "";
+  const existingOwner = data.owner || data.menu?.owner || "";
+  const isSameMenu = existingMenuId === activeMenu.id && existingOwner === activeUser.username;
+  if (!isSameMenu) {
+    throw new Error("That code is already being used by another shared menu.");
+  }
 }
 
 function openSharedMenuSnapshot({ code, menu, categories: sharedCategories = [] }) {
@@ -3449,7 +3552,7 @@ function normalizeScreen(activeUser, invitedUser) {
     state.screen = "menus";
   }
 
-  if (activeUser && state.screen === "menu" && !getActiveRestaurantMenu()) {
+  if (activeUser && ["menu", "pdf", "flashcards", "quiz"].includes(state.screen) && !getActiveRestaurantMenu()) {
     state.screen = "menus";
   }
 
@@ -3624,6 +3727,7 @@ function renderActiveMenuHeader() {
   const canUsePdf = Boolean(activeMenu && getActiveUser());
   const canManageMenuCategories = canManageCategories();
   const canShareMenu = canShareActiveMenu();
+  const canUseStudyTools = canStudyActiveMenu();
   const isSharedView = state.screen === "shared";
   currentMenuTitle.textContent = activeMenu?.name || "No menu selected";
   backToMenusButton.textContent = isSharedView ? "Exit" : "Menus";
@@ -3638,13 +3742,17 @@ function renderActiveMenuHeader() {
   quickPdfBuilderButton.hidden = !canUsePdf;
   quickCategoryButton.hidden = !canManageMenuCategories;
   quickShareMenuButton.hidden = !canShareMenu;
+  quickFlashcardButton.hidden = !canUseStudyTools;
+  quickQuizButton.hidden = !canUseStudyTools;
   quickMenuActions.hidden =
     quickEditModeButton.hidden &&
     quickScanMenuButton.hidden &&
     quickImportPdfButton.hidden &&
     quickPdfBuilderButton.hidden &&
     quickCategoryButton.hidden &&
-    quickShareMenuButton.hidden;
+    quickShareMenuButton.hidden &&
+    quickFlashcardButton.hidden &&
+    quickQuizButton.hidden;
 }
 
 function openRestaurantMenu(menuId) {
@@ -5078,6 +5186,387 @@ function escapeAttribute(value) {
   return escapeHtml(value).replaceAll("`", "&#096;");
 }
 
+function canStudyActiveMenu() {
+  return Boolean(getActiveUser() && getActiveRestaurantMenu() && menuItems.length);
+}
+
+function randomItem(values) {
+  if (!values.length) return null;
+  return values[Math.floor(Math.random() * values.length)];
+}
+
+function shuffleValues(values) {
+  const shuffled = [...values];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+  return shuffled;
+}
+
+function uniqueValues(values) {
+  const seen = new Set();
+  const unique = [];
+  values.forEach((value) => {
+    const label = String(value || "").trim();
+    const key = label.toLowerCase();
+    if (label && !seen.has(key)) {
+      seen.add(key);
+      unique.push(label);
+    }
+  });
+  return unique;
+}
+
+function getItemAllergens(item) {
+  return uniqueValues(Array.isArray(item?.allergens) ? item.allergens : []);
+}
+
+function getItemIngredientText(item) {
+  const details = String(item?.details || "");
+  const ingredientMatch = details.match(/Ingredients:\s*(.*?)(?:\.\s*(?:Portion|Accompaniments|Price not listed|Section):|$)/i);
+  const rawText = ingredientMatch?.[1] || details || item?.description || "";
+  return rawText
+    .replace(/\bSection:\s*[^.]+\./gi, "")
+    .replace(/\bIngredients:\s*/gi, "")
+    .replace(/\bPortion:\s*.*$/i, "")
+    .replace(/\bAccompaniments:\s*.*$/i, "")
+    .replace(/\bPrice not listed.*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getItemIngredientTerms(item) {
+  const source = `${getItemIngredientText(item)} ${item?.description || ""}`.toLowerCase();
+  const vocabularyMatches = ingredientVocabulary.filter((term) => source.includes(term.toLowerCase()));
+  if (vocabularyMatches.length) return uniqueValues(vocabularyMatches);
+
+  return uniqueValues(
+    source
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((word) => word.length > 4)
+      .slice(0, 8)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+  );
+}
+
+function getStudyItemsWithAllergens() {
+  return menuItems.filter((item) => getItemAllergens(item).length);
+}
+
+function getStudyItemsWithIngredients() {
+  return menuItems.filter((item) => getItemIngredientTerms(item).length || getItemIngredientText(item));
+}
+
+function getAllStudyAllergens() {
+  return uniqueValues(menuItems.flatMap(getItemAllergens));
+}
+
+function getAllStudyIngredientTerms() {
+  return uniqueValues(menuItems.flatMap(getItemIngredientTerms));
+}
+
+function openFlashcardPage() {
+  if (!canStudyActiveMenu()) return;
+
+  closeDrawer();
+  state.flashcard = null;
+  showScreen("flashcards");
+  nextFlashcard();
+}
+
+function closeFlashcardPage() {
+  showScreen("menu");
+}
+
+function nextFlashcard() {
+  if (!canStudyActiveMenu()) return;
+
+  const mode =
+    state.flashcardMode === "mixed"
+      ? randomItem(["allergies", "ingredients"])
+      : state.flashcardMode;
+  const deck = mode === "allergies" ? getStudyItemsWithAllergens() : getStudyItemsWithIngredients();
+  const item = randomItem(deck.length ? deck : menuItems);
+  if (!item) return;
+
+  state.flashcard = {
+    itemId: item.id,
+    mode,
+    revealed: false
+  };
+  renderFlashcard();
+}
+
+function toggleFlashcardMode() {
+  const currentIndex = flashcardModes.indexOf(state.flashcardMode);
+  state.flashcardMode = flashcardModes[(currentIndex + 1) % flashcardModes.length];
+  nextFlashcard();
+}
+
+function flipFlashcard() {
+  if (!state.flashcard) return;
+  state.flashcard.revealed = !state.flashcard.revealed;
+  renderFlashcard();
+}
+
+function renderFlashcard() {
+  if (!flashcardPage || state.screen !== "flashcards") return;
+
+  const modeLabel = {
+    mixed: "Mixed",
+    allergies: "Allergies",
+    ingredients: "Ingredients"
+  }[state.flashcardMode];
+  flashcardModeButton.textContent = modeLabel;
+
+  const item = menuItems.find((candidate) => candidate.id === state.flashcard?.itemId);
+  if (!item) {
+    flashcardType.textContent = "Menu item";
+    flashcardPrompt.textContent = "Choose a card to start.";
+    flashcardHint.textContent = "Cards can ask for ingredients or allergy notes.";
+    flashcardAnswer.hidden = true;
+    flashcardAnswer.textContent = "";
+    flashcardFlipButton.textContent = "Show answer";
+    return;
+  }
+
+  const isAllergyCard = state.flashcard.mode === "allergies";
+  const allergens = getItemAllergens(item);
+  const ingredientText = getItemIngredientText(item);
+  flashcardType.textContent = isAllergyCard ? "Allergy card" : "Ingredient card";
+  flashcardPrompt.textContent = item.name;
+  flashcardHint.textContent = isAllergyCard
+    ? "Name the listed allergy notes before flipping."
+    : "Name the main ingredients before flipping.";
+  flashcardAnswer.hidden = !state.flashcard.revealed;
+  flashcardAnswer.textContent = isAllergyCard
+    ? allergens.join(", ") || "No major allergens listed."
+    : ingredientText || "No ingredient notes listed.";
+  flashcardFlipButton.textContent = state.flashcard.revealed ? "Hide answer" : "Show answer";
+}
+
+function openQuizPage() {
+  if (!canStudyActiveMenu()) return;
+
+  closeDrawer();
+  state.quiz = null;
+  showScreen("quiz");
+  nextQuizQuestion();
+}
+
+function closeQuizPage() {
+  showScreen("menu");
+}
+
+function createQuizQuestion() {
+  const availableBuilders = [
+    createAllergenYesNoQuestion,
+    createIngredientYesNoQuestion,
+    createAllergenMultiQuestion,
+    createItemByAllergenQuestion,
+    createItemByIngredientQuestion
+  ];
+  const shuffledBuilders = shuffleValues(availableBuilders);
+
+  for (const builder of shuffledBuilders) {
+    const question = builder();
+    if (question) return question;
+  }
+
+  return null;
+}
+
+function createAllergenYesNoQuestion() {
+  const item = randomItem(menuItems);
+  const allAllergens = getAllStudyAllergens();
+  if (!item || !allAllergens.length) return null;
+
+  const itemAllergens = getItemAllergens(item);
+  const shouldUseCorrect = itemAllergens.length && Math.random() > 0.45;
+  const allergen = shouldUseCorrect
+    ? randomItem(itemAllergens)
+    : randomItem(allAllergens.filter((candidate) => !itemAllergens.includes(candidate))) || randomItem(allAllergens);
+  const answer = itemAllergens.includes(allergen) ? "yes" : "no";
+
+  return {
+    typeLabel: "Allergy check",
+    prompt: `Does ${item.name} list ${allergen} as an allergy note?`,
+    multiple: false,
+    options: [
+      { label: "Yes", value: "yes" },
+      { label: "No", value: "no" }
+    ],
+    answers: [answer],
+    explanation: `${item.name}: ${itemAllergens.join(", ") || "No major allergens listed."}`
+  };
+}
+
+function createIngredientYesNoQuestion() {
+  const item = randomItem(menuItems);
+  const allTerms = getAllStudyIngredientTerms();
+  if (!item || !allTerms.length) return null;
+
+  const itemTerms = getItemIngredientTerms(item);
+  const shouldUseCorrect = itemTerms.length && Math.random() > 0.45;
+  const term = shouldUseCorrect
+    ? randomItem(itemTerms)
+    : randomItem(allTerms.filter((candidate) => !itemTerms.includes(candidate))) || randomItem(allTerms);
+  const answer = itemTerms.includes(term) ? "yes" : "no";
+
+  return {
+    typeLabel: "Ingredient check",
+    prompt: `Do the menu notes for ${item.name} mention ${term}?`,
+    multiple: false,
+    options: [
+      { label: "Yes", value: "yes" },
+      { label: "No", value: "no" }
+    ],
+    answers: [answer],
+    explanation: `${item.name}: ${getItemIngredientText(item) || "No ingredient notes listed."}`
+  };
+}
+
+function createAllergenMultiQuestion() {
+  const item = randomItem(getStudyItemsWithAllergens());
+  const allAllergens = getAllStudyAllergens();
+  if (!item || allAllergens.length < 3) return null;
+
+  const correct = shuffleValues(getItemAllergens(item)).slice(0, 3);
+  const distractors = shuffleValues(allAllergens.filter((allergen) => !correct.includes(allergen))).slice(0, Math.max(2, 5 - correct.length));
+  const options = shuffleValues([...correct, ...distractors]).map((value) => ({ label: value, value }));
+
+  return {
+    typeLabel: "Multi select",
+    prompt: `Select every allergy note listed for ${item.name}.`,
+    multiple: true,
+    options,
+    answers: correct,
+    explanation: `${item.name}: ${getItemAllergens(item).join(", ")}`
+  };
+}
+
+function createItemByAllergenQuestion() {
+  const allAllergens = getAllStudyAllergens();
+  const allergen = randomItem(allAllergens);
+  if (!allergen) return null;
+
+  const correctItems = menuItems.filter((item) => getItemAllergens(item).includes(allergen));
+  const correctItem = randomItem(correctItems);
+  const distractors = shuffleValues(menuItems.filter((item) => item.id !== correctItem?.id)).slice(0, 3);
+  if (!correctItem || distractors.length < 2) return null;
+
+  const options = shuffleValues([correctItem, ...distractors]).map((item) => ({ label: item.name, value: item.id }));
+  return {
+    typeLabel: "Find the item",
+    prompt: `Which item lists ${allergen} as an allergy note?`,
+    multiple: false,
+    options,
+    answers: [correctItem.id],
+    explanation: `${correctItem.name} lists ${allergen}.`
+  };
+}
+
+function createItemByIngredientQuestion() {
+  const allTerms = getAllStudyIngredientTerms();
+  const term = randomItem(allTerms);
+  if (!term) return null;
+
+  const correctItems = menuItems.filter((item) => getItemIngredientTerms(item).includes(term));
+  const correctItem = randomItem(correctItems);
+  const distractors = shuffleValues(menuItems.filter((item) => item.id !== correctItem?.id)).slice(0, 3);
+  if (!correctItem || distractors.length < 2) return null;
+
+  const options = shuffleValues([correctItem, ...distractors]).map((item) => ({ label: item.name, value: item.id }));
+  return {
+    typeLabel: "Find the item",
+    prompt: `Which item mentions ${term} in its menu notes?`,
+    multiple: false,
+    options,
+    answers: [correctItem.id],
+    explanation: `${correctItem.name} mentions ${term}.`
+  };
+}
+
+function nextQuizQuestion() {
+  if (!canStudyActiveMenu()) return;
+
+  state.quiz = createQuizQuestion();
+  renderQuiz();
+}
+
+function renderQuiz() {
+  if (!quizPage || state.screen !== "quiz") return;
+
+  quizScore.textContent = `${state.quizScore.correct} / ${state.quizScore.total}`;
+  quizOptions.replaceChildren();
+
+  if (!state.quiz) {
+    quizType.textContent = "Randomized";
+    quizQuestion.textContent = "Start a quiz question.";
+    quizMessage.textContent = "No quiz data is ready for this menu yet.";
+    quizCheckButton.disabled = true;
+    return;
+  }
+
+  quizType.textContent = state.quiz.typeLabel;
+  quizQuestion.textContent = state.quiz.prompt;
+  quizMessage.textContent = state.quiz.answered ? state.quiz.message : "";
+  const inputType = state.quiz.multiple ? "checkbox" : "radio";
+
+  state.quiz.options.forEach((option) => {
+    const label = document.createElement("label");
+    label.className = "quiz-option";
+    if (state.quiz.answered && state.quiz.answers.includes(option.value)) {
+      label.classList.add("is-correct");
+    }
+    if (state.quiz.answered && state.quiz.selected.includes(option.value) && !state.quiz.answers.includes(option.value)) {
+      label.classList.add("is-wrong");
+    }
+
+    const input = document.createElement("input");
+    input.type = inputType;
+    input.name = "quiz-option";
+    input.value = option.value;
+    input.disabled = state.quiz.answered;
+    input.checked = state.quiz.selected?.includes(option.value) || false;
+    label.append(input, document.createTextNode(option.label));
+    quizOptions.append(label);
+  });
+
+  quizCheckButton.disabled = state.quiz.answered;
+}
+
+function checkQuizAnswer() {
+  if (!state.quiz || state.quiz.answered) return;
+
+  const selected = [...quizOptions.querySelectorAll("input:checked")].map((input) => input.value);
+  if (!selected.length) {
+    quizMessage.textContent = "Choose an answer first.";
+    return;
+  }
+
+  const expected = [...state.quiz.answers].sort();
+  const actual = [...selected].sort();
+  const isCorrect = expected.length === actual.length && expected.every((value, index) => value === actual[index]);
+  state.quiz.answered = true;
+  state.quiz.selected = selected;
+  state.quiz.message = isCorrect ? `Correct. ${state.quiz.explanation}` : `Not quite. ${state.quiz.explanation}`;
+  state.quizScore.total += 1;
+  if (isCorrect) state.quizScore.correct += 1;
+  renderQuiz();
+}
+
+function resetQuizScore() {
+  state.quizScore = {
+    correct: 0,
+    total: 0
+  };
+  quizMessage.textContent = "";
+  renderQuiz();
+}
+
 function renderAdminState() {
   const activeUser = getActiveUser();
   const invitedUser = getInvitedUser();
@@ -5092,6 +5581,8 @@ function renderAdminState() {
   menuPage.hidden = !(activeUser && state.screen === "menu") && !showingSharedMenu;
   usersPage.hidden = !activeUser || state.screen !== "users";
   pdfPage.hidden = !activeUser || state.screen !== "pdf";
+  flashcardPage.hidden = !activeUser || state.screen !== "flashcards";
+  quizPage.hidden = !activeUser || state.screen !== "quiz";
 
   adminLoginForm.hidden = Boolean(activeUser) || showingInviteSetup;
   passwordSetupForm.hidden = !showingInviteSetup;
@@ -5142,6 +5633,8 @@ function renderAdminState() {
   renderDashboard();
   if (isAdmin()) renderUserList();
   renderMenu();
+  renderFlashcard();
+  renderQuiz();
 }
 
 function getUsernameFromEmail(email) {
@@ -5355,6 +5848,7 @@ function openShareMenuDialog() {
   const activeMenu = getActiveRestaurantMenu();
   const code = normalizeShareCode(activeMenu.shareCode) || generateShareCode();
   setShareCodeDisplay(code);
+  customShareCodeInput.value = "";
   shareMenuMessage.textContent = activeMenu.shareCode
     ? "This menu already has a saved share code."
     : "Save this code before sharing it.";
@@ -5370,22 +5864,41 @@ function setShareCodeDisplay(code) {
 }
 
 function refreshShareCode() {
+  customShareCodeInput.value = "";
   setShareCodeDisplay(generateShareCode());
   shareMenuMessage.textContent = "New code ready. Save it before sharing.";
 }
 
+function useCustomShareCode() {
+  const code = normalizeShareCode(customShareCodeInput.value);
+  const validationMessage = getShareCodeValidationMessage(code);
+  if (validationMessage) {
+    shareMenuMessage.textContent = validationMessage;
+    return;
+  }
+
+  customShareCodeInput.value = code;
+  setShareCodeDisplay(code);
+  shareMenuMessage.textContent = "Custom code ready. Save it before sharing.";
+}
+
 async function saveShareCode() {
   const code = normalizeShareCode(shareCodeValue.textContent);
-  if (!code || !canShareActiveMenu()) return;
+  const validationMessage = getShareCodeValidationMessage(code);
+  if (validationMessage || !canShareActiveMenu()) {
+    shareMenuMessage.textContent = validationMessage || "Open one of your menus before sharing.";
+    return;
+  }
 
   saveShareCodeButton.disabled = true;
   shareMenuMessage.textContent = "Saving share code...";
   try {
+    await validateShareCodeAvailability(code);
     await publishMenuShare(code);
     shareMenuMessage.textContent = `Share code saved: ${code}`;
     renderActiveMenuHeader();
-  } catch {
-    shareMenuMessage.textContent = "Could not save the share code. Check Firebase connection.";
+  } catch (error) {
+    shareMenuMessage.textContent = error?.message || "Could not save the share code. Check Firebase connection.";
   } finally {
     saveShareCodeButton.disabled = false;
   }
@@ -6698,6 +7211,10 @@ shareMenuButton.addEventListener("click", openShareMenuDialog);
 quickShareMenuButton.addEventListener("click", openShareMenuDialog);
 closeShareMenuButton.addEventListener("click", closeShareMenuDialog);
 refreshShareCodeButton.addEventListener("click", refreshShareCode);
+useCustomShareCodeButton.addEventListener("click", useCustomShareCode);
+customShareCodeInput.addEventListener("input", () => {
+  customShareCodeInput.value = normalizeShareCode(customShareCodeInput.value);
+});
 saveShareCodeButton.addEventListener("click", saveShareCode);
 copyShareCodeButton.addEventListener("click", copyShareCode);
 pdfBuilderButton.addEventListener("click", openPdfPage);
@@ -6706,6 +7223,17 @@ backFromPdfButton.addEventListener("click", closePdfPage);
 selectAllPdfButton.addEventListener("click", () => setPdfSelection(true));
 clearPdfButton.addEventListener("click", () => setPdfSelection(false));
 generatePdfButton.addEventListener("click", generatePdf);
+quickFlashcardButton.addEventListener("click", openFlashcardPage);
+backFromFlashcardsButton.addEventListener("click", closeFlashcardPage);
+flashcardShuffleButton.addEventListener("click", nextFlashcard);
+flashcardModeButton.addEventListener("click", toggleFlashcardMode);
+flashcardNextButton.addEventListener("click", nextFlashcard);
+flashcardFlipButton.addEventListener("click", flipFlashcard);
+quickQuizButton.addEventListener("click", openQuizPage);
+backFromQuizButton.addEventListener("click", closeQuizPage);
+quizNewQuestionButton.addEventListener("click", nextQuizQuestion);
+quizCheckButton.addEventListener("click", checkQuizAnswer);
+quizResetButton.addEventListener("click", resetQuizScore);
 createUserToggle.addEventListener("click", toggleCreateUserPanel);
 methodTabs.forEach((tab) => {
   tab.addEventListener("click", () => setCreateMethod(tab.dataset.method));
