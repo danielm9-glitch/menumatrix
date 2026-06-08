@@ -129,27 +129,6 @@ textarea {
   font-size: 0.78rem;
 }
 
-.tester-login {
-  margin: -2px 0 0;
-  border: 1px solid rgba(47, 125, 86, 0.24);
-  border-radius: 8px;
-  padding: 10px 11px;
-  background: rgba(255, 255, 255, 0.48);
-  color: var(--ink);
-  font-size: 0.78rem;
-  font-weight: 800;
-  line-height: 1.45;
-}
-
-.tester-login strong {
-  display: block;
-  margin-bottom: 2px;
-  color: var(--leaf);
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 .code-login-form {
   margin-top: 10px;
 }
@@ -1664,12 +1643,78 @@ h1 {
 }
 
 .menu-row {
+  position: relative;
   min-height: 96px;
   padding: 12px;
   border-top: 1px solid var(--line);
+  overflow: hidden;
+  transform: translateX(calc(var(--swipe-offset, 0px) * 0.18));
+  transition: transform 180ms ease, background 180ms ease;
+  touch-action: pan-y;
+}
+
+.menu-row::before {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  align-items: center;
+  padding: 0 18px;
+  color: white;
+  content: attr(data-swipe-action);
+  font-size: 0.86rem;
+  font-weight: 950;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.menu-row.is-swiping::before {
+  opacity: 1;
+}
+
+.menu-row.swipe-edit-ready {
+  background: #edf5ef;
+}
+
+.menu-row.swipe-edit-ready::before,
+.menu-row.swipe-commit-edit::before {
+  justify-items: start;
+  background: linear-gradient(90deg, rgba(47, 125, 86, 0.9), rgba(47, 125, 86, 0.28), transparent 74%);
+}
+
+.menu-row.swipe-delete-ready {
+  background: #fbebe8;
+}
+
+.menu-row.swipe-delete-ready::before,
+.menu-row.swipe-commit-delete::before {
+  justify-items: end;
+  background: linear-gradient(270deg, rgba(201, 79, 61, 0.94), rgba(201, 79, 61, 0.3), transparent 74%);
+}
+
+.menu-row.swipe-commit-edit,
+.menu-row.swipe-commit-delete {
+  --swipe-offset: 0px;
+  transform: scale(0.985);
+}
+
+.menu-row.swipe-commit-edit::before,
+.menu-row.swipe-commit-delete::before {
+  opacity: 1;
+}
+
+.menu-row.is-swipe-enabled {
+  cursor: grab;
+}
+
+.menu-row.is-swipe-enabled:active {
+  cursor: grabbing;
 }
 
 .item-cell {
+  position: relative;
+  z-index: 1;
   grid-column: 1 / -1;
 }
 
@@ -1739,6 +1784,8 @@ h1 {
 }
 
 .pill {
+  position: relative;
+  z-index: 1;
   display: inline-grid;
   min-height: 28px;
   align-items: center;
@@ -1766,6 +1813,8 @@ h1 {
 }
 
 .heat-meter {
+  position: relative;
+  z-index: 1;
   grid-column: 2;
   color: var(--tomato);
   font-size: 0.82rem;
@@ -1774,6 +1823,8 @@ h1 {
 }
 
 .price-button {
+  position: relative;
+  z-index: 1;
   grid-column: 3;
   min-height: 36px;
   border: 0;
@@ -1802,6 +1853,8 @@ h1 {
 }
 
 .item-details {
+  position: relative;
+  z-index: 1;
   grid-column: 1 / -1;
   display: grid;
   grid-template-columns: 96px minmax(0, 1fr);

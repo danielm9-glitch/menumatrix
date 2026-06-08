@@ -1971,6 +1971,7 @@ let accountDeleteSliderDragging = false;
 let accountDeleteSliderProgress = 0;
 let accountDeletionBusy = false;
 let pdfImportDraftItems = [];
+let rowSwipeState = null;
 
 const formatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -3534,7 +3535,7 @@ function showScreen(screen) {
 }
 
 function normalizeScreen(activeUser, invitedUser) {
-  if (state.screen === "shared" && state.sharedMenu) {
+  if (state.sharedMenu && ["shared", "flashcards", "quiz"].includes(state.screen)) {
     return;
   }
 
@@ -4015,6 +4016,7 @@ function renderMenu() {
 
   items.forEach((item) => {
     const row = template.content.firstElementChild.cloneNode(true);
+    row.dataset.itemId = item.id;
     row.classList.toggle("is-open", state.openItems.has(item.id));
     row.querySelector("h3").textContent = item.name;
     row.querySelector(".item-cell > p").textContent = item.description;
@@ -4025,8 +4027,13 @@ function renderMenu() {
 
     const rowEditButton = row.querySelector(".row-edit-button");
     const canEditItem = state.editing && canEditCategory(item.category);
+    const canSwipeItem = !state.sharedMenu && canEditCategory(item.category);
     rowEditButton.hidden = !canEditItem;
     rowEditButton.addEventListener("click", () => openItemDialog(item.id));
+    if (canSwipeItem) {
+      row.classList.add("is-swipe-enabled");
+      attachRowSwipeHandlers(row, item);
+    }
 
     const allergenList = row.querySelector(".allergen-list");
     const allergens = item.allergens.length ? item.allergens : ["No major allergens"];
@@ -4066,6 +4073,86 @@ function renderMenu() {
 
     menuGrid.append(row);
   });
+}
+
+function attachRowSwipeHandlers(row, item) {
+  row.addEventListener("pointerdown", (event) => handleRowSwipeStart(event, row, item));
+  row.addEventListener("pointermove", handleRowSwipeMove);
+  row.addEventListener("pointerup", handleRowSwipeEnd);
+  row.addEventListener("pointercancel", cancelRowSwipe);
+}
+
+function handleRowSwipeStart(event, row, item) {
+  if (event.button !== undefined && event.button !== 0) return;
+  const interactiveTarget = event.target.closest("button, input, textarea, select, a");
+  if (interactiveTarget && !interactiveTarget.classList.contains("item-toggle")) return;
+
+  rowSwipeState = {
+    row,
+    item,
+    startX: event.clientX,
+    startY: event.clientY,
+    currentX: event.clientX,
+    active: false
+  };
+  row.setPointerCapture?.(event.pointerId);
+}
+
+function handleRowSwipeMove(event) {
+  if (!rowSwipeState) return;
+
+  const deltaX = event.clientX - rowSwipeState.startX;
+  const deltaY = event.clientY - rowSwipeState.startY;
+  if (!rowSwipeState.active && Math.abs(deltaX) < 14) return;
+  if (!rowSwipeState.active && Math.abs(deltaY) > Math.abs(deltaX)) {
+    cancelRowSwipe();
+    return;
+  }
+
+  event.preventDefault();
+  rowSwipeState.active = true;
+  rowSwipeState.currentX = event.clientX;
+  updateRowSwipeVisual(deltaX);
+}
+
+function handleRowSwipeEnd(event) {
+  if (!rowSwipeState) return;
+
+  const deltaX = event.clientX - rowSwipeState.startX;
+  const { row, item } = rowSwipeState;
+  cancelRowSwipe();
+
+  if (Math.abs(deltaX) < 82) return;
+
+  row.classList.add(deltaX > 0 ? "swipe-commit-edit" : "swipe-commit-delete");
+  window.setTimeout(() => row.classList.remove("swipe-commit-edit", "swipe-commit-delete"), 260);
+
+  if (deltaX > 0) {
+    openItemDialog(item.id);
+    return;
+  }
+
+  requestDeleteMenuItem(item.id);
+}
+
+function cancelRowSwipe() {
+  if (!rowSwipeState) return;
+
+  rowSwipeState.row.style.removeProperty("--swipe-offset");
+  rowSwipeState.row.dataset.swipeAction = "";
+  rowSwipeState.row.classList.remove("is-swiping", "swipe-edit-ready", "swipe-delete-ready");
+  rowSwipeState = null;
+}
+
+function updateRowSwipeVisual(deltaX) {
+  const offset = Math.max(-104, Math.min(104, deltaX));
+  const { row } = rowSwipeState;
+
+  row.style.setProperty("--swipe-offset", `${offset}px`);
+  row.dataset.swipeAction = offset >= 0 ? "Edit" : "Delete";
+  row.classList.add("is-swiping");
+  row.classList.toggle("swipe-edit-ready", offset > 72);
+  row.classList.toggle("swipe-delete-ready", offset < -72);
 }
 
 function toggleItemDetails(id) {
@@ -5187,7 +5274,7 @@ function escapeAttribute(value) {
 }
 
 function canStudyActiveMenu() {
-  return Boolean(getActiveUser() && getActiveRestaurantMenu() && menuItems.length);
+  return Boolean((getActiveUser() || state.sharedMenu) && getActiveRestaurantMenu() && menuItems.length);
 }
 
 function randomItem(values) {
@@ -5277,7 +5364,7 @@ function openFlashcardPage() {
 }
 
 function closeFlashcardPage() {
-  showScreen("menu");
+  showScreen(state.sharedMenu && !getActiveUser() ? "shared" : "menu");
 }
 
 function nextFlashcard() {
@@ -5357,7 +5444,7 @@ function openQuizPage() {
 }
 
 function closeQuizPage() {
-  showScreen("menu");
+  showScreen(state.sharedMenu && !getActiveUser() ? "shared" : "menu");
 }
 
 function createQuizQuestion() {
@@ -5575,14 +5662,15 @@ function renderAdminState() {
   const showingInviteSetup = Boolean(invitedUser) && !activeUser;
 
   const showingSharedMenu = state.screen === "shared" && Boolean(state.sharedMenu);
-  authPage.hidden = Boolean(activeUser) || state.screen === "register" || showingSharedMenu;
+  const showingSharedTraining = Boolean(state.sharedMenu) && ["flashcards", "quiz"].includes(state.screen);
+  authPage.hidden = Boolean(activeUser) || state.screen === "register" || showingSharedMenu || showingSharedTraining;
   registerPage.hidden = Boolean(activeUser) || showingInviteSetup || state.screen !== "register";
   menusPage.hidden = !activeUser || state.screen !== "menus";
   menuPage.hidden = !(activeUser && state.screen === "menu") && !showingSharedMenu;
   usersPage.hidden = !activeUser || state.screen !== "users";
   pdfPage.hidden = !activeUser || state.screen !== "pdf";
-  flashcardPage.hidden = !activeUser || state.screen !== "flashcards";
-  quizPage.hidden = !activeUser || state.screen !== "quiz";
+  flashcardPage.hidden = state.screen !== "flashcards" || (!activeUser && !state.sharedMenu);
+  quizPage.hidden = state.screen !== "quiz" || (!activeUser && !state.sharedMenu);
 
   adminLoginForm.hidden = Boolean(activeUser) || showingInviteSetup;
   passwordSetupForm.hidden = !showingInviteSetup;
@@ -7147,15 +7235,31 @@ function saveItem(event) {
   renderMenu();
 }
 
-function deleteItem() {
-  const id = itemId.value;
+function deleteMenuItemById(id) {
   const item = menuItems.find((menuItem) => menuItem.id === id);
-  if (!item || !canEditCategory(item.category)) return;
+  if (!item || !canEditCategory(item.category) || state.sharedMenu) return false;
 
   menuItems = menuItems.filter((item) => item.id !== id);
   saveMenuItems();
-  closeItemDialog();
+  state.openItems.delete(id);
+  renderAllergyChips();
   renderMenu();
+  return true;
+}
+
+function requestDeleteMenuItem(id) {
+  const item = menuItems.find((menuItem) => menuItem.id === id);
+  if (!item || !canEditCategory(item.category) || state.sharedMenu) return;
+
+  const confirmed = window.confirm(`Delete ${item.name}?`);
+  if (!confirmed) return;
+
+  deleteMenuItemById(id);
+}
+
+function deleteItem() {
+  const deleted = deleteMenuItemById(itemId.value);
+  if (deleted) closeItemDialog();
 }
 
 searchInput.addEventListener("input", (event) => {
