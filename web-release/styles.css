@@ -911,6 +911,10 @@ h1 {
   gap: 12px;
 }
 
+.access-control-slot {
+  display: grid;
+}
+
 .method-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1129,6 +1133,69 @@ h1 {
 
 .permission-group input {
   width: 16px;
+}
+
+.permission-accordion {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 253, 250, 0.72);
+  overflow: hidden;
+}
+
+.permission-accordion summary::-webkit-details-marker {
+  display: none;
+}
+
+.access-summary {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 11px 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.access-summary span:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.access-summary strong {
+  color: var(--ink);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.access-summary small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.access-chevron {
+  color: var(--leaf);
+  font-size: 1rem;
+  font-weight: 950;
+  transform: rotate(0deg);
+  transition: transform 160ms ease;
+}
+
+.permission-accordion[open] .access-chevron {
+  transform: rotate(90deg);
+}
+
+.permission-accordion .permission-group {
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+}
+
+.permission-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
 }
 
 .user-list {

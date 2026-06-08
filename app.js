@@ -2155,6 +2155,8 @@ const newEmail = document.querySelector("#newEmail");
 const newEmailLabel = document.querySelector("#newEmailLabel");
 const newPassword = document.querySelector("#newPassword");
 const newPasswordLabel = document.querySelector("#newPasswordLabel");
+const newUserPermissionsSlot = document.querySelector("#newUserPermissionsSlot");
+const newUserMenuAccessSlot = document.querySelector("#newUserMenuAccessSlot");
 const userMessage = document.querySelector("#userMessage");
 const userList = document.querySelector("#userList");
 const itemDialog = document.querySelector("#itemDialog");
@@ -2715,9 +2717,18 @@ function loadUsers() {
   }
 }
 
+function normalizeAssignedMenuIds(values = []) {
+  return uniqueValues(values.map((value) => String(value || "").trim()));
+}
+
 function normalizeUser(user = {}) {
   const username = String(user.username || "").trim();
   const status = ["active", "pending", "unverified", "deleted"].includes(user.status) ? user.status : "active";
+  const explicitMenuIds = Array.isArray(user.menuIds)
+    ? normalizeAssignedMenuIds(user.menuIds)
+    : Array.isArray(user.assignedMenuIds)
+      ? normalizeAssignedMenuIds(user.assignedMenuIds)
+      : null;
   return {
     username,
     email: user.email || "",
@@ -2727,6 +2738,7 @@ function normalizeUser(user = {}) {
       Array.isArray(user.permissions) && user.permissions.length
         ? getUniqueCategoryValues(user.permissions.map(normalizeCategoryValue)).filter((permission) => categories.includes(permission))
         : [],
+    menuIds: explicitMenuIds,
     status,
     firebaseUid: user.firebaseUid || "",
     createdAt: user.createdAt || "",
@@ -2743,6 +2755,7 @@ function sanitizeUserForCloud(user) {
     password: normalized.password,
     role: normalized.role,
     permissions: normalized.permissions,
+    menuIds: normalized.menuIds,
     status: normalized.status,
     firebaseUid: normalized.firebaseUid,
     createdAt: normalized.createdAt,
@@ -2840,6 +2853,22 @@ function getMenuOwner(menu) {
   return menu?.owner || primaryAdminUsername;
 }
 
+function getAssignedMenuIds(user) {
+  return Array.isArray(user?.menuIds) ? normalizeAssignedMenuIds(user.menuIds) : null;
+}
+
+function canUserAccessMenu(user, menu) {
+  if (!user || !menu) return false;
+  if (user.role === "admin") return true;
+
+  const owner = getMenuOwner(menu);
+  if (owner === user.username) return true;
+  if (user.role !== "editor" || owner !== primaryAdminUsername) return false;
+
+  const assignedMenuIds = getAssignedMenuIds(user);
+  return assignedMenuIds === null ? true : assignedMenuIds.includes(menu.id);
+}
+
 function getWorkspaceOwner(user = getActiveUser()) {
   if (!user) return primaryAdminUsername;
   return user.role === "owner" ? user.username : primaryAdminUsername;
@@ -2863,12 +2892,7 @@ function isOwnerWorkspace(user = getActiveUser()) {
 function getVisibleRestaurantMenus() {
   const user = getActiveUser();
   if (!user) return [];
-  if (isAdmin()) return restaurantMenus;
-
-  return restaurantMenus.filter((menu) => {
-    const owner = getMenuOwner(menu);
-    return owner === user.username || (user.role === "editor" && owner === primaryAdminUsername);
-  });
+  return restaurantMenus.filter((menu) => canUserAccessMenu(user, menu));
 }
 
 function loadSavedShareCodes() {
@@ -3174,7 +3198,9 @@ function getEditableCategories() {
   const user = getActiveUser();
   if (!user) return [];
   if (ownsActiveMenu()) return [...categories];
-  return isAdmin() ? [...categories] : user.permissions || [];
+  if (isAdmin()) return [...categories];
+  if (!canUserAccessMenu(user, getActiveRestaurantMenu())) return [];
+  return user.permissions || [];
 }
 
 function canEditCategory(category) {
@@ -4969,9 +4995,20 @@ function closePdfPage() {
 }
 
 function toggleCreateUserPanel() {
-  createUserPanel.hidden = !createUserPanel.hidden;
+  const willOpen = createUserPanel.hidden;
+  createUserPanel.hidden = !willOpen;
   createUserToggle.setAttribute("aria-expanded", String(!createUserPanel.hidden));
   createUserToggle.querySelector(".expand-marker").textContent = createUserPanel.hidden ? "+" : "-";
+  if (willOpen) renderNewUserAccessControls();
+}
+
+function renderNewUserAccessControls({ reset = false } = {}) {
+  if (!newUserPermissionsSlot || !newUserMenuAccessSlot) return;
+
+  const permissions = reset ? [] : getSelectedPermissions(userForm);
+  const menuIds = reset ? [] : getSelectedMenuIds(userForm);
+  newUserPermissionsSlot.replaceChildren(createPermissionFieldset({ role: "editor", permissions }));
+  newUserMenuAccessSlot.replaceChildren(createMenuAccessFieldset({ role: "editor", menuIds }));
 }
 
 function setCreateMethod(method) {
@@ -5719,7 +5756,10 @@ function renderAdminState() {
   renderSavedShareCodes();
   renderAccountDashboard();
   renderDashboard();
-  if (isAdmin()) renderUserList();
+  if (isAdmin()) {
+    renderUserList();
+    if (!createUserPanel.hidden) renderNewUserAccessControls();
+  }
   renderMenu();
   renderFlashcard();
   renderQuiz();
@@ -6247,7 +6287,7 @@ function renderUserList() {
     const details = document.createElement("form");
     details.className = "user-edit-panel";
     details.hidden = true;
-    details.append(createEmailLabel(user), createPasswordLabel(user), createPermissionFieldset(user));
+    details.append(createEmailLabel(user), createPasswordLabel(user), createPermissionFieldset(user), createMenuAccessFieldset(user));
 
     if (user.role !== "admin") {
       const actions = document.createElement("div");
@@ -6309,7 +6349,8 @@ function getPrivilegeRank(user) {
 function getPrivilegeLabel(user) {
   if (user.role === "admin") return "All sections";
   if (user.role === "owner") return "Own menus";
-  return (user.permissions || []).map(getCategoryLabel).join(", ") || "No edit access";
+  const sections = (user.permissions || []).map(getCategoryLabel).join(", ") || "No edit access";
+  return `${sections} - ${getMenuAccessLabel(user)}`;
 }
 
 function getCategoryLabel(category) {
@@ -6368,27 +6409,120 @@ function createEmailLabel(user) {
   return label;
 }
 
-function createPermissionFieldset(user) {
+function createAccessAccordion(title, detail, content, { open = false } = {}) {
+  const details = document.createElement("details");
+  details.className = "permission-accordion";
+  details.open = open;
+
+  const summary = document.createElement("summary");
+  summary.className = "access-summary";
+
+  const copy = document.createElement("span");
+  const heading = document.createElement("strong");
+  const meta = document.createElement("small");
+  heading.textContent = title;
+  meta.textContent = detail;
+  copy.append(heading, meta);
+
+  const chevron = document.createElement("span");
+  chevron.className = "access-chevron";
+  chevron.textContent = ">";
+
+  summary.append(copy, chevron);
+  details.append(summary, content);
+  return details;
+}
+
+function createPermissionFieldset(user, options = {}) {
   const fieldset = document.createElement("fieldset");
   fieldset.className = "permission-group";
 
   const legend = document.createElement("legend");
-  legend.textContent = "Can modify";
+  legend.textContent = "Categories";
   fieldset.append(legend);
 
+  const fullCategoryAccess = user.role === "admin" || user.role === "owner";
   categories.forEach((category) => {
     const label = document.createElement("label");
     const input = document.createElement("input");
     input.type = "checkbox";
     input.name = "permissions";
     input.value = category;
-    input.checked = user.role === "admin" || (user.permissions || []).includes(category);
-    input.disabled = user.role === "admin";
+    input.checked = fullCategoryAccess || (user.permissions || []).includes(category);
+    input.disabled = fullCategoryAccess;
     label.append(input, document.createTextNode(` ${getCategoryLabel(category)}`));
     fieldset.append(label);
   });
 
-  return fieldset;
+  const selectedCount = fullCategoryAccess ? categories.length : (user.permissions || []).filter((category) => categories.includes(category)).length;
+  const detail = fullCategoryAccess
+    ? "Full category access"
+    : selectedCount
+      ? `${selectedCount} categor${selectedCount === 1 ? "y" : "ies"} selected`
+      : "No categories selected";
+  return createAccessAccordion("Can modify", detail, fieldset, options);
+}
+
+function createMenuAccessFieldset(user, options = {}) {
+  const fieldset = document.createElement("fieldset");
+  fieldset.className = "permission-group";
+
+  const legend = document.createElement("legend");
+  legend.textContent = "Menus";
+  fieldset.append(legend);
+
+  if (user.role === "owner") {
+    const note = document.createElement("p");
+    note.className = "permission-note";
+    note.textContent = "Owners manage the menus created inside their own workspace.";
+    fieldset.append(note);
+    return createAccessAccordion("Menu access", getMenuAccessLabel(user), fieldset, options);
+  }
+
+  if (!restaurantMenus.length) {
+    const note = document.createElement("p");
+    note.className = "permission-note";
+    note.textContent = "No menus have been created yet.";
+    fieldset.append(note);
+    return createAccessAccordion("Menu access", "No menus available", fieldset, options);
+  }
+
+  const assignedMenuIds = getAssignedMenuIds(user);
+  const hasFullMenuAccess = user.role === "admin" || assignedMenuIds === null;
+  restaurantMenus.forEach((menu) => {
+    const label = document.createElement("label");
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.name = "menuAccess";
+    input.value = menu.id;
+    input.checked = hasFullMenuAccess || assignedMenuIds.includes(menu.id);
+    input.disabled = user.role === "admin";
+    label.append(input, document.createTextNode(` ${menu.name || "Untitled menu"}`));
+    fieldset.append(label);
+  });
+
+  return createAccessAccordion("Menu access", getMenuAccessLabel(user), fieldset, options);
+}
+
+function getMenuAccessLabel(user) {
+  if (user.role === "admin") return "All menus";
+  if (user.role === "owner") return "Own menu workspace";
+
+  const assignedMenuIds = getAssignedMenuIds(user);
+  if (assignedMenuIds === null) return "All admin menus";
+  if (!assignedMenuIds.length) return "No menus selected";
+
+  const visibleCount = assignedMenuIds.filter((menuId) => restaurantMenus.some((menu) => menu.id === menuId)).length;
+  const count = visibleCount || assignedMenuIds.length;
+  return `${count} menu${count === 1 ? "" : "s"} selected`;
+}
+
+function getSelectedPermissions(container) {
+  return [...container.querySelectorAll("input[name='permissions']:checked")].map((input) => input.value);
+}
+
+function getSelectedMenuIds(container) {
+  return [...container.querySelectorAll("input[name='menuAccess']:checked")].map((input) => input.value);
 }
 
 function saveUser(event) {
@@ -6398,10 +6532,16 @@ function saveUser(event) {
   const username = newUsername.value.trim();
   const email = newEmail.value.trim();
   const isInvite = createMethod.value === "invite";
-  const permissions = [...userForm.querySelectorAll("input[name='permissions']:checked")].map((input) => input.value);
+  const permissions = getSelectedPermissions(userForm);
+  const menuIds = getSelectedMenuIds(userForm);
 
   if (!permissions.length) {
     userMessage.textContent = "Choose at least one section.";
+    return;
+  }
+
+  if (restaurantMenus.length && !menuIds.length) {
+    userMessage.textContent = "Choose at least one menu this user can access.";
     return;
   }
 
@@ -6417,6 +6557,7 @@ function saveUser(event) {
     password: isInvite ? "" : newPassword.value,
     role: "editor",
     permissions,
+    menuIds,
     status: isInvite ? "pending" : "active",
     createdAt: existingIndex >= 0 ? users[existingIndex].createdAt || "" : new Date().toISOString(),
     updatedAt: new Date().toISOString()
@@ -6435,6 +6576,7 @@ function saveUser(event) {
 
   saveUsers();
   userForm.reset();
+  renderNewUserAccessControls({ reset: true });
   if (isInvite) {
     sendInviteEmail(user);
     userMessage.textContent = "Invite created. Your email app should open.";
@@ -6505,20 +6647,29 @@ function updateUser(event, username) {
   if (userIndex < 0 || users[userIndex].role === "admin") return;
 
   const form = event.currentTarget;
-  const permissions = [...form.querySelectorAll("input[name='permissions']:checked")].map((input) => input.value);
+  const permissions = getSelectedPermissions(form);
+  const menuIds = getSelectedMenuIds(form);
 
   if (!permissions.length) {
     userMessage.textContent = "Choose at least one section.";
     return;
   }
 
-  users[userIndex] = {
+  if (users[userIndex].role === "editor" && restaurantMenus.length && !menuIds.length) {
+    userMessage.textContent = "Choose at least one menu this user can access.";
+    return;
+  }
+
+  const updatedUser = {
     ...users[userIndex],
     email: form.elements.email.value,
     password: form.elements.password.value,
     permissions,
     updatedAt: new Date().toISOString()
   };
+  if (users[userIndex].role === "editor") updatedUser.menuIds = menuIds;
+  if (users[userIndex].role === "owner") updatedUser.menuIds = null;
+  users[userIndex] = updatedUser;
 
   saveUsers();
   userMessage.textContent = "User updated.";
@@ -6601,6 +6752,7 @@ function addCategory(event) {
   renderAllergyChips();
   renderMenu();
   renderUserList();
+  if (!createUserPanel.hidden) renderNewUserAccessControls();
   newCategoryName.value = "";
   categoryMessage.textContent = `${getCategoryLabel(category)} added.`;
 }

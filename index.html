@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Menu Matrix</title>
-    <link rel="stylesheet" href="styles.css?v=viewer-study-swipe" />
+    <link rel="stylesheet" href="styles.css?v=user-menu-access" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -414,12 +414,8 @@
                 Password
                 <input id="newPassword" type="password" autocomplete="new-password" />
               </label>
-              <fieldset class="permission-group">
-                <legend>Can modify</legend>
-                <label><input type="checkbox" name="permissions" value="starters" /> Starters</label>
-                <label><input type="checkbox" name="permissions" value="mains" /> Mains</label>
-                <label><input type="checkbox" name="permissions" value="drinks" /> Drinks</label>
-              </fieldset>
+              <div id="newUserPermissionsSlot" class="access-control-slot"></div>
+              <div id="newUserMenuAccessSlot" class="access-control-slot"></div>
               <button id="createUserSubmit" class="save-button" type="submit">Send invite</button>
               <p id="userMessage" class="login-message" role="status"></p>
             </form>
@@ -926,6 +922,6 @@
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js?v=viewer-study-swipe"></script>
+    <script src="app.js?v=user-menu-access"></script>
   </body>
 </html>
