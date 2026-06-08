@@ -1,6 +1,6 @@
 const storageKey = "restaurant-menu-matrix-items";
 const menuSeedKey = "restaurant-menu-matrix-seed";
-const currentMenuSeed = "mott32-las-vegas-five";
+const currentMenuSeed = "mott32-dinner-menu-matrix-v4";
 const usersStorageKey = "restaurant-menu-matrix-users";
 const currentUserKey = "restaurant-menu-matrix-current-user";
 const designStorageKey = "restaurant-menu-matrix-design";
@@ -24,7 +24,7 @@ const defaultDesign = {
   panel: "#fbfaf6",
   heroImage: defaultHeroImage
 };
-const defaultCategories = ["starters", "mains", "drinks", "soups", "dim-sum", "entrees", "desserts"];
+const defaultCategories = ["bbq", "steamed-dim-sum", "baked-fried", "starters", "soups", "birds-nest", "abalone", "market-seafood", "fresh-seafood", "clay-pot", "meat", "vegetables", "rice-noodles", "desserts", "out-of-menu"];
 let categories = loadCategories();
 const defaultUsers = [
   {
@@ -37,73 +37,1886 @@ const defaultUsers = [
 
 const defaultMenuItems = [
   {
-    id: "peking-duck",
-    name: "Apple Wood Roasted 42 Days Peking Duck",
-    description: "Signature Mott 32 cut, carved for crisp skin and tender meat",
-    category: "mains",
-    diet: "NA",
-    style: "",
-    heat: 0,
-    allergens: ["Soy", "Wheat"],
-    details: "One of Mott 32's signature dishes. Teach the team to mention the apple wood roast, 42-day duck, crisp skin, and classic tableside-style presentation.",
-    image: "https://images.unsplash.com/photo-1518492104633-130d0cc84637?auto=format&fit=crop&w=800&q=80",
-    price: 108
+    "id": "apple-wood-roasted-42-days-peking-duck-signature-mott-32-cut",
+    "name": "Apple Wood Roasted 42 Days Peking Duck, Signature Mott 32 Cut",
+    "description": "Peking duck aged exactly 42 days. Roasted in an oven for 60 minutes and smoked by apple wood. Before the duck is presented and carved tableside, the accompaniments are presented to the guest: duck sauce, peanut sauce, sesame sauce, cane sugar, scallions, and cucumber The duck sauce is mixed with peanut & sesame sauce tableside.",
+    "category": "bbq",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Egg",
+      "Peanut",
+      "Nut",
+      "Onion"
+    ],
+    "details": "Section: BBQ. Ingredients: Duck Maltose Vinegar Egg. Portion: 6 lb / duck. Accompaniments: Duck sauce mixed with sesame & peanut sauce (Duck sauce: sweet bean sauce, honey, chicken powder, sesame oil, Chinese yellow wine, sugar) Cane sugar Cucumber & scallion.",
+    "image": "https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?auto=format&fit=crop&w=800&q=80",
+    "price": 128.0
   },
   {
-    id: "soup-dumplings",
-    name: "Traditional Iberico Pork Shanghainese Soup Dumplings",
-    description: "Four delicate xiao long bao with savory pork broth",
-    category: "starters",
-    diet: "NA",
-    style: "",
-    heat: 1,
-    allergens: ["Wheat", "Soy"],
-    details: "A dim sum staple. Coach staff to warn guests the dumplings contain hot broth and should be eaten carefully with the soup spoon.",
-    image: "https://images.unsplash.com/photo-1496116218417-1a781b1c416c?auto=format&fit=crop&w=800&q=80",
-    price: 13
+    "id": "peking-style-spicy-crispy-duck-rack",
+    "name": "Peking Style Spicy Crispy Duck Rack",
+    "description": "The remainder of duck from the whole Peking duck can be wok fried with chili and garlic.",
+    "category": "bbq",
+    "diet": "NA",
+    "style": "",
+    "heat": 1,
+    "allergens": [
+      "Gluten",
+      "Sesame",
+      "Soy",
+      "Onion",
+      "Garlic",
+      "Capsaicin"
+    ],
+    "details": "Section: BBQ. Ingredients: Chopped duck Soy sauce Spring onion Chilis Garlic.",
+    "image": "https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?auto=format&fit=crop&w=800&q=80",
+    "price": 22.0
   },
   {
-    id: "bbq-pork-bun",
-    name: "Crispy Sugar Coated BBQ Iberico Pork Bun",
-    description: "Three baked buns with sweet-savory barbecue pork filling",
-    category: "starters",
-    diet: "NA",
-    style: "",
-    heat: 0,
-    allergens: ["Wheat", "Soy"],
-    details: "This is a baked dim sum item with a crisp sugar-coated exterior and rich Iberico pork barbecue center. Good for guests who like sweet and savory.",
-    image: "https://images.unsplash.com/photo-1563245372-f21724e3856d?auto=format&fit=crop&w=800&q=80",
-    price: 13
+    "id": "barbecue-pluma-iberico-pork-yellow-mountain-honey",
+    "name": "Barbecue Pluma Iberico Pork, Yellow Mountain Honey",
+    "description": "Pluma iberico marinated pork is roasted, then coated with honey",
+    "category": "bbq",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Egg",
+      "Fish",
+      "Shellfish",
+      "Pork",
+      "Onion",
+      "Garlic",
+      "Coriander",
+      "Potato"
+    ],
+    "details": "Section: BBQ. Ingredients:. Acorn fed, free range Ib\u00e9rico pork pluma Hoisin sauce Minced shallot Ground bean sauce Coriander Oyster sauce Potato starch Sugar Maltose Chicken powder Ketchup Egg Minced garlic. Portion: 12-14 pcs.",
+    "image": "https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?auto=format&fit=crop&w=800&q=80",
+    "price": 48.0
   },
   {
-    id: "smoked-black-cod",
-    name: "Signature Smoked Black Cod",
-    description: "Smoky, silky black cod with a rich Cantonese-style glaze",
-    category: "mains",
-    diet: "NA",
-    style: "sea",
-    heat: 0,
-    allergens: ["Fish", "Soy"],
-    details: "A polished seafood signature. Describe it as delicate, smoky, slightly sweet, and very soft in texture.",
-    image: "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=800&q=80",
-    price: 42
+    "id": "minced-duck-fried-rice",
+    "name": "Minced Duck Fried Rice",
+    "description": "Crispy fried rice with minced duck, asparagus and green onion",
+    "category": "bbq",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Egg",
+      "Soy",
+      "Onion"
+    ],
+    "details": "Section: BBQ. Ingredients: Minced Duck, crispy asparagus, egg, green onion Minced Duck, crispy rice, asparagus, egg, green onion. Portion: rice,. Price not listed in PDF; confirm current market price before service.",
+    "image": "https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?auto=format&fit=crop&w=800&q=80",
+    "price": 0
   },
   {
-    id: "lobster-fried-rice",
-    name: "Signature Maine Lobster Fried Rice",
-    description: "King oyster mushrooms and edamame folded into lobster fried rice",
-    category: "mains",
-    diet: "NA",
-    style: "sea",
-    heat: 0,
-    allergens: ["Shellfish", "Egg", "Soy"],
-    details: "A premium rice and noodle section dish. Highlight the lobster, mushroom, and edamame; confirm shellfish allergy before recommending.",
-    image: "https://images.unsplash.com/photo-1603133872878-684f208fb84b?auto=format&fit=crop&w=800&q=80",
-    price: 68
+    "id": "traditional-iberico-pork-shanghainese-soup-dumplings",
+    "name": "Traditional Iberico Pork Shanghainese Soup Dumplings",
+    "description": "Steamed dumpling filled with hot soup and Iberico pork.",
+    "category": "steamed-dim-sum",
+    "diet": "NA",
+    "style": "",
+    "heat": 1,
+    "allergens": [
+      "Gluten",
+      "Wheat",
+      "Sesame",
+      "Soy",
+      "Pork",
+      "Onion",
+      "Gelatine"
+    ],
+    "details": "Section: Steamed Dim Sum. Ingredients: Iberico pork *All Pork belly Dark soy sauce *High gluten flour Chinese yellow wine Scallion Sesame oil Ginger Unflavored gelatine Salt Chicken powder Sugar. Portion: - purpose flour 4 pcs. Accompaniments: Dark rice vinegar(from Shanghai) with shredded ginger.",
+    "image": "https://images.unsplash.com/photo-1496116218417-1a781b1c416c?auto=format&fit=crop&w=800&q=80",
+    "price": 13.0
+  },
+  {
+    "id": "hot-sour-iberico-pork-shanghainese-soup-dumplings",
+    "name": "Hot & Sour Iberico Pork Shanghainese Soup Dumplings",
+    "description": "Steamed dumpling filled with hot & sour and Iberico pork. Color-Orange from the carrot.",
+    "category": "steamed-dim-sum",
+    "diet": "NA",
+    "style": "",
+    "heat": 1,
+    "allergens": [
+      "Gluten",
+      "Sesame",
+      "Soy",
+      "Pork",
+      "Onion",
+      "Capsaicin",
+      "Carrot",
+      "Gelatine"
+    ],
+    "details": "Section: Steamed Dim Sum. Ingredients: Iberico pork All Pork belly Dark soy sauce High Chinese yellow wine Carrot Scallion Sesame oil Ginger Unflavored gelatine Salt Chili powder Chili Chicken powder Ground white powder Sugar Chili bean sauce Dark vinegar. Portion: - purpose flour 4 pcs gluten flour. Accompaniments: Dark rice vinegar(from Shanghai) with shredded ginger.",
+    "image": "https://images.unsplash.com/photo-1496116218417-1a781b1c416c?auto=format&fit=crop&w=800&q=80",
+    "price": 14.0
+  },
+  {
+    "id": "soft-quail-egg-iberico-pork-black-truffle-siu-mai",
+    "name": "Soft Quail Egg, Iberico Pork, Black Truffle Siu Mai",
+    "description": "Steamed Siu Mai filled with soft quail egg, pork, shrimp and a little mushroom. Topped with black truffle.",
+    "category": "steamed-dim-sum",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Egg",
+      "Fish",
+      "Shellfish",
+      "Sesame",
+      "Mushroom",
+      "Pork",
+      "Potato"
+    ],
+    "details": "Section: Steamed Dim Sum. Ingredients: Black truffle All Sesame oil Quail egg Iberico pork Potato starch Shrimp Shiitake mushroom Sugar Chicken powder. Portion: - purpose flour 2 pcs.",
+    "image": "https://images.unsplash.com/photo-1496116218417-1a781b1c416c?auto=format&fit=crop&w=800&q=80",
+    "price": 14.0
+  },
+  {
+    "id": "crispy-sugar-coated-bbq-iberico-pork-bun",
+    "name": "Crispy Sugar Coated BBQ Iberico Pork Bun",
+    "description": "Baked sugar-coated bun filled with BBQ pork.",
+    "category": "baked-fried",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Dairy",
+      "Egg",
+      "Fish",
+      "Shellfish",
+      "Sesame",
+      "Soy",
+      "Pork",
+      "Onion",
+      "Pepper",
+      "Potato",
+      "Gelatine"
+    ],
+    "details": "Section: Baked & Fried. Ingredients: Iberico pork Ground white Butter pepper Sugar Milk Unflavored gelatine Potato starch All Sugar Corn starch Egg white Chicken powder Shallot Dark soy sauce Onion Light soy sauce Ginger Oyster sauce Sesame oil. Portion: 3 pcs powder - purpose flour.",
+    "image": "https://images.unsplash.com/photo-1563245372-f21724e3856d?auto=format&fit=crop&w=800&q=80",
+    "price": 13.0
+  },
+  {
+    "id": "shredded-peking-duck-mushroom-spring-roll",
+    "name": "Shredded Peking Duck, Mushroom Spring Roll",
+    "description": "Deep fried spring roll filled with shredded peking duck, carrot, shiitake mushroom.",
+    "category": "baked-fried",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Wheat",
+      "Mushroom",
+      "Potato",
+      "Carrot"
+    ],
+    "details": "Section: Baked & Fried. Ingredients: Shredded duck High gluten flour Mushroom Potato starch Carrot Chicken powder Salt Sugar. Portion: 3 rolls cut into 6 small pcs. Accompaniments: Worcestershire sauce.",
+    "image": "https://images.unsplash.com/photo-1563245372-f21724e3856d?auto=format&fit=crop&w=800&q=80",
+    "price": 14.0
+  },
+  {
+    "id": "vegan-shanghainese-soup-dumplings-minced-pork-tofu",
+    "name": "Vegan Shanghainese Soup Dumplings, Minced \"Pork\", Tofu",
+    "description": "Steam Vegan soup dumpling, Vegan \u2018pork\u2019",
+    "category": "baked-fried",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Sesame"
+    ],
+    "details": "Section: Baked & Fried. Ingredients: Bean Flowers. Portion: 4 pcs. Accompaniments: Ginger vinegar. Price not listed in PDF; confirm current market price before service.",
+    "image": "https://images.unsplash.com/photo-1563245372-f21724e3856d?auto=format&fit=crop&w=800&q=80",
+    "price": 0
+  },
+  {
+    "id": "garoupa-chopped-chili-prawn-vegetable-dumpling",
+    "name": "Garoupa, Chopped Chili, Prawn, Vegetable Dumpling",
+    "description": "Steam Dumpling fill with fish, shrimp, vegetable. Top with chili",
+    "category": "baked-fried",
+    "diet": "NA",
+    "style": "",
+    "heat": 1,
+    "allergens": [
+      "Fish",
+      "Seafood",
+      "Shellfish",
+      "Sesame",
+      "Nut",
+      "Potato"
+    ],
+    "details": "Section: Baked & Fried. Ingredients: Fish Potato starch Shrimp Vegetable (choy sum) Scallop. Portion: 4pcs.",
+    "image": "https://images.unsplash.com/photo-1563245372-f21724e3856d?auto=format&fit=crop&w=800&q=80",
+    "price": 22.0
+  },
+  {
+    "id": "scallop-dumplings-spinach-prawn-caviar",
+    "name": "Scallop Dumplings Spinach, Prawn, Caviar",
+    "description": "Steam Dumpling with Shrimp slices scallop, top with Caviar",
+    "category": "baked-fried",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Wheat",
+      "Fish",
+      "Seafood",
+      "Shellfish",
+      "Sesame",
+      "Pork",
+      "Potato"
+    ],
+    "details": "Section: Baked & Fried. Ingredients: Shrimp Wheat starch Scallop Potato starch Caviar Color from Spinach Lard. Portion: 3 pcs.",
+    "image": "https://images.unsplash.com/photo-1563245372-f21724e3856d?auto=format&fit=crop&w=800&q=80",
+    "price": 24.0
+  },
+  {
+    "id": "wild-mushroom-spring-roll",
+    "name": "Wild Mushroom Spring Roll",
+    "description": "Deep Fried spring roll with Mushroom, carrot, cabbage.",
+    "category": "baked-fried",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Wheat",
+      "Mushroom",
+      "Potato",
+      "Carrot"
+    ],
+    "details": "Section: Baked & Fried. Ingredients: Mushroom High gluten flour Carrot Potato starch Cabbage. Portion: 3 pcs.",
+    "image": "https://images.unsplash.com/photo-1563245372-f21724e3856d?auto=format&fit=crop&w=800&q=80",
+    "price": 13.0
+  },
+  {
+    "id": "marinated-cucumber-and-garlic",
+    "name": "Marinated Cucumber and Garlic",
+    "description": "Diced cucumber marinated in vinegar and sesame oil.",
+    "category": "starters",
+    "diet": "NA",
+    "style": "",
+    "heat": 1,
+    "allergens": [
+      "Gluten",
+      "Sesame",
+      "Soy",
+      "Garlic",
+      "Capsaicin"
+    ],
+    "details": "Section: Starters. Ingredients: Cucumber Minced garlic Dark vinegar Sesame oil Sugar Soy sauce Chili oil.",
+    "image": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80",
+    "price": 9.0
+  },
+  {
+    "id": "sesame-prawn-toast-autumn-sauce",
+    "name": "Sesame Prawn Toast, Autumn Sauce",
+    "description": "Shrimp paste with white toast deep fried",
+    "category": "starters",
+    "diet": "NA",
+    "style": "",
+    "heat": 1,
+    "allergens": [
+      "Gluten",
+      "Fish",
+      "Shellfish",
+      "Sesame",
+      "Garlic",
+      "Capsaicin",
+      "Cilantro"
+    ],
+    "details": "Section: Starters. Ingredients: Shrimp Paste Toast Cilantro Chili bean sauce Ketchup (in the sauce) Garlic(in the sauce) Gluten(in the sauce) Sesame. Portion: 4 pcs.",
+    "image": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80",
+    "price": 18.0
+  },
+  {
+    "id": "shredded-peking-duck-salad-beetroot-crispy-taro-citrus-truffle-d",
+    "name": "Shredded Peking Duck Salad, Beetroot,Crispy Taro,Citrus Truffle Dressing",
+    "description": "Mixed green salad tossed in yuzu vinegar and black truffle oil, topped with shredded duck.",
+    "category": "starters",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Sesame",
+      "Nut",
+      "Garlic",
+      "Citrus"
+    ],
+    "details": "Section: Starters. Ingredients: Mixed green Pickle Garlic Shredded duck Taro Truffle oil Japanese waf u salad dressing(sesame, citrus).",
+    "image": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80",
+    "price": 24.0
+  },
+  {
+    "id": "cold-free-range-chicken-coriander-black-truffle",
+    "name": "Cold Free Range Chicken, Coriander, Black Truffle",
+    "description": "Poached free range chicken tossed with truffle sauce, truffle oil, deep fried sliced shallot and coriander.",
+    "category": "starters",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Mushroom",
+      "Onion",
+      "Cilantro",
+      "Coriander"
+    ],
+    "details": "Section: Starters. Ingredients: Poached chicken Cilantro Chicken powder Truffle oil Truffle paste Deep fried sliced shallot.",
+    "image": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80",
+    "price": 20.0
+  },
+  {
+    "id": "jellyfish-black-fungus-black-vinegar",
+    "name": "Jellyfish, Black Fungus, Black Vinegar",
+    "description": "Black vinegar marinated Jellyfish with Wood-ear mushroom and cucumber",
+    "category": "starters",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Fish",
+      "Seafood",
+      "Mushroom",
+      "Cilantro"
+    ],
+    "details": "Section: Starters. Ingredients: Jellyfish Cucumber Wood-ear Fungus Black vinegar Cilantro.",
+    "image": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80",
+    "price": 28.0
+  },
+  {
+    "id": "crispy-air-dried-angus-beef-szechuan-peppercorn-sesame",
+    "name": "Crispy Air-Dried Angus Beef, Szechuan Peppercorn, Sesame",
+    "description": "Deep fried air-dried angus beef with Szechuan numbing syrup with sesame seed",
+    "category": "starters",
+    "diet": "NA",
+    "style": "",
+    "heat": 1,
+    "allergens": [
+      "Gluten",
+      "Sesame",
+      "Soy",
+      "Pepper",
+      "Capsaicin"
+    ],
+    "details": "Section: Starters. Ingredients: Angus beef Szechuan peppercorn Sugar Sesame seed Soy.",
+    "image": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80",
+    "price": 18.0
+  },
+  {
+    "id": "crispy-sea-bass-salt-and-pepper",
+    "name": "Crispy sea Bass, Salt and Pepper",
+    "description": "Deep fried sea bass with salt and pepper",
+    "category": "starters",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Seafood",
+      "Sesame",
+      "Garlic",
+      "Pepper",
+      "Potato"
+    ],
+    "details": "Section: Starters. Ingredients: Sea bass Pepper Potato starch Garlic Sesame.",
+    "image": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80",
+    "price": 30.0
+  },
+  {
+    "id": "buddha-jumps-over-the-wall",
+    "name": "Buddha Jumps Over the Wall",
+    "description": "Double boiled soup with abalone, Japanese sea cucumber, fish maw, bamboo pith, sea conch, conpoy.",
+    "category": "soups",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Fish",
+      "Shellfish",
+      "Mushroom",
+      "Pork"
+    ],
+    "details": "Section: Soups. Ingredients: Japanese s ea cucumber Abalone Bamboo pith Sea conch fish maw Black chicken *Dry Scallops. Portion: Per Person.",
+    "image": "https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&w=800&q=80",
+    "price": 198.0
+  },
+  {
+    "id": "hot-sour-soup-assorted-seafood",
+    "name": "Hot & Sour Soup, Assorted Seafood",
+    "description": "Diced seafood, shredded Chinese fungus and bamboo pith. Creamy soup.",
+    "category": "soups",
+    "diet": "NA",
+    "style": "",
+    "heat": 1,
+    "allergens": [
+      "Gluten",
+      "Egg",
+      "Fish",
+      "Shellfish",
+      "Mushroom",
+      "Capsaicin",
+      "Pepper"
+    ],
+    "details": "Section: Soups. Ingredients: Fish Scallop Vinegar Shrimp Chili Chili bean sauce Shredded black fungus Shredded bamboo shoot Shredded shiitake mushroom Shredded bamboo pith White Pepper. Portion: Per Person.",
+    "image": "https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&w=800&q=80",
+    "price": 14.0
+  },
+  {
+    "id": "double-boiled-pearl-meat-soup-silky-fowl-matsutake-mushroom",
+    "name": "Double Boiled Pearl Meat Soup, Silky Fowl, Matsutake Mushroom",
+    "description": "Double boiled silky fowl soup with pearl meat, snow fungus and matsutake mushrooms.",
+    "category": "soups",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Fish",
+      "Shellfish",
+      "Mushroom",
+      "Pork"
+    ],
+    "details": "Section: Soups. Ingredients: Silky fowl Pearl meat Pork Matsutake mushroom Snow fungus Black chicken Dry Conch. Portion: Per Person.",
+    "image": "https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&w=800&q=80",
+    "price": 35.0
+  },
+  {
+    "id": "fish-maw-double-boiled-fish-bone-broth-bamboo-pith",
+    "name": "Fish Maw, Double Boiled Fish Bone Broth, Bamboo Pith",
+    "description": "Fish maw, bamboo pith, sea conch",
+    "category": "soups",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Fish",
+      "Shellfish",
+      "Mushroom",
+      "Pork"
+    ],
+    "details": "Section: Soups. Ingredients:. Fish maw Sea conch Black chicken Bamboo pith Pork. Portion: Per Person.",
+    "image": "https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&w=800&q=80",
+    "price": 68.0
+  },
+  {
+    "id": "shrimp-wonton-soup",
+    "name": "Shrimp Wonton Soup",
+    "description": "Review menu matrix for description.",
+    "category": "soups",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Fish",
+      "Mushroom",
+      "Pork",
+      "Onion",
+      "Shellfish"
+    ],
+    "details": "Section: Soups. Ingredients: Shrimp wonton Pork Spring onion Chicken broth Shrimp roe Shiitake Mushroom Fish(in broth). Portion: 4 pcs.",
+    "image": "https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&w=800&q=80",
+    "price": 12.0
+  },
+  {
+    "id": "morel-assorted-mushroom-asparagus-soup",
+    "name": "Morel, Assorted Mushroom, Asparagus Soup",
+    "description": "Review menu matrix for description.",
+    "category": "soups",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Mushroom",
+      "Carrot"
+    ],
+    "details": "Section: Soups. Ingredients: Carrot Asparagus Morel mushroom Tofu Gluten. Portion: Per Person.",
+    "image": "https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&w=800&q=80",
+    "price": 16.0
+  },
+  {
+    "id": "double-boiled-birds-nest-supreme-soup",
+    "name": "Double Boiled, Birds Nest, Supreme Soup",
+    "description": "Double boiled bird's nest supreme soup.",
+    "category": "birds-nest",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Pork"
+    ],
+    "details": "Section: Birds Nest. Ingredients: Bird's nest Chicken & Pork soup Choy Sum. Portion: Per person.",
+    "image": "https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&w=800&q=80",
+    "price": 88.0
+  },
+  {
+    "id": "birds-nest-soup-chicken-broth-yunnan-ham",
+    "name": "Birds Nest Soup, Chicken Broth, Yunnan Ham",
+    "description": "Double boiled bird's nest supreme soup with Yunnan ham, garnished with choy sum.",
+    "category": "birds-nest",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Soy",
+      "Pork"
+    ],
+    "details": "Section: Birds Nest. Ingredients: Bird's nest Chicken & Pork soup Choy sum / Chinese broccoli Soy Sauce. Portion: Per person.",
+    "image": "https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&w=800&q=80",
+    "price": 88.0
+  },
+  {
+    "id": "braised-whole-japanese-dried-abalone-oyster-sauce-38g-dried",
+    "name": "Braised Whole Japanese Dried Abalone, Oyster Sauce (38g dried)",
+    "description": "Braised Japanese dried abalone served in oyster sauce.",
+    "category": "abalone",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Fish",
+      "Shellfish",
+      "Pork"
+    ],
+    "details": "Section: Abalone. Ingredients: Abalone Oyster sauce Broccoli. Portion: 16-Head abalone (38 g).",
+    "image": "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=800&q=80",
+    "price": 398.0
+  },
+  {
+    "id": "braised-whole-japanese-dried-abalone-oyster-sauce-24g-dried",
+    "name": "Braised Whole Japanese Dried Abalone, Oyster Sauce (24g dried)",
+    "description": "Braised Japanese dried abalone served in oyster sauce.",
+    "category": "abalone",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Fish",
+      "Shellfish",
+      "Pork"
+    ],
+    "details": "Section: Abalone. Ingredients: Abalone Oyster sauce Broccoli. Portion: 20-Head abalone (24 g).",
+    "image": "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=800&q=80",
+    "price": 260.0
+  },
+  {
+    "id": "whole-south-african-abalone-oyster-sauce-100g-dried",
+    "name": "Whole South African Abalone, Oyster Sauce (100g dried)",
+    "description": "Braised South African dried abalone served in oyster sauce.",
+    "category": "abalone",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Fish",
+      "Shellfish",
+      "Pork"
+    ],
+    "details": "Section: Abalone. Ingredients: Abalone Oyster sauce Broccoli. Portion: 6-Head dried abalone (100 g).",
+    "image": "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=800&q=80",
+    "price": 228.0
+  },
+  {
+    "id": "braised-south-african-abalone-oyster-sauce-30g-dried",
+    "name": "Braised South African Abalone, Oyster Sauce (30g dried)",
+    "description": "Braised South African dried abalone served in oyster sauce.",
+    "category": "abalone",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Fish",
+      "Shellfish",
+      "Pork"
+    ],
+    "details": "Section: Abalone. Ingredients: Abalone Oyster sauce Broccoli. Portion: 20-Head abalone (30 g).",
+    "image": "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=800&q=80",
+    "price": 98.0
+  },
+  {
+    "id": "braised-whole-japanese-sea-cucumber-oyster-sauce",
+    "name": "Braised Whole Japanese Sea Cucumber, Oyster Sauce",
+    "description": "Braised whole Japanese sea cucumber in oyster sauce, topped with shrimp roe.",
+    "category": "abalone",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Fish",
+      "Shellfish",
+      "Pork",
+      "Onion"
+    ],
+    "details": "Section: Abalone. Ingredients: Sea cucumber Oyster sauce Shrimp roe Leek Sugar Snap Pea. Portion: 50-Head (12 g).",
+    "image": "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=800&q=80",
+    "price": 68.0
+  },
+  {
+    "id": "whole-leopard-coral-garoupa-steamed-with-ginger",
+    "name": "Whole Leopard Coral Garoupa, Steamed with Ginger",
+    "description": "Steamed whole Garoupa with ginger and spring onion, served with soy sauce. SOURCED FROM AUSTRALIA",
+    "category": "market-seafood",
+    "diet": "NA",
+    "style": "",
+    "heat": 1,
+    "allergens": [
+      "Gluten",
+      "Soy",
+      "Onion",
+      "Cilantro"
+    ],
+    "details": "Section: Market Seafood. Ingredients: Leopard Coral Garoupa Shredded ginger Spring onion. Accompaniments: Soy Sauce. Price not listed in PDF; confirm current market price before service.",
+    "image": "https://images.unsplash.com/photo-1559737558-2f5a35f4523b?auto=format&fit=crop&w=800&q=80",
+    "price": 0
+  },
+  {
+    "id": "wok-fried-maine-lobster-ginger-scallion",
+    "name": "Wok Fried Maine Lobster, Ginger & Scallion",
+    "description": "Wok fried whole lobster with scallion and ginger.",
+    "category": "market-seafood",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Fish",
+      "Shellfish",
+      "Onion"
+    ],
+    "details": "Section: Market Seafood. Ingredients: Maine lobster Scallion Ginger. Portion: 1.5 lb / pc.",
+    "image": "https://images.unsplash.com/photo-1559737558-2f5a35f4523b?auto=format&fit=crop&w=800&q=80",
+    "price": 58.0
+  },
+  {
+    "id": "signature-lobster-ma-po-tofu",
+    "name": "Signature Lobster Ma Po Tofu",
+    "description": "Whole lobster with Ma Po Tofu. (Boston Lobster)",
+    "category": "market-seafood",
+    "diet": "NA",
+    "style": "",
+    "heat": 1,
+    "allergens": [
+      "Gluten",
+      "Fish",
+      "Shellfish",
+      "Sesame",
+      "Soy",
+      "Onion",
+      "Garlic",
+      "Capsaicin",
+      "Pepper"
+    ],
+    "details": "Section: Market Seafood. Ingredients: Maine lobster Minced garlic Red bell pepper Chili bean sauce Spring onion Chili oil Sesame Soy Sauce. Portion: 1.5 lb / pc.",
+    "image": "https://images.unsplash.com/photo-1559737558-2f5a35f4523b?auto=format&fit=crop&w=800&q=80",
+    "price": 68.0
+  },
+  {
+    "id": "fresh-whole-crab-golden-garlic-chili",
+    "name": "Fresh Whole Crab, Golden Garlic, Chili",
+    "description": "Wok fried whole crab with garlic and chili",
+    "category": "market-seafood",
+    "diet": "NA",
+    "style": "",
+    "heat": 1,
+    "allergens": [
+      "Gluten",
+      "Fish",
+      "Shellfish",
+      "Sesame",
+      "Onion",
+      "Garlic",
+      "Capsaicin"
+    ],
+    "details": "Section: Market Seafood. Ingredients: Dungeness crab Fried garlic Shallot Dried chili Minced garlic Chili Spring onion Black Bean. Portion: 2 lbs.",
+    "image": "https://images.unsplash.com/photo-1559737558-2f5a35f4523b?auto=format&fit=crop&w=800&q=80",
+    "price": 78.0
+  },
+  {
+    "id": "whole-alaskan-king-crab-2-ways-crab-body-fried-with-golden-garli",
+    "name": "Whole Alaskan King Crab 2 ways Crab Body Fried with Golden Garlic & Chili / Salt & Pepper Crab Legs Steamed with Egg White & Hwa Tiao / Minced Garlic & Bean Vermicelli",
+    "description": "Review menu matrix for description.",
+    "category": "market-seafood",
+    "diet": "NA",
+    "style": "",
+    "heat": 1,
+    "allergens": [
+      "Egg",
+      "Fish",
+      "Shellfish",
+      "Sesame",
+      "Garlic",
+      "Capsaicin"
+    ],
+    "details": "Section: Market Seafood. Ingredients: Alaskan King Crab. Price not listed in PDF; confirm current market price before service.",
+    "image": "https://images.unsplash.com/photo-1559737558-2f5a35f4523b?auto=format&fit=crop&w=800&q=80",
+    "price": 0
+  },
+  {
+    "id": "whole-marble-goby-deep-fried-steamed-with-soy-sauce",
+    "name": "Whole Marble Goby (Deep Fried / Steamed with Soy Sauce)",
+    "description": "It can be deep fried with garlic / Scallions SOURCED FROM VIETNAM",
+    "category": "market-seafood",
+    "diet": "NA",
+    "style": "",
+    "heat": 1,
+    "allergens": [
+      "Gluten",
+      "Soy",
+      "Garlic",
+      "Cilantro"
+    ],
+    "details": "Section: Market Seafood. Ingredients: Marble Goby. Portion: **It's a suggested dish by the chef, giving more choice to the guest when they are looking for a live fish..",
+    "image": "https://images.unsplash.com/photo-1559737558-2f5a35f4523b?auto=format&fit=crop&w=800&q=80",
+    "price": 148.0
+  },
+  {
+    "id": "australian-lobster-steam-with-garlic-ginger-scallion-salt-pepper",
+    "name": "Australian Lobster (Steam with Garlic, Ginger scallion, Salt & Pepper)",
+    "description": "Steam Whole Australian Lobster with Ginger Scallion Or Work Fried Ginger scallion Or Light breaded Deep Fried with Salt & Pepper Garlic Plain Steam with Soy sauce no garlic",
+    "category": "market-seafood",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Soy",
+      "Garlic",
+      "Potato",
+      "Onion"
+    ],
+    "details": "Section: Market Seafood. Ingredients: Garlic Scallion Soy Gluten Ginger Potato starch. Portion: Allergy depend on the style of cooking. Price not listed in PDF; confirm current market price before service.",
+    "image": "https://images.unsplash.com/photo-1559737558-2f5a35f4523b?auto=format&fit=crop&w=800&q=80",
+    "price": 0
+  },
+  {
+    "id": "santa-barbara-prawns-poached-steam-with-garlic-salt-pepper",
+    "name": "Santa Barbara Prawns (Poached/ Steam with Garlic/ Salt & Pepper)",
+    "description": "Steam with garlic (butterfly style) Poached served with soy on the side Deep fried with garlic, salt & pepper",
+    "category": "market-seafood",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Sesame",
+      "Soy",
+      "Garlic",
+      "Pepper",
+      "Onion"
+    ],
+    "details": "Section: Market Seafood. Ingredients: Garlic, soy, scallion Soy Salt, pepper, sesame,. Price not listed in PDF; confirm current market price before service.",
+    "image": "https://images.unsplash.com/photo-1559737558-2f5a35f4523b?auto=format&fit=crop&w=800&q=80",
+    "price": 0
+  },
+  {
+    "id": "signature-smoked-black-cod",
+    "name": "Signature Smoked Black Cod",
+    "description": "Marinated black cod, deep fried, then flavor Chinese 5 spice",
+    "category": "fresh-seafood",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Soy"
+    ],
+    "details": "Section: Fresh Seafood. Ingredients: marinate d again for e (soy sauce, rice sugar,).. Portion: Black cod xtra Soy sauce Sugar Chinese 5 spice Vinegar Egg. Accompaniments: 8 pcs Gluten (soy sauce batter) 5 spice (star anise Cinnamon Geranium leaves) Vinegar Egg.",
+    "image": "https://images.unsplash.com/photo-1559737558-2f5a35f4523b?auto=format&fit=crop&w=800&q=80",
+    "price": 42.0
+  },
+  {
+    "id": "poached-mandarin-fish-fillet-szechuan-pepper-broth",
+    "name": "Poached Mandarin Fish Fillet Szechuan Pepper Broth",
+    "description": "Poach mandarin fish fillet with S zechuan Szechuan",
+    "category": "fresh-seafood",
+    "diet": "NA",
+    "style": "",
+    "heat": 1,
+    "allergens": [
+      "Pepper",
+      "Capsaicin"
+    ],
+    "details": "Section: Fresh Seafood. Ingredients: chili broth, topped with peppercorn oil.. Portion: Mandarin fish fillet Chinese celery Potato vermicelli Bean sprout Pickled cabbage Dried chili Enoki Mushrooms Szechuan peppercorn Minced garlic Szechuan Peppercorn Oil Celery. Accompaniments: Mushroom (enoki mushroom) Capsa icin Garlic Potato.",
+    "image": "https://images.unsplash.com/photo-1559737558-2f5a35f4523b?auto=format&fit=crop&w=800&q=80",
+    "price": 42.0
+  },
+  {
+    "id": "grilled-black-cod-sauce",
+    "name": "Grilled Black Cod Sauce",
+    "description": ", Sweet Miso Pan fr serve",
+    "category": "fresh-seafood",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [],
+    "details": "Section: Fresh Seafood. Ingredients: ied Black Cod, then bake d with miso sauce on the side.. Portion: d, Black Cod Soy sauce Japanese soy bean paste Mirin Honey. Accompaniments: 2 pcs Gluten (soy sauce miso sauce) Honey.",
+    "image": "https://images.unsplash.com/photo-1559737558-2f5a35f4523b?auto=format&fit=crop&w=800&q=80",
+    "price": 48.0
+  },
+  {
+    "id": "crispy-pacific-ocean-prawn-salty-egg",
+    "name": "Crispy Pacific Ocean Prawn, Salty Egg",
+    "description": "Breaded and deep stir - Topped with deep fried",
+    "category": "fresh-seafood",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Egg"
+    ],
+    "details": "Section: Fresh Seafood. Ingredients: - fried prawns fried wi th salty egg paste. Kale. Portion: Prawn Salty egg yolk paste B utter Sesame(garnish). Accompaniments: 6 pcs Gluten (batter) Shellfish Egg Dairy Sesame(garnish).",
+    "image": "https://images.unsplash.com/photo-1559737558-2f5a35f4523b?auto=format&fit=crop&w=800&q=80",
+    "price": 38.0
+  },
+  {
+    "id": "wok-fried-sliced-scallop-mixed-fungus-black-truffle-paste",
+    "name": "Wok Fried Sliced Scallop, Mixed Fungus, Black Truffle Paste",
+    "description": "Wok fried truffle sauce, asparagus.",
+    "category": "fresh-seafood",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Shellfish"
+    ],
+    "details": "Section: Fresh Seafood. Ingredients: sliced scallops with. Portion: Scallop Sliced truffle Truffle paste Truffle Oil Asparagus bell pepper Minced garlic Spring onion Mushroom. Accompaniments: 5-6 pcs of Shellfish scallop Mushroom (mushroom & truffle) Onion Garlic.",
+    "image": "https://images.unsplash.com/photo-1559737558-2f5a35f4523b?auto=format&fit=crop&w=800&q=80",
+    "price": 48.0
+  },
+  {
+    "id": "king-prawn-black-pepper-garlic-soya-sauce",
+    "name": "King Prawn, Black Pepper, Garlic, Soya Sauce",
+    "description": "Wok fried king prawn with black pepper and fresh peppercorn, served in a clay pot.",
+    "category": "clay-pot",
+    "diet": "NA",
+    "style": "",
+    "heat": 1,
+    "allergens": [
+      "Gluten",
+      "Fish",
+      "Shellfish",
+      "Soy",
+      "Onion",
+      "Garlic"
+    ],
+    "details": "Section: Clay Pot. Portion: Prawns Spring onion Sliced garlic F resh peppercorn Ground black pepper Soy sauce.",
+    "image": "https://images.unsplash.com/photo-1563379926898-05f4575a45d8?auto=format&fit=crop&w=800&q=80",
+    "price": 38.0
+  },
+  {
+    "id": "alaskan-king-crab-casserole-crab-roe-vermicelli",
+    "name": "Alaskan King Crab Casserole, Crab Roe, Vermicelli",
+    "description": "Wok fried Alaskan king crab meat, fish roe and shrimp roe with bean vermicelli. Served in a clay pot.",
+    "category": "clay-pot",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Fish",
+      "Seafood",
+      "Shellfish",
+      "Mushroom",
+      "Cilantro"
+    ],
+    "details": "Section: Clay Pot. Ingredients: flying. Portion: Green bean vermicelli King Crab meat Enoki mushroom Flying fish roe Shrimp roe Diced coriander *Spring Onion.",
+    "image": "https://images.unsplash.com/photo-1563379926898-05f4575a45d8?auto=format&fit=crop&w=800&q=80",
+    "price": 45.0
+  },
+  {
+    "id": "japanese-wagyu-beef-a5-grilled-leeks-homemade-black-bean-paste-g",
+    "name": "Japanese Wagyu Beef A5+, Grilled Leeks, Homemade Black Bean Paste, Garlic Chips",
+    "description": "Review menu matrix for description.",
+    "category": "meat",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Mushroom",
+      "Garlic",
+      "Onion"
+    ],
+    "details": "Section: Meat. Ingredients: Grade A5 Japanese wag yu beef served with grilled leeks in a homemade black bean paste and white mushroom, sweet beans and garnished with garlic chips.. Portion: A5 Japanese wagyu Scallion Snap Peas Chili bean sauce Fried Garlic Chips Leek.",
+    "image": "https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?auto=format&fit=crop&w=800&q=80",
+    "price": 188.0
+  },
+  {
+    "id": "stir-fried-australian-wagyu-m6-sirloin-shiitake-mushrooms-baby-l",
+    "name": "Stir Fried Australian Wagyu M6+ Sirloin, Shiitake Mushrooms, Baby Leeks, Chili",
+    "description": "Review menu matrix for description.",
+    "category": "meat",
+    "diet": "NA",
+    "style": "",
+    "heat": 1,
+    "allergens": [
+      "Mushroom",
+      "Pepper",
+      "Onion"
+    ],
+    "details": "Section: Meat. Ingredients: Wok fried, cubed Australian wagyu M9+ sirloin with assorted mushrooms, asparagus, shallot and shishito pepper.. Portion: Australian wagyu M Asparagus Chili bean sauce, chili shallot shishito pepper Minced garlic Minced chili Ground black pepper Soy sauce.",
+    "image": "https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?auto=format&fit=crop&w=800&q=80",
+    "price": 68.0
+  },
+  {
+    "id": "crispy-triple-cooked-wagyu-beef-short-rib",
+    "name": "Crispy Triple Cooked Wagyu Beef Short Rib",
+    "description": "Review menu matrix for description.",
+    "category": "meat",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Sesame",
+      "Onion",
+      "Pepper"
+    ],
+    "details": "Section: Meat. Ingredients: Triple cooked (1st: pan-fried, 2nd: braised, last: baked) beef rib, served in a Chinese gravy. Topped with sesame, onion, red pepper.. Portion: Beef Short rib Diced onion Chinese Chopped dried chili Ginger Sesame Sugar Soy sauce Chicken powder Garlic..",
+    "image": "https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?auto=format&fit=crop&w=800&q=80",
+    "price": 88.0
+  },
+  {
+    "id": "wok-fried-angus-beef-broccoli",
+    "name": "Wok Fried Angus Beef, Broccoli",
+    "description": "Review menu matrix for description.",
+    "category": "meat",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [],
+    "details": "Section: Meat. Ingredients: Wok fried broccoli with sliced angus beef. Portion: Broccoli Angus beef Chicken powder Dried chilis Shiitake Mushroom Soy Sauce Sugar Oyster Sauce Garlic.",
+    "image": "https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?auto=format&fit=crop&w=800&q=80",
+    "price": 32.0
+  },
+  {
+    "id": "free-range-chicken-dried-chillies-szechuan-red-peppercorns",
+    "name": "Free Range Chicken, Dried Chillies, Szechuan Red Peppercorns",
+    "description": "Review menu matrix for description.",
+    "category": "meat",
+    "diet": "NA",
+    "style": "",
+    "heat": 1,
+    "allergens": [
+      "Nut",
+      "Pepper",
+      "Capsaicin"
+    ],
+    "details": "Section: Meat. Ingredients: Wok fried free range chicken mixed with dried chilli, Szechuan red peppercorn and cashew nuts.. Portion: Chicken thigh Dried chili Dried Szechuan peppercorn Sliced garlic Diced spring onion Cashew nut Peppercorn oil.",
+    "image": "https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?auto=format&fit=crop&w=800&q=80",
+    "price": 32.0
+  },
+  {
+    "id": "general-tso-s-chicken",
+    "name": "General Tso's Chicken",
+    "description": "Review menu matrix for description.",
+    "category": "meat",
+    "diet": "NA",
+    "style": "",
+    "heat": 1,
+    "allergens": [],
+    "details": "Section: Meat. Ingredients: Wok fried chicken with spicy & sweet sauce.. Portion: Chicken (white meat breaded) Sugar Chili Vinegar Dried chili Flour.",
+    "image": "https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?auto=format&fit=crop&w=800&q=80",
+    "price": 28.0
+  },
+  {
+    "id": "bamboo-charcoal-grilled-lamb-rack-black-pepper",
+    "name": "Bamboo Charcoal Grilled Lamb rack, Black Pepper",
+    "description": "Review menu matrix for description.",
+    "category": "meat",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [],
+    "details": "Section: Meat. Ingredients: Grilled lamb rack black paper with edible bamboo charcoal. Portion: Lam rack Black pepper Soy Garlic Flour Ketchup.",
+    "image": "https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?auto=format&fit=crop&w=800&q=80",
+    "price": 68.0
+  },
+  {
+    "id": "free-range-chicken-thai-basil-three-cup-sauce",
+    "name": "Free Range Chicken, Thai Basil, Three Cup Sauce",
+    "description": "Review menu matrix for description.",
+    "category": "meat",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Sesame",
+      "Soy"
+    ],
+    "details": "Section: Meat. Ingredients: Free Range chicken in three cup sauce(Soy, Sesame oil, cooking wine) with Thai basil. Portion: Free Range chicken Three cup sauce Thai basil.",
+    "image": "https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?auto=format&fit=crop&w=800&q=80",
+    "price": 30.0
+  },
+  {
+    "id": "crispy-vegan-chicken-szechuan-red-peppercorns-sauteed-dried-chil",
+    "name": "Crispy Vegan Chicken, Szechuan Red Peppercorns, Sauteed Dried Chili, Cashew Nuts",
+    "description": "Review menu matrix for description.",
+    "category": "meat",
+    "diet": "NA",
+    "style": "",
+    "heat": 1,
+    "allergens": [
+      "Nut",
+      "Pepper",
+      "Capsaicin"
+    ],
+    "details": "Section: Meat. Ingredients: Wok fried Vegan chicken mixed with dried chilli, Szechuan red peppercorn and cashew nuts.. Portion: Dried chili Dried Szechuan peppercorn Sliced garlic Diced spring onion Cashew nut Peppercorn oil Tofu. Price not listed in PDF; confirm current market price before service.",
+    "image": "https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?auto=format&fit=crop&w=800&q=80",
+    "price": 0
+  },
+  {
+    "id": "sauteed-asparagus-jicama",
+    "name": "Sauteed Asparagus, Jicama",
+    "description": ", Ginkgo Nuts Saut\u00e9ed asparagus, black fungus.",
+    "category": "vegetables",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Nut",
+      "Mushroom"
+    ],
+    "details": "Section: Vegetables. Ingredients: Jicama, Ginkgo nuts and. Portion: Asparagus Jicama Ginkgo nut Black fungus.",
+    "image": "https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=800&q=80",
+    "price": 20.0
+  },
+  {
+    "id": "braised-eggplant-minced-pork-chili-peppers",
+    "name": "Braised Eggplant, Minced Pork, Chili Peppers",
+    "description": "Braised eggplant stir fried with minced pork, salty fish paste. Topped with spring onion.",
+    "category": "vegetables",
+    "diet": "NA",
+    "style": "",
+    "heat": 1,
+    "allergens": [
+      "Gluten",
+      "Fish",
+      "Seafood",
+      "Soy",
+      "Pork",
+      "Garlic",
+      "Capsaicin"
+    ],
+    "details": "Section: Vegetables. Portion: Eggplant Minced pork Salty fish paste Minced garlic Diced ginger Red bell pepper Chili bean sauce Chiu hou sauce (made by soy bean, sesame, light soy sauce).",
+    "image": "https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=800&q=80",
+    "price": 20.0
+  },
+  {
+    "id": "wok-fried-chinese-broccoli-minced-pork",
+    "name": "Wok Fried Chinese Broccoli, Minced Pork",
+    "description": ", Minced Wok fried Chinese broccoli served in a sizzling clay pot.",
+    "category": "vegetables",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Fish",
+      "Shellfish",
+      "Pork",
+      "Garlic",
+      "Pepper"
+    ],
+    "details": "Section: Vegetables. Ingredients: with minced pork. Portion: Chinese broccoli Minced garlic Minced pork.",
+    "image": "https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=800&q=80",
+    "price": 20.0
+  },
+  {
+    "id": "sauteed-string-beans-diced-australian-wagyu-beef-preserved-olive",
+    "name": "Sauteed String Beans, Diced Australian Wagyu Beef, Preserved Olive Leaf",
+    "description": "Saut\u00e9ed string beans with diced wagyu beef, topped with sliced red bell pepper.",
+    "category": "vegetables",
+    "diet": "NA",
+    "style": "",
+    "heat": 1,
+    "allergens": [
+      "Gluten",
+      "Soy",
+      "Garlic",
+      "Capsaicin",
+      "Onion"
+    ],
+    "details": "Section: Vegetables. Portion: String bean Diced wagyu beef Minced garlic Minced shallot Diced dried chili Preserved Olive.",
+    "image": "https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=800&q=80",
+    "price": 22.0
+  },
+  {
+    "id": "braised-tofu-morel-mushrooms",
+    "name": "Braised Tofu, Morel Mushrooms",
+    "description": "Mushrooms Braised bean curd garnished with choy sum.",
+    "category": "vegetables",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Fish",
+      "Shellfish",
+      "Mushroom"
+    ],
+    "details": "Section: Vegetables. Ingredients: with n, Shitak e mushroom,. Portion: Tofu Morel mushroom Choy sum Edamame Oyster sauce.",
+    "image": "https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=800&q=80",
+    "price": 28.0
+  },
+  {
+    "id": "wok-fried-baby-napa-cabbage-baby-beans-xo-sauce",
+    "name": "Wok Fried Baby Napa Cabbage, Baby Beans, XO Sauce",
+    "description": "Wok fried baby cabbage with pork oil and XO sauce, then topped with honey beans.",
+    "category": "vegetables",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Fish",
+      "Shellfish",
+      "Onion",
+      "Garlic"
+    ],
+    "details": "Section: Vegetables. Portion: Baby napa cabbage XO sauce (made by dried scallops, shrimp, chili peppers, onions, garlic) Honey bean Lard Pork Sakura Shrimp.",
+    "image": "https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=800&q=80",
+    "price": 20.0
+  },
+  {
+    "id": "wok-fried-baby-bok-choy-garlic",
+    "name": "Wok Fried Baby Bok Choy, Garlic",
+    "description": "with Garlic Wok-fried baby bok choy with garlic",
+    "category": "vegetables",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Garlic"
+    ],
+    "details": "Section: Vegetables. Portion: Baby Bok Choy Garlic.",
+    "image": "https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=800&q=80",
+    "price": 22.0
+  },
+  {
+    "id": "wok-fried-snow-pea-tips-minced-garlic",
+    "name": "Wok-Fried Snow Pea Tips, Minced Garlic",
+    "description": "Wok-fired snow pea tips with garlic",
+    "category": "vegetables",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Garlic"
+    ],
+    "details": "Section: Vegetables. Portion: Snow pea tips Garlic.",
+    "image": "https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=800&q=80",
+    "price": 30.0
+  },
+  {
+    "id": "signature-maine-lobster-fried-rice-king-oyster-mushrooms-edamame",
+    "name": "Signature Maine Lobster Fried Rice, King Oyster Mushrooms, Edamame",
+    "description": "Fried rice with mushroom s, edamame. Served in a clay pot.",
+    "category": "rice-noodles",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Mushroom"
+    ],
+    "details": "Section: Rice & Noodles. Ingredients: Boston lobster, assorted. Portion: Maine lobster assorted Edamame Lobster oil Spring onion White rice Minced garlic Diced ginger Diced coriander Diced Chinese celery. Accompaniments: Gluten (oyster sauce), s Mushroom Shellfish (lobster & oyster sauce) Onion Ginger Cilantro Garlic.",
+    "image": "https://images.unsplash.com/photo-1603133872878-684f208fb84b?auto=format&fit=crop&w=800&q=80",
+    "price": 68.0
+  },
+  {
+    "id": "fried-rice-diced-prawn-iberico-pork-asparagus-in-yeung-chow-styl",
+    "name": "Fried Rice, Diced Prawn, Iberico Pork, Asparagus in Yeung Chow Style",
+    "description": "Fried rice with diced prawn, diced char siu, egg and asparagus",
+    "category": "rice-noodles",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [],
+    "details": "Section: Rice & Noodles. Portion: Diced BBQ iberico pork Diced prawn Asparagus Egg Soy sauce White rice Chicken powder. Accompaniments: Gluten(soy sauce, BBQ pork) Pork Shellfish Egg (chicken powder).",
+    "image": "https://images.unsplash.com/photo-1603133872878-684f208fb84b?auto=format&fit=crop&w=800&q=80",
+    "price": 24.0
+  },
+  {
+    "id": "alaskan-crabmeat-fried-rice-flying-fish-roe",
+    "name": "Alaskan Crabmeat Fried Rice, Flying Fish Roe",
+    "description": "Fried rice with Alaskan crabmeat, scallops, egg white onion. Topped with flying fish roe.",
+    "category": "rice-noodles",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Fish"
+    ],
+    "details": "Section: Rice & Noodles. Ingredients: dry, asparagus, spring. Portion: Alaskan crab meat Dry scallop Egg Spring onion Flying White rice Ginger Asparagus Soy sauce. Accompaniments: Shellfish, Gluten(soy sauce) Egg Onion.",
+    "image": "https://images.unsplash.com/photo-1603133872878-684f208fb84b?auto=format&fit=crop&w=800&q=80",
+    "price": 32.0
+  },
+  {
+    "id": "scallops-prawns-crispy-rice-in-fish-soup",
+    "name": "Scallops, Prawns, Crispy Rice in Fish Soup",
+    "description": "Fish soup served with scallop, spring onion, crispy rice, coriander, celery and",
+    "category": "rice-noodles",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Shellfish"
+    ],
+    "details": "Section: Rice & Noodles. Ingredients: shrimp.. Portion: Diced scallop Diced fish Diced prawn Chinese celery Coriander Mushroom. Accompaniments: Shellfish, Sesame, Onion Cilantro Mushroom.",
+    "image": "https://images.unsplash.com/photo-1603133872878-684f208fb84b?auto=format&fit=crop&w=800&q=80",
+    "price": 32.0
+  },
+  {
+    "id": "stir-fried-shanghainese-noodle-prawn-beef-pork-vegetables",
+    "name": "Stir Fried Shanghainese Noodle (Prawn/Beef/Pork/Vegetables)",
+    "description": "Stir Fried Shanghainese sauce and either Prawn/Beef/Pork/Vegetables. / \u96dc\u83dc)",
+    "category": "rice-noodles",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Soy"
+    ],
+    "details": "Section: Rice & Noodles. Ingredients: Noodle with soy. Portion: Shanghainese noodle Soy sauce Prawn/Beef/Pork/Vegetables Scallion M ushroom Oyster Sauce Choy Sum Carrot. Accompaniments: Gluten Pork (optional) Shellfish (optional) Onion (scallion) mushroom.",
+    "image": "https://images.unsplash.com/photo-1603133872878-684f208fb84b?auto=format&fit=crop&w=800&q=80",
+    "price": 24.0
+  },
+  {
+    "id": "wok-fried-flat-rice-noodles-us-black-angus-beef-bean-sprouts",
+    "name": "Wok Fried Flat Rice Noodles, US Black Angus Beef, Bean Sprouts",
+    "description": "Wok fried flat rice noodle, with sliced Angus beef, onion, bean sprouts.",
+    "category": "rice-noodles",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [],
+    "details": "Section: Rice & Noodles. Portion: Sliced beef Shredded spring onion Shredded onion Bean sprout Flat rice noodle Soy sauce Oyster Sauce. Accompaniments: Gluten(soy sauce) Onion Shellfish (Oyster Sauce) Chives.",
+    "image": "https://images.unsplash.com/photo-1603133872878-684f208fb84b?auto=format&fit=crop&w=800&q=80",
+    "price": 28.0
+  },
+  {
+    "id": "fried-rice-seasonal-vegetables",
+    "name": "Fried Rice, Seasonal Vegetables",
+    "description": "Review menu matrix for description.",
+    "category": "rice-noodles",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [],
+    "details": "Section: Rice & Noodles. Portion: Corn Diced tomato Diced king oyster mushroom Diced White rice. Accompaniments: Mushroom Gluten Corn Tomato. Price not listed in PDF; confirm current market price before service.",
+    "image": "https://images.unsplash.com/photo-1603133872878-684f208fb84b?auto=format&fit=crop&w=800&q=80",
+    "price": 0
+  },
+  {
+    "id": "alaskan-crabmeat-fried-rice-bjork-caviar-30g",
+    "name": "Alaskan Crabmeat Fried Rice, Bjork Caviar(30g)",
+    "description": "Alaskan crabmeat fried rice with egg and Bjork Caviar on the side 3 0 g \uff09",
+    "category": "rice-noodles",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [],
+    "details": "Section: Rice & Noodles. Portion: Crabmeat Egg white Spring onion Asparagus. Accompaniments: Shellfish Egg Onion.",
+    "image": "https://images.unsplash.com/photo-1603133872878-684f208fb84b?auto=format&fit=crop&w=800&q=80",
+    "price": 138.0
+  },
+  {
+    "id": "sweetened-beancurd-cream-mango-soup-pomelo",
+    "name": "Sweetened Beancurd Cream, Mango Soup, Pomelo",
+    "description": "Sweetened bean curd cream in fresh mango soup with sago.",
+    "category": "desserts",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Dairy",
+      "Soy"
+    ],
+    "details": "Section: Dessert. Ingredients: Mango puree Milk Cream Sugar Grapefruit Pomelo Soy milk Corn starch. Portion: Per person.",
+    "image": "https://images.unsplash.com/photo-1551024506-0bccd828d307?auto=format&fit=crop&w=800&q=80",
+    "price": 12.0
+  },
+  {
+    "id": "double-boiled-imperial-birds-nest-soup-rock-sugar",
+    "name": "Double Boiled Imperial Birds Nest Soup, Rock Sugar",
+    "description": "Double boiled bird's nest soup with rock sugar.",
+    "category": "desserts",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [],
+    "details": "Section: Dessert. Ingredients: Bird's nest Rock sugar. Portion: Per person.",
+    "image": "https://images.unsplash.com/photo-1551024506-0bccd828d307?auto=format&fit=crop&w=800&q=80",
+    "price": 88.0
+  },
+  {
+    "id": "double-boiled-imperial-birds-nest-soup-almond-cream",
+    "name": "Double Boiled Imperial Birds Nest Soup, Almond Cream",
+    "description": "Double boiled bird's nest soup almond cream.",
+    "category": "desserts",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Nut",
+      "Almond",
+      "Dairy"
+    ],
+    "details": "Section: Dessert. Ingredients: with Bird's nest Almond. Portion: cream.",
+    "image": "https://images.unsplash.com/photo-1551024506-0bccd828d307?auto=format&fit=crop&w=800&q=80",
+    "price": 88.0
+  },
+  {
+    "id": "double-boiled-egg-white-black-sesame",
+    "name": "Double Boiled Egg White, Black Sesame",
+    "description": "Double Boiled Egg White, stuffed in black sesame paste.",
+    "category": "desserts",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Wheat",
+      "Dairy",
+      "Egg",
+      "Sesame"
+    ],
+    "details": "Section: Dessert. Ingredients: Egg white Milk Sugar Black sesame paste.",
+    "image": "https://images.unsplash.com/photo-1551024506-0bccd828d307?auto=format&fit=crop&w=800&q=80",
+    "price": 12.0
+  },
+  {
+    "id": "rose-valrhona-white-chocolate-panna-cotta-lychee-sorbet-raspberr",
+    "name": "Rose & Valrhona White Chocolate Panna Cotta, Lychee Sorbet, Raspberries",
+    "description": "Panna Cotta is a custard topped with a scoop of lychee sorbet meringue. Garnished with Frozen raspberries, osmanthus flakes, rose pedals flakes and short bread crumbles.",
+    "category": "desserts",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Dairy",
+      "Egg",
+      "Raspberry",
+      "Gelatine"
+    ],
+    "details": "Section: Dessert. Ingredients: Panna Cotta (and crispy Gelatine, Eggs) Meringue (egg whites, Osmanthus, Rose petal) Lychee Sorbet (lychee puree) Frozen Raspberry Osmanthus Rose pedal flakes Shortbread starch, sugar). Portion: White Chocolate, Milk, flakes Crumble (butter, flour, corn.",
+    "image": "https://images.unsplash.com/photo-1551024506-0bccd828d307?auto=format&fit=crop&w=800&q=80",
+    "price": 20.0
+  },
+  {
+    "id": "pomelo-grapefruit-honeycomb-coconut-ice-cream",
+    "name": "Pomelo, Grapefruit & Honeycomb, Coconut Ice Cream",
+    "description": "Review menu matrix for description.",
+    "category": "desserts",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Wheat",
+      "Dairy",
+      "Nut",
+      "Honey"
+    ],
+    "details": "Section: Dessert. Ingredients: Coconut Dried Milk Pomelo Flowers Crumble (butter, flour, corn starch, sugar) Honey Comb (sugar, Honey).",
+    "image": "https://images.unsplash.com/photo-1551024506-0bccd828d307?auto=format&fit=crop&w=800&q=80",
+    "price": 20.0
+  },
+  {
+    "id": "almond-chocolate-oolong-tea-xiao-long-bao",
+    "name": "Almond & Chocolate, Oolong Tea Xiao Long Bao",
+    "description": "Oolong tea Chocolate Xiao long bao filled with Dark Chocolate and Almond",
+    "category": "desserts",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Dairy",
+      "Almond"
+    ],
+    "details": "Section: Dessert. Ingredients: Milk Chocolate Almond.",
+    "image": "https://images.unsplash.com/photo-1551024506-0bccd828d307?auto=format&fit=crop&w=800&q=80",
+    "price": 20.0
+  },
+  {
+    "id": "wild-mushroom-and-water-chestnut-dumplings",
+    "name": "Wild Mushroom and Water Chestnut Dumplings",
+    "description": "Shiitake mushroom King oyster mushroom Black fungus Jicama Carrot",
+    "category": "out-of-menu",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Mushroom",
+      "Potato"
+    ],
+    "details": "Section: Out Of Menu. Ingredients: Potato starch Corn starch. Portion: 3 pcs.",
+    "image": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    "price": 13.0
+  },
+  {
+    "id": "stir-fried-cubed-australian-m6-wagyu-beef-in-lettuce-cup-mustard",
+    "name": "Stir Fried Cubed Australian M6 Wagyu Beef in Lettuce Cup, Mustard Oil",
+    "description": "6 Stir fried dice d Australian M Wagyu beef served in a lettuce cup topped with mustard oil and crispy ginger.",
+    "category": "out-of-menu",
+    "diet": "NA",
+    "style": "",
+    "heat": 1,
+    "allergens": [
+      "Gluten",
+      "Nut",
+      "Onion",
+      "Capsaicin",
+      "Shellfish"
+    ],
+    "details": "Section: Out Of Menu. Ingredients: 6 Diced Australian M 6 Wagyu beef Diced cucumber Ginkgo nut Mustard oil Scallion Oyster Sauce. Portion: 6 pcs.",
+    "image": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    "price": 22.0
+  },
+  {
+    "id": "crispy-squid-baby-corn-salt-and-pepper",
+    "name": "Crispy Squid, Baby Corn, Salt and Pepper",
+    "description": "Deep fried squid and baby corn with fried crispy garlic, onion, dry chili pepper",
+    "category": "out-of-menu",
+    "diet": "NA",
+    "style": "",
+    "heat": 1,
+    "allergens": [
+      "Gluten",
+      "Wheat",
+      "Sesame",
+      "Onion",
+      "Garlic",
+      "Capsaicin",
+      "Pepper"
+    ],
+    "details": "Section: Out Of Menu. Ingredients: Squid Garlic Baby corn Salt Pepper Flour.",
+    "image": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    "price": 16.0
+  },
+  {
+    "id": "jasmine-smoked-pork-rib",
+    "name": "Jasmine Smoked Pork Rib",
+    "description": "Roasted pork rib, smoked with jasmine flower, topped with peanut.",
+    "category": "out-of-menu",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Egg",
+      "Fish",
+      "Shellfish",
+      "Peanut",
+      "Nut",
+      "Pork",
+      "Onion",
+      "Garlic",
+      "Coriander",
+      "Potato"
+    ],
+    "details": "Section: Out Of Menu. Ingredients: Pork rib Hoisin sauce Minced shallot Ground bean sauce Coriander Oyster sauce Potato starch Sugar Maltose Chicken powder Ketchup Egg Minced garlic Peanut. Portion: 4 pcs.",
+    "image": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    "price": 24.0
+  },
+  {
+    "id": "assorted-wild-mushroom-in-lettuce-cup-black-truffle-sauce",
+    "name": "Assorted Wild Mushroom in Lettuce Cup, Black Truffle Sauce",
+    "description": "Stir fried assorted mushroom, ginkgo nuts and truffle sauce served in a lettuce cup.",
+    "category": "out-of-menu",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Nut",
+      "Mushroom",
+      "Onion",
+      "Pepper"
+    ],
+    "details": "Section: Out Of Menu. Ingredients: Diced Jicama Diced bamboo shoot Spring onion Ginkgo nut Diced shiitake mushroom Diced red bell pepper. Portion: 6 pcs.",
+    "image": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    "price": 20.0
+  },
+  {
+    "id": "crispy-szechuan-chicken",
+    "name": "Crispy Szechuan Chicken",
+    "description": "Lightly breaded diced chicken breast, wok tossed with spicy Szechuan sauce",
+    "category": "out-of-menu",
+    "diet": "NA",
+    "style": "",
+    "heat": 1,
+    "allergens": [
+      "Gluten",
+      "Wheat",
+      "Capsaicin"
+    ],
+    "details": "Section: Out Of Menu. Ingredients: Cucumber on bottom Chili sauce Flour.",
+    "image": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    "price": 18.0
+  },
+  {
+    "id": "scallops-pumpkin",
+    "name": "Scallops, Pumpkin",
+    "description": "Scallops, pumpkin soup, Sugar Snap Pea",
+    "category": "out-of-menu",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Dairy",
+      "Fish",
+      "Shellfish"
+    ],
+    "details": "Section: Out Of Menu. Ingredients: Scallop Shrimp fish Sugar Snap Pea Pumpkin Heavy Cream. Portion: Per Person.",
+    "image": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    "price": 16.0
+  },
+  {
+    "id": "braised-whole-dried-fish-maw-abalone-sauce",
+    "name": "Braised Whole Dried Fish Maw, Abalone Sauce",
+    "description": "Braised fish maw steak, oyster sauce",
+    "category": "out-of-menu",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Fish",
+      "Shellfish",
+      "Pork"
+    ],
+    "details": "Section: Out Of Menu. Ingredients: Fish maw Oyster sauce. Price not listed in PDF; confirm current market price before service.",
+    "image": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    "price": 0.0
+  },
+  {
+    "id": "steamed-fillet-of-leopard-coral-garoupa-sea-salt-ginger",
+    "name": "Steamed Fillet of Leopard Coral Garoupa, Sea Salt & Ginger",
+    "description": "Steamed Garoupa fillet with sea salt and ginger, no sauce needed.",
+    "category": "out-of-menu",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Onion"
+    ],
+    "details": "Section: Out Of Menu. Ingredients: Fillet of Leopard Coral Garoupa Sea salt Minced ginger Spring onion. Price not listed in PDF; confirm current market price before service.",
+    "image": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    "price": 0
+  },
+  {
+    "id": "baked-alaskan-king-crab-legs-pumpkin-salty-egg",
+    "name": "Baked Alaskan King Crab Legs, Pumpkin, Salty Egg",
+    "description": "Baked crab leg with salty egg yolk paste and crispy kale",
+    "category": "out-of-menu",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Dairy",
+      "Egg",
+      "Fish",
+      "Shellfish",
+      "Onion"
+    ],
+    "details": "Section: Out Of Menu. Ingredients: Alaskan crab legs. Diced onion Minced pumpkin Chicken powder Butter Salty egg yolk paste. Portion: 4 pcs.",
+    "image": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    "price": 68.0
+  },
+  {
+    "id": "kung-po-prawn-sweetcorn-water-chestnut-cake",
+    "name": "Kung Po Prawn, Sweetcorn & Water Chestnut Cake",
+    "description": "Stir fried prawns with sweet, spicy & sour sauce, then place on pan fried sweetcorn & water chestnut cake after completion.",
+    "category": "out-of-menu",
+    "diet": "NA",
+    "style": "",
+    "heat": 1,
+    "allergens": [
+      "Gluten",
+      "Fish",
+      "Shellfish",
+      "Soy",
+      "Peanut",
+      "Nut",
+      "Onion",
+      "Capsaicin",
+      "Pepper"
+    ],
+    "details": "Section: Out Of Menu. Ingredients: Prawn Soy sauce Corn Peppercorn oil Water chestnut Chili Szechuan peppercorn Vinegar Sugar Spring onion Peanuts. Portion: 8 pcs (4 prawns cut in half).",
+    "image": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    "price": 38.0
+  },
+  {
+    "id": "crispy-free-range-yellow-chicken",
+    "name": "Crispy Free Range Yellow Chicken",
+    "description": "Deep fried chicken, topped with sea salt, garnished with lime wedge and crispy shredded",
+    "category": "out-of-menu",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Lime"
+    ],
+    "details": "Section: Out Of Menu. Ingredients: Whole / half chicken Sea salt ginger. Crispy shredded ginger Lime.",
+    "image": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    "price": 58.0
+  },
+  {
+    "id": "sweet-sour-pork-dragon-fruit-aged-black-vinegar",
+    "name": "Sweet & Sour Pork, Dragon Fruit, Aged Black Vinegar",
+    "description": "Deep fried pork black vinegar sauce. Garnished with 6 pieces of dragon fruit and bell pepper.",
+    "category": "out-of-menu",
+    "diet": "NA",
+    "style": "",
+    "heat": 1,
+    "allergens": [
+      "Gluten",
+      "Egg",
+      "Soy",
+      "Pork",
+      "Pepper"
+    ],
+    "details": "Section: Out Of Menu. Ingredients: cooked in aged Pork Dragon fruit Dark vinegar Bell pepper Egg Sugar Corn Starch Soy Sauce.",
+    "image": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    "price": 28.0
+  },
+  {
+    "id": "crispy-egg-noodles-bamboo-pith-mushrooms-green-vegetables",
+    "name": "Crispy Egg Noodles, Bamboo Pith, Mushrooms, Green Vegetables",
+    "description": "Deep fried egg noodle, cut into round shape. Garnished with 4 pieces of choy sum and bamboo pith. Served with the assorted mushroom sauce(king oyster mushroom, shiitake mushroom, button mushroom, yellow fungus, elm fungus, carrot).",
+    "category": "out-of-menu",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Egg",
+      "Fish",
+      "Shellfish",
+      "Mushroom",
+      "Carrot"
+    ],
+    "details": "Section: Out Of Menu. Ingredients: Egg noodle Bamboo pith Choy sum Carrot King oyster mushroom Shiitake mushroom Bu Yellow fungus Elm fungus Chicken powder. Portion: tt on mushroom.",
+    "image": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    "price": 26.0
+  },
+  {
+    "id": "minced-duck-lettuce-cup",
+    "name": "Minced Duck Lettuce Cup",
+    "description": "Minced duck Diced bamboo shoot Diced lettuce. Diced mushroom",
+    "category": "out-of-menu",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Fish",
+      "Shellfish",
+      "Sesame",
+      "Soy",
+      "Mushroom",
+      "Onion"
+    ],
+    "details": "Section: Out Of Menu. Ingredients: 6 cups Jicama.",
+    "image": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    "price": 18.0
+  },
+  {
+    "id": "fresh-mango-coconut-glutinous-rice-roll",
+    "name": "Fresh Mango, Coconut, Glutinous Rice Roll",
+    "description": "Glutenous rice roll wrapped with fresh mango, cream,",
+    "category": "out-of-menu",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Dairy"
+    ],
+    "details": "Section: Out Of Menu. Ingredients: Diced mango Mango puree Mango oil Unflavored gela Sugar Cream. Portion: ti n e.",
+    "image": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    "price": 12.0
+  },
+  {
+    "id": "fondant-au-chocolat-matcha",
+    "name": "Fondant au Chocolat, Matcha",
+    "description": "Review menu matrix for description.",
+    "category": "out-of-menu",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Wheat",
+      "Egg",
+      "Dairy"
+    ],
+    "details": "Section: Out Of Menu. Ingredients: Butter White Chocolate Matcha Powder Egg Flour Crumble, Corn Starch Milk Sugar Green Tea Ice Cream Gold Flake.",
+    "image": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    "price": 16.0
+  },
+  {
+    "id": "free-range-chicken-dried-shallots-black-bean-sauce",
+    "name": "Free Range Chicken, Dried Shallots, Black Bean Sauce",
+    "description": "Wok fried free range chicken with shallot and black bean sauce. Served in a clay pot.",
+    "category": "out-of-menu",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Sesame",
+      "Soy",
+      "Onion",
+      "Garlic",
+      "Pepper"
+    ],
+    "details": "Section: Out Of Menu. Ingredients: Chicken Shallot Spring onion Sliced ginger Black bean sauce Chiu hou sauce (made by soy bean, sesame, light soy sauce). Portion: (Dark Meat) *Bell Pepper.",
+    "image": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    "price": 28.0
+  },
+  {
+    "id": "wok-fried-maine-lobster-black-truffle-egg-white",
+    "name": "Wok Fried Maine Lobster, Black Truffle, Egg White",
+    "description": "Wok fried African lobster with egg white, topped with sliced black truffle.",
+    "category": "out-of-menu",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Dairy",
+      "Egg",
+      "Fish",
+      "Shellfish",
+      "Mushroom"
+    ],
+    "details": "Section: Out Of Menu. Ingredients: Maine lobster Egg white Sliced black truffle Truffle oil Sliced asparagus Milk. Portion: 1.5 lb / pc.",
+    "image": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    "price": 88.0
+  },
+  {
+    "id": "wok-fried-broccoli-ginkgo",
+    "name": "Wok Fried Broccoli, Ginkgo",
+    "description": "Wok fried broccoli with gin",
+    "category": "out-of-menu",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Nut",
+      "Garlic"
+    ],
+    "details": "Section: Out Of Menu. Ingredients: kg o nuts.. Portion: Broccoli Ginkgo nut Garlic.",
+    "image": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    "price": 16.0
+  },
+  {
+    "id": "crispy-baby-octopus-salt-and-pepper",
+    "name": "Crispy Baby Octopus, Salt and Pepper",
+    "description": "Deep fried, lightly breaded mini octopus, wok fried with salt and pepper",
+    "category": "out-of-menu",
+    "diet": "NA",
+    "style": "",
+    "heat": 1,
+    "allergens": [
+      "Gluten",
+      "Wheat",
+      "Seafood",
+      "Sesame",
+      "Garlic",
+      "Capsaicin"
+    ],
+    "details": "Section: Out Of Menu. Ingredients: Baby octopus Garlic Salt Chili Flour.",
+    "image": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    "price": 18.0
+  },
+  {
+    "id": "crispy-shredded-mushrooms-french-green-bean-sesame",
+    "name": "Crispy Shredded Mushrooms, French Green Bean, Sesame",
+    "description": "Light breaded deep fired mushroom with French green bean sweet and sour sauce, top with sesame seed",
+    "category": "out-of-menu",
+    "diet": "NA",
+    "style": "",
+    "heat": 1,
+    "allergens": [
+      "Gluten",
+      "Sesame",
+      "Mushroom",
+      "Potato"
+    ],
+    "details": "Section: Out Of Menu. Ingredients: Mushroom Potato starch Sesame seed Vinegar.",
+    "image": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    "price": 30.0
+  },
+  {
+    "id": "sweet-sour-pork-dragon-fruit-aged-black-vinegar-2",
+    "name": "Sweet & Sour Pork, Dragon Fruit, Aged Black Vinegar",
+    "description": "Deep Fried Pork with Black Vinegar Sweet & Sour sauce Dragon Fruit",
+    "category": "out-of-menu",
+    "diet": "NA",
+    "style": "",
+    "heat": 1,
+    "allergens": [
+      "Gluten",
+      "Pork"
+    ],
+    "details": "Section: Out Of Menu. Ingredients: Pork Vinegar Dragon Fruit Gluten.",
+    "image": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    "price": 38.0
+  },
+  {
+    "id": "sauteed-shredded-vegan-pork-wood-ear-fungus-carrot-bamboo-shoot-",
+    "name": "Sauteed Shredded Vegan Pork, Wood Ear Fungus, Carrot, Bamboo Shoot, Chives, Chili Bean Sauce",
+    "description": "Review menu matrix for description.",
+    "category": "out-of-menu",
+    "diet": "NA",
+    "style": "",
+    "heat": 1,
+    "allergens": [
+      "Mushroom",
+      "Pork"
+    ],
+    "details": "Section: Out Of Menu. Ingredients: Stir fried Vegan pork with wood ear mushroom bamboo shoot. Portion: \u201cpork\u201d Wood ear mushroom Carrot Bamboo shoot Chives.",
+    "image": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    "price": 28.0
+  },
+  {
+    "id": "wok-fried-flat-rice-noodle-sliced-vegan-beef-bean-sprouts",
+    "name": "Wok Fried Flat Rice Noodle, Sliced Vegan Beef, Bean Sprouts",
+    "description": "Wok-fired flat rice noodle with vegan beef, bean sprout Green onion, Chive",
+    "category": "out-of-menu",
+    "diet": "NA",
+    "style": "",
+    "heat": 0,
+    "allergens": [
+      "Gluten",
+      "Soy",
+      "Onion"
+    ],
+    "details": "Section: Out Of Menu. Ingredients: Flat rice Vegan \u201cbeef\u201d Bean Sprout Chive Green Onion Soy Onion. Portion: noodle.",
+    "image": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    "price": 28.0
   }
 ];
 
-const allergyOptions = ["Dairy", "Egg", "Fish", "Sesame", "Shellfish", "Soy", "Wheat"];
+const allergyOptions = ["Capsaicin", "Dairy", "Egg", "Fish", "Garlic", "Gluten", "Mushroom", "Nut", "Onion", "Peanut", "Pork", "Seafood", "Sesame", "Shellfish", "Soy", "Wheat"];
 const defaultRestaurantMenuId = "mott32-las-vegas";
 
 if (localStorage.getItem(authFlowKey) !== currentAuthFlow) {
@@ -157,6 +1970,11 @@ const formatter = new Intl.NumberFormat("en-US", {
   currency: "USD",
   maximumFractionDigits: 0
 });
+
+function formatMenuPrice(price) {
+  const value = Number(price);
+  return value > 0 ? formatter.format(value) : "MP";
+}
 
 const menuGrid = document.querySelector("#menuGrid");
 const template = document.querySelector("#menuRowTemplate");
@@ -2120,10 +3938,11 @@ function renderMenu() {
     heat.setAttribute("aria-label", `${item.heat} out of 3 heat level`);
 
     const button = row.querySelector(".price-button");
-    button.textContent = formatter.format(item.price);
+    const priceLabel = formatMenuPrice(item.price);
+    button.textContent = priceLabel;
     button.classList.toggle("editing", canEditItem);
     button.classList.toggle("locked", state.editing && !canEditItem);
-    button.setAttribute("aria-label", canEditItem ? `Edit ${item.name}` : `${item.name} costs ${formatter.format(item.price)}`);
+    button.setAttribute("aria-label", canEditItem ? `Edit ${item.name}` : `${item.name} costs ${priceLabel}`);
     button.addEventListener("click", () => {
       if (canEditItem) {
         openItemDialog(item.id);
@@ -3227,7 +5046,7 @@ function getPrintableHtml(items) {
 
 function getPrintableItemMarkup(item) {
   const photo = pdfIncludePhotos.checked ? `<img src="${escapeAttribute(item.image)}" alt="" />` : "";
-  const price = pdfIncludePrices.checked ? ` <span class="price">${formatter.format(item.price)}</span>` : "";
+  const price = pdfIncludePrices.checked ? ` <span class="price">${formatMenuPrice(item.price)}</span>` : "";
   const allergens = pdfIncludeAllergens.checked
     ? `<p class="meta">Allergens: ${escapeHtml(item.allergens.length ? item.allergens.join(", ") : "No major allergens")}</p>`
     : "";
@@ -3894,13 +5713,25 @@ function getPrivilegeLabel(user) {
 
 function getCategoryLabel(category) {
   const knownLabel = {
-    starters: "Starters",
-    mains: "Mains",
+    abalone: "Abalone",
+    "baked-fried": "Baked & Fried",
+    bbq: "BBQ",
+    "birds-nest": "Bird's Nest",
+    "clay-pot": "Clay Pot",
+    desserts: "Desserts",
     drinks: "Drinks",
-    soups: "Soups",
-    "dim-sum": "Dim Sum",
     entrees: "Entrees",
-    desserts: "Desserts"
+    "fresh-seafood": "Fresh Seafood",
+    mains: "Mains",
+    "market-seafood": "Market Seafood",
+    meat: "Meat",
+    "out-of-menu": "Out of Menu",
+    "rice-noodles": "Rice & Noodles",
+    "steamed-dim-sum": "Steamed Dim Sum",
+    starters: "Starters",
+    soups: "Soups",
+    vegetables: "Vegetables",
+    "dim-sum": "Dim Sum"
   }[category];
   if (knownLabel) return knownLabel;
   return String(category || "")
