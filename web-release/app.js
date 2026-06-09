@@ -2079,6 +2079,7 @@ const homeSummaryTitle = document.querySelector("#homeSummaryTitle");
 const menusDirectoryKicker = document.querySelector("#menusDirectoryKicker");
 const menusDirectoryTitle = document.querySelector("#menusDirectoryTitle");
 const syncStatus = document.querySelector("#syncStatus");
+const backToTopButton = document.querySelector("#backToTopButton");
 const setupPassword = document.querySelector("#setupPassword");
 const setupMessage = document.querySelector("#setupMessage");
 const inviteIntro = document.querySelector("#inviteIntro");
@@ -3619,6 +3620,21 @@ function sanitizeDesignSettings(settings) {
 function showScreen(screen) {
   state.screen = screen;
   renderAdminState();
+  window.requestAnimationFrame(updateBackToTopButton);
+}
+
+function updateBackToTopButton() {
+  if (!backToTopButton) return;
+
+  const pageIsLong = document.documentElement.scrollHeight > window.innerHeight + 260;
+  backToTopButton.hidden = !(pageIsLong && window.scrollY > 360);
+}
+
+function scrollToPageTop() {
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth"
+  });
 }
 
 function normalizeScreen(activeUser, invitedUser) {
@@ -6190,6 +6206,7 @@ function renderAdminState() {
   renderMenu();
   renderFlashcard();
   renderQuiz();
+  window.requestAnimationFrame(updateBackToTopButton);
 }
 
 function getUsernameFromEmail(email) {
@@ -8031,6 +8048,9 @@ resetDesignButton.addEventListener("click", resetDesign);
 closeDialogButton.addEventListener("click", closeItemDialog);
 deleteItemButton.addEventListener("click", deleteItem);
 itemForm.addEventListener("submit", saveItem);
+backToTopButton.addEventListener("click", scrollToPageTop);
+window.addEventListener("scroll", updateBackToTopButton, { passive: true });
+window.addEventListener("resize", updateBackToTopButton);
 
 renderCategoryTabs();
 
