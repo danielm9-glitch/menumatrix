@@ -1537,6 +1537,42 @@ h1 {
   gap: 8px;
 }
 
+.quiz-count-options {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.quiz-count-options legend {
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.quiz-count-options label {
+  display: grid;
+  min-height: 42px;
+  grid-template-columns: auto auto;
+  gap: 7px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffdfa;
+  color: var(--ink);
+  font-size: 0.84rem;
+  font-weight: 900;
+}
+
+.quiz-count-options input {
+  width: 15px;
+}
+
 .quiz-option {
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr);

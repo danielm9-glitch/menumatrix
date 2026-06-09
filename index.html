@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Menu Matrix</title>
-    <link rel="stylesheet" href="styles.css?v=browser-sidebar" />
+    <link rel="stylesheet" href="styles.css?v=quiz-results" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -252,15 +252,36 @@
         </div>
       </header>
 
-      <section class="study-score-panel">
+      <section id="quizSetupPanel" class="study-card quiz-setup-card">
+        <div>
+          <p class="kicker">Quiz setup</p>
+          <h2>Start a menu quiz</h2>
+        </div>
+        <form id="quizSetupForm" class="user-form">
+          <label>
+            Your name
+            <input id="quizTakerName" autocomplete="name" placeholder="Enter your name" required />
+          </label>
+          <fieldset class="quiz-count-options">
+            <legend>Questions</legend>
+            <label><input type="radio" name="quizQuestionCount" value="5" checked /> 5</label>
+            <label><input type="radio" name="quizQuestionCount" value="10" /> 10</label>
+            <label><input type="radio" name="quizQuestionCount" value="15" /> 15</label>
+            <label><input type="radio" name="quizQuestionCount" value="20" /> 20</label>
+          </fieldset>
+          <button class="save-button" type="submit">Start quiz</button>
+        </form>
+      </section>
+
+      <section id="quizScorePanel" class="study-score-panel" hidden>
         <div>
           <p class="kicker">Current score</p>
           <strong id="quizScore">0 / 0</strong>
         </div>
-        <button id="quizNewQuestionButton" class="quick-action-button is-active" type="button">New question</button>
+        <button id="quizNewQuestionButton" class="quick-action-button is-active" type="button">Next question</button>
       </section>
 
-      <section class="study-card quiz-card" aria-live="polite">
+      <section id="quizCard" class="study-card quiz-card" aria-live="polite" hidden>
         <p id="quizType" class="kicker">Randomized</p>
         <h2 id="quizQuestion">Start a quiz question.</h2>
         <div id="quizOptions" class="quiz-options"></div>
@@ -269,6 +290,15 @@
           <button id="quizResetButton" class="action-button" type="button">Reset score</button>
         </div>
         <p id="quizMessage" class="login-message" role="status"></p>
+      </section>
+
+      <section id="quizResultPanel" class="study-card quiz-result-card" hidden>
+        <div>
+          <p class="kicker">Final result</p>
+          <h2 id="quizResultTitle">Quiz complete</h2>
+        </div>
+        <div id="quizResultSummary" class="dashboard-metric-grid"></div>
+        <button id="quizStartOverButton" class="save-button" type="button">Start another quiz</button>
       </section>
     </main>
 
@@ -314,6 +344,7 @@
         <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="payments">Payments</button>
         <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="restaurants">Restaurants</button>
         <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="menus">Menus</button>
+        <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="quiz-results">Quizzes</button>
         <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="customization">Customization</button>
       </nav>
 
@@ -472,6 +503,15 @@
           <strong>Menus</strong>
         </div>
         <div id="dashboardMenuList" class="dashboard-list"></div>
+      </section>
+
+      <section class="dashboard-panel" data-dashboard-panel="quiz-results" hidden>
+        <div class="section-heading">
+          <p class="kicker">Training results</p>
+          <strong>Quiz Results</strong>
+        </div>
+        <div id="dashboardQuizSummary" class="dashboard-metric-grid"></div>
+        <div id="dashboardQuizList" class="dashboard-list"></div>
       </section>
 
       <section class="dashboard-panel" data-dashboard-panel="customization" hidden>
@@ -940,6 +980,6 @@
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js?v=browser-sidebar"></script>
+    <script src="app.js?v=quiz-results"></script>
   </body>
 </html>

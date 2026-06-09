@@ -13,6 +13,7 @@ const firebaseMenuDocumentId = "main";
 const primaryAdminUsername = "admin";
 const cloudOcrEndpoint = window.MENU_MATRIX_OCR_ENDPOINT || "";
 const menuFullnessTarget = 12;
+const quizResultsLimit = 150;
 const legacyMott32HeroImage = "https://www.nicepng.com/png/detail/809-8099031_mott32-las-vegas-mott-32-logo.png";
 const defaultHeroImage = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 260'%3E%3Crect width='640' height='260' fill='%23f7f1e6'/%3E%3Ctext x='320' y='116' text-anchor='middle' font-family='Georgia%2C serif' font-size='84' font-weight='700' fill='%2319211d'%3EMOTT 32%3C/text%3E%3Ctext x='320' y='168' text-anchor='middle' font-family='Arial%2C sans-serif' font-size='22' letter-spacing='8' fill='%2366716b'%3ELAS VEGAS%3C/text%3E%3C/svg%3E";
 const defaultDesign = {
@@ -1946,6 +1947,7 @@ const state = {
   dashboardReturnScreen: "menus",
   flashcardMode: "mixed",
   flashcard: null,
+  quizSession: null,
   quiz: null,
   quizScore: {
     correct: 0,
@@ -1973,6 +1975,8 @@ let accountDeleteSliderProgress = 0;
 let accountDeletionBusy = false;
 let pdfImportDraftItems = [];
 let rowSwipeState = null;
+let sharedQuizResultsPulling = false;
+let sharedQuizResultsPulledAt = 0;
 
 const formatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -2261,6 +2265,8 @@ const dashboardAuthSummary = document.querySelector("#dashboardAuthSummary");
 const dashboardPaymentsSummary = document.querySelector("#dashboardPaymentsSummary");
 const dashboardRestaurantList = document.querySelector("#dashboardRestaurantList");
 const dashboardMenuList = document.querySelector("#dashboardMenuList");
+const dashboardQuizSummary = document.querySelector("#dashboardQuizSummary");
+const dashboardQuizList = document.querySelector("#dashboardQuizList");
 const dashboardCustomizationSummary = document.querySelector("#dashboardCustomizationSummary");
 const dashboardCustomizationButton = document.querySelector("#dashboardCustomizationButton");
 const backFromFlashcardsButton = document.querySelector("#backFromFlashcardsButton");
@@ -2273,6 +2279,11 @@ const flashcardPrompt = document.querySelector("#flashcardPrompt");
 const flashcardHint = document.querySelector("#flashcardHint");
 const flashcardAnswer = document.querySelector("#flashcardAnswer");
 const backFromQuizButton = document.querySelector("#backFromQuizButton");
+const quizSetupPanel = document.querySelector("#quizSetupPanel");
+const quizSetupForm = document.querySelector("#quizSetupForm");
+const quizTakerName = document.querySelector("#quizTakerName");
+const quizScorePanel = document.querySelector("#quizScorePanel");
+const quizCard = document.querySelector("#quizCard");
 const quizScore = document.querySelector("#quizScore");
 const quizNewQuestionButton = document.querySelector("#quizNewQuestionButton");
 const quizType = document.querySelector("#quizType");
@@ -2281,6 +2292,10 @@ const quizOptions = document.querySelector("#quizOptions");
 const quizCheckButton = document.querySelector("#quizCheckButton");
 const quizResetButton = document.querySelector("#quizResetButton");
 const quizMessage = document.querySelector("#quizMessage");
+const quizResultPanel = document.querySelector("#quizResultPanel");
+const quizResultTitle = document.querySelector("#quizResultTitle");
+const quizResultSummary = document.querySelector("#quizResultSummary");
+const quizStartOverButton = document.querySelector("#quizStartOverButton");
 
 function normalizeCategoryValue(value) {
   return String(value || "")
@@ -2467,6 +2482,7 @@ function normalizeRestaurantMenu(menu, index = 0) {
     categories: getUniqueCategories(menu.categories || categories),
     items: items.map(normalizeMenuItem),
     stats: normalizeMenuStats(menu.stats),
+    quizResults: normalizeQuizResults(menu.quizResults),
     designSettings: normalizedDesign
   };
 }
@@ -2485,6 +2501,44 @@ function normalizeMenuStats(stats = {}) {
     clicks: Math.max(0, Number(stats.clicks) || 0),
     lastOpenedAt: typeof stats.lastOpenedAt === "string" ? stats.lastOpenedAt : ""
   };
+}
+
+function normalizeQuizResult(result = {}) {
+  const total = Math.max(0, Number(result.total) || Number(result.questionLimit) || 0);
+  const score = Math.max(0, Math.min(total || Number(result.score) || 0, Number(result.score) || 0));
+  const takenAt = typeof result.takenAt === "string" && result.takenAt ? result.takenAt : new Date().toISOString();
+  const questionLimit = Math.max(5, Number(result.questionLimit) || total || 5);
+  return {
+    id: result.id || `quiz-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    takerName: String(result.takerName || "Guest").trim() || "Guest",
+    menuId: String(result.menuId || ""),
+    menuName: String(result.menuName || ""),
+    restaurantName: String(result.restaurantName || ""),
+    owner: String(result.owner || ""),
+    shareCode: normalizeShareCode(result.shareCode || ""),
+    takenAt,
+    finishedAt: typeof result.finishedAt === "string" && result.finishedAt ? result.finishedAt : takenAt,
+    questionLimit,
+    score,
+    total,
+    percent: total ? Math.round((score / total) * 100) : 0,
+    source: String(result.source || "app")
+  };
+}
+
+function mergeQuizResults(currentResults = [], incomingResults = []) {
+  const merged = new Map();
+  [...currentResults, ...incomingResults].forEach((result) => {
+    const normalized = normalizeQuizResult(result);
+    if (normalized.id) merged.set(normalized.id, normalized);
+  });
+  return [...merged.values()]
+    .sort((a, b) => Date.parse(b.finishedAt || b.takenAt || "") - Date.parse(a.finishedAt || a.takenAt || ""))
+    .slice(0, quizResultsLimit);
+}
+
+function normalizeQuizResults(results = []) {
+  return Array.isArray(results) ? mergeQuizResults([], results) : [];
 }
 
 function normalizeDesignSettings(settings = {}) {
@@ -3053,6 +3107,7 @@ async function publishMenuShare(code) {
       menuId: activeMenu.id,
       menuName: activeMenu.name,
       categories,
+      quizResults: normalizeQuizResults(activeMenu.quizResults),
       menu: sanitizeRestaurantMenuForStorage({ ...activeMenu, shareCode: normalizedCode }),
       updatedAt: new Date().toISOString()
     },
@@ -3076,6 +3131,7 @@ async function syncSharedMenuSnapshots() {
           menuId: menu.id,
           menuName: menu.name,
           categories,
+          quizResults: normalizeQuizResults(menu.quizResults),
           menu: sanitizeRestaurantMenuForStorage(menu),
           updatedAt: new Date().toISOString()
         },
@@ -3128,7 +3184,8 @@ async function loadSharedMenuFromCode(code) {
         ...(data.menu || {}),
         id: data.menuId || data.menu?.id || `shared-${normalizedCode}`,
         name: data.menuName || data.menu?.name || "Shared menu",
-        shareCode: normalizedCode
+        shareCode: normalizedCode,
+        quizResults: mergeQuizResults(data.menu?.quizResults || [], data.quizResults || [])
       },
       categories: data.categories
     });
@@ -3542,6 +3599,7 @@ function sanitizeRestaurantMenuForStorage(menu) {
     categories: getUniqueCategories(menu.categories || categories),
     items: Array.isArray(menu.items) ? menu.items.map(sanitizeMenuItemForCloud) : [],
     stats: normalizeMenuStats(menu.stats),
+    quizResults: normalizeQuizResults(menu.quizResults),
     designSettings: sanitizeDesignSettings(menu.designSettings || defaultDesign)
   };
 }
@@ -4895,6 +4953,7 @@ function renderDashboard() {
   renderDashboardCustomizationSummary();
   renderDashboardRestaurants();
   renderDashboardMenus();
+  renderDashboardQuizResults();
 }
 
 function createDashboardMetric(label, value, note = "") {
@@ -5004,6 +5063,120 @@ function renderDashboardMenus() {
       })
     );
   });
+}
+
+function getAllQuizResults() {
+  return restaurantMenus
+    .flatMap((menu) =>
+      normalizeQuizResults(menu.quizResults).map((result) => ({
+        ...result,
+        menuId: result.menuId || menu.id,
+        menuName: result.menuName || menu.name,
+        restaurantName: result.restaurantName || menu.restaurantName,
+        owner: result.owner || getMenuOwner(menu),
+        shareCode: result.shareCode || normalizeShareCode(menu.shareCode)
+      }))
+    )
+    .sort((a, b) => Date.parse(b.finishedAt || b.takenAt || "") - Date.parse(a.finishedAt || a.takenAt || ""));
+}
+
+function renderDashboardQuizResults() {
+  if (!dashboardQuizSummary || !dashboardQuizList) return;
+
+  pullSharedQuizResultsForDashboard();
+  const results = getAllQuizResults();
+  const average = results.length
+    ? Math.round(results.reduce((sum, result) => sum + result.percent, 0) / results.length)
+    : 0;
+  const highest = results.reduce((best, result) => Math.max(best, result.percent), 0);
+  const latest = results[0];
+
+  dashboardQuizSummary.replaceChildren(
+    createDashboardMetric("Attempts", String(results.length), "Completed quizzes"),
+    createDashboardMetric("Average", results.length ? `${average}%` : "0%", "Average score"),
+    createDashboardMetric("Highest", results.length ? `${highest}%` : "0%", "Best score"),
+    createDashboardMetric("Latest", latest ? latest.takerName : "None yet", latest ? formatQuizDate(latest.finishedAt || latest.takenAt) : "No quiz has been taken")
+  );
+
+  dashboardQuizList.replaceChildren();
+  if (!results.length) {
+    dashboardQuizList.append(createDashboardEmpty("No quiz results have been saved yet."));
+    return;
+  }
+
+  results.forEach((result) => {
+    dashboardQuizList.append(
+      createDashboardListRow({
+        title: `${result.takerName} - ${result.score}/${result.total} (${result.percent}%)`,
+        meta: `${result.menuName || "Menu"} - ${formatQuizDate(result.finishedAt || result.takenAt)}`,
+        badge: result.source === "shared-code" ? "Shared" : "Logged in",
+        onClick: () => {
+          if (result.menuId) openRestaurantMenu(result.menuId);
+        }
+      })
+    );
+  });
+}
+
+async function pullSharedQuizResultsForDashboard() {
+  const now = Date.now();
+  if (sharedQuizResultsPulling || now - sharedQuizResultsPulledAt < 15000) return;
+  if (!getActiveUser() || !getShareCollection()) return;
+
+  const sharedMenus = restaurantMenus.filter((menu) => normalizeShareCode(menu.shareCode));
+  if (!sharedMenus.length) return;
+
+  sharedQuizResultsPulling = true;
+  sharedQuizResultsPulledAt = now;
+
+  try {
+    let changed = false;
+    await Promise.all(
+      sharedMenus.map(async (menu) => {
+        const snapshot = await getShareDocument(menu.shareCode)?.get();
+        if (!snapshot?.exists) return;
+
+        const data = snapshot.data();
+        const sharedResults = mergeQuizResults(data.quizResults || [], data.menu?.quizResults || [])
+          .filter((result) => {
+            return (
+              !result.menuId ||
+              result.menuId === menu.id ||
+              normalizeShareCode(result.shareCode) === normalizeShareCode(menu.shareCode)
+            );
+          })
+          .map((result) => ({
+            ...result,
+            menuId: menu.id,
+            menuName: result.menuName || menu.name,
+            restaurantName: result.restaurantName || menu.restaurantName,
+            owner: result.owner || getMenuOwner(menu),
+            shareCode: normalizeShareCode(menu.shareCode)
+          }));
+
+        const merged = mergeQuizResults(menu.quizResults || [], sharedResults);
+        if (!areQuizResultListsEqual(menu.quizResults || [], merged)) {
+          menu.quizResults = merged;
+          changed = true;
+        }
+      })
+    );
+
+    if (changed) {
+      saveRestaurantMenus();
+      renderDashboardQuizResults();
+    }
+  } catch {
+    // Results already saved locally; Firebase sync status handles broader connection failures.
+  } finally {
+    sharedQuizResultsPulling = false;
+  }
+}
+
+function areQuizResultListsEqual(first = [], second = []) {
+  const firstIds = normalizeQuizResults(first).map((result) => result.id).join("|");
+  const secondIds = normalizeQuizResults(second).map((result) => result.id).join("|");
+  return firstIds === secondIds;
 }
 
 function createDashboardEmpty(message) {
@@ -5528,13 +5701,61 @@ function openQuizPage() {
   if (!canStudyActiveMenu()) return;
 
   closeDrawer();
+  const activeUser = getActiveUser();
+  state.quizSession = null;
   state.quiz = null;
+  state.quizScore = {
+    correct: 0,
+    total: 0
+  };
+  quizSetupForm?.reset();
+  if (quizTakerName && activeUser?.username) quizTakerName.value = activeUser.username;
   showScreen("quiz");
-  nextQuizQuestion();
+  renderQuiz();
 }
 
 function closeQuizPage() {
   showScreen(state.sharedMenu && !getActiveUser() ? "shared" : "menu");
+}
+
+function getSelectedQuizQuestionCount() {
+  const selected = quizSetupForm?.querySelector("input[name='quizQuestionCount']:checked");
+  return Math.max(5, Number(selected?.value) || 5);
+}
+
+function startQuizSession(event) {
+  event.preventDefault();
+  if (!canStudyActiveMenu()) return;
+
+  const activeMenu = getActiveRestaurantMenu();
+  const takerName = quizTakerName.value.trim();
+  if (!takerName) {
+    quizTakerName.focus();
+    return;
+  }
+
+  const questionLimit = getSelectedQuizQuestionCount();
+  state.quizScore = {
+    correct: 0,
+    total: 0
+  };
+  state.quizSession = {
+    id: `quiz-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    takerName,
+    questionLimit,
+    startedAt: new Date().toISOString(),
+    finishedAt: "",
+    menuId: activeMenu?.id || "",
+    menuName: activeMenu?.name || "Shared menu",
+    restaurantName: activeMenu?.restaurantName || "",
+    owner: getMenuOwner(activeMenu),
+    shareCode: normalizeShareCode(activeMenu?.shareCode || state.sharedCode || ""),
+    completed: false,
+    saved: false,
+    saveMessage: ""
+  };
+  state.quiz = null;
+  nextQuizQuestion();
 }
 
 function createQuizQuestion() {
@@ -5668,28 +5889,62 @@ function createItemByIngredientQuestion() {
 
 function nextQuizQuestion() {
   if (!canStudyActiveMenu()) return;
+  if (!state.quizSession || state.quizSession.completed) {
+    renderQuiz();
+    return;
+  }
+  if (state.quiz && !state.quiz.answered) return;
+  if (state.quizScore.total >= state.quizSession.questionLimit) {
+    finishQuizSession();
+    return;
+  }
 
   state.quiz = createQuizQuestion();
+  if (state.quiz) {
+    state.quiz.questionNumber = state.quizScore.total + 1;
+  }
   renderQuiz();
 }
 
 function renderQuiz() {
   if (!quizPage || state.screen !== "quiz") return;
 
-  quizScore.textContent = `${state.quizScore.correct} / ${state.quizScore.total}`;
+  const hasSession = Boolean(state.quizSession);
+  const isComplete = Boolean(state.quizSession?.completed);
+  quizSetupPanel.hidden = hasSession;
+  quizScorePanel.hidden = !hasSession;
+  quizCard.hidden = !hasSession;
+  quizResultPanel.hidden = !isComplete;
+  quizScore.textContent = hasSession
+    ? `${state.quizScore.correct} / ${state.quizScore.total} answered`
+    : "0 / 0";
   quizOptions.replaceChildren();
+
+  if (!hasSession) {
+    quizType.textContent = "Ready";
+    quizQuestion.textContent = "Enter your name to start.";
+    quizMessage.textContent = "";
+    quizCheckButton.disabled = true;
+    quizNewQuestionButton.disabled = true;
+    return;
+  }
 
   if (!state.quiz) {
     quizType.textContent = "Randomized";
     quizQuestion.textContent = "Start a quiz question.";
     quizMessage.textContent = "No quiz data is ready for this menu yet.";
     quizCheckButton.disabled = true;
+    quizNewQuestionButton.disabled = true;
     return;
   }
 
-  quizType.textContent = state.quiz.typeLabel;
+  quizType.textContent = `Question ${Math.min(state.quiz.questionNumber || state.quizScore.total + 1, state.quizSession.questionLimit)} of ${state.quizSession.questionLimit} - ${state.quiz.typeLabel}`;
   quizQuestion.textContent = state.quiz.prompt;
-  quizMessage.textContent = state.quiz.answered ? state.quiz.message : "";
+  quizMessage.textContent = isComplete
+    ? state.quizSession.saveMessage || "Quiz complete."
+    : state.quiz.answered
+      ? state.quiz.message
+      : "";
   const inputType = state.quiz.multiple ? "checkbox" : "radio";
 
   state.quiz.options.forEach((option) => {
@@ -5712,11 +5967,16 @@ function renderQuiz() {
     quizOptions.append(label);
   });
 
-  quizCheckButton.disabled = state.quiz.answered;
+  quizCheckButton.disabled = state.quiz.answered || isComplete;
+  quizNewQuestionButton.disabled = !state.quiz.answered || isComplete || state.quizScore.total >= state.quizSession.questionLimit;
+  quizNewQuestionButton.textContent =
+    state.quizScore.total >= state.quizSession.questionLimit ? "Quiz complete" : "Next question";
+  quizResetButton.textContent = "Restart quiz";
+  renderQuizResult();
 }
 
 function checkQuizAnswer() {
-  if (!state.quiz || state.quiz.answered) return;
+  if (!state.quizSession || !state.quiz || state.quiz.answered || state.quizSession.completed) return;
 
   const selected = [...quizOptions.querySelectorAll("input:checked")].map((input) => input.value);
   if (!selected.length) {
@@ -5732,16 +5992,130 @@ function checkQuizAnswer() {
   state.quiz.message = isCorrect ? `Correct. ${state.quiz.explanation}` : `Not quite. ${state.quiz.explanation}`;
   state.quizScore.total += 1;
   if (isCorrect) state.quizScore.correct += 1;
+  if (state.quizScore.total >= state.quizSession.questionLimit) {
+    finishQuizSession();
+    return;
+  }
   renderQuiz();
 }
 
 function resetQuizScore() {
+  state.quizSession = null;
+  state.quiz = null;
   state.quizScore = {
     correct: 0,
     total: 0
   };
+  quizSetupForm?.reset();
+  const activeUser = getActiveUser();
+  if (quizTakerName && activeUser?.username) quizTakerName.value = activeUser.username;
   quizMessage.textContent = "";
   renderQuiz();
+}
+
+function getCurrentQuizResult() {
+  if (!state.quizSession) return null;
+
+  return normalizeQuizResult({
+    id: state.quizSession.id,
+    takerName: state.quizSession.takerName,
+    menuId: state.quizSession.menuId,
+    menuName: state.quizSession.menuName,
+    restaurantName: state.quizSession.restaurantName,
+    owner: state.quizSession.owner,
+    shareCode: state.quizSession.shareCode,
+    takenAt: state.quizSession.startedAt,
+    finishedAt: state.quizSession.finishedAt || new Date().toISOString(),
+    questionLimit: state.quizSession.questionLimit,
+    score: state.quizScore.correct,
+    total: state.quizScore.total,
+    source: state.sharedMenu ? "shared-code" : "logged-in"
+  });
+}
+
+function finishQuizSession() {
+  if (!state.quizSession || state.quizSession.completed) return;
+
+  state.quizSession.completed = true;
+  state.quizSession.finishedAt = new Date().toISOString();
+  state.quizSession.saveMessage = "Quiz complete. Saving result...";
+  const result = getCurrentQuizResult();
+  renderQuiz();
+  saveQuizResult(result);
+}
+
+function renderQuizResult() {
+  if (!quizResultPanel || !state.quizSession?.completed) return;
+
+  const result = getCurrentQuizResult();
+  if (!result) return;
+
+  quizResultTitle.textContent = `${result.takerName}: ${result.score} / ${result.total}`;
+  quizResultSummary.replaceChildren(
+    createDashboardMetric("Score", `${result.percent}%`, `${result.score} correct out of ${result.total}`),
+    createDashboardMetric("Questions", String(result.total), `${result.menuName || "Menu quiz"}`),
+    createDashboardMetric("Taken", formatQuizDate(result.takenAt), result.finishedAt ? `Finished ${formatQuizDate(result.finishedAt)}` : ""),
+    createDashboardMetric("Saved", state.quizSession.saveMessage || "Result ready", "Visible in the admin dashboard")
+  );
+}
+
+function addQuizResultToMenu(result) {
+  if (!result || state.sharedMenu) return false;
+
+  const menu = restaurantMenus.find((candidate) => candidate.id === result.menuId) || getActiveRestaurantMenu();
+  if (!menu) return false;
+
+  menu.quizResults = mergeQuizResults(menu.quizResults || [], [result]);
+  saveRestaurantMenus();
+  renderDashboard();
+  return true;
+}
+
+async function saveQuizResult(result) {
+  if (!result || !state.quizSession) return;
+
+  try {
+    const savedToMenu = addQuizResultToMenu(result);
+    if (result.shareCode) {
+      await saveQuizResultToShare(result.shareCode, result);
+    }
+    state.quizSession.saved = true;
+    state.quizSession.saveMessage = savedToMenu || result.shareCode
+      ? "Quiz complete. Result saved."
+      : "Quiz complete. Result saved on this device.";
+  } catch {
+    state.quizSession.saveMessage = "Quiz complete. Result could not sync yet.";
+  }
+
+  renderQuiz();
+}
+
+async function saveQuizResultToShare(code, result) {
+  const doc = getShareDocument(code);
+  if (!doc || !result) return;
+
+  const snapshot = await doc.get();
+  const data = snapshot.exists ? snapshot.data() : {};
+  const nextResults = mergeQuizResults(data.quizResults || data.menu?.quizResults || [], [result]);
+  const nextMenu = data.menu ? { ...data.menu, quizResults: nextResults } : undefined;
+  const payload = {
+    quizResults: nextResults,
+    updatedAt: new Date().toISOString()
+  };
+  if (nextMenu) payload.menu = nextMenu;
+  await doc.set(payload, { merge: true });
+}
+
+function formatQuizDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Date unknown";
+  return date.toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
 }
 
 function renderAdminState() {
@@ -7585,9 +7959,11 @@ flashcardNextButton.addEventListener("click", nextFlashcard);
 flashcardFlipButton.addEventListener("click", flipFlashcard);
 quickQuizButton.addEventListener("click", openQuizPage);
 backFromQuizButton.addEventListener("click", closeQuizPage);
+quizSetupForm.addEventListener("submit", startQuizSession);
 quizNewQuestionButton.addEventListener("click", nextQuizQuestion);
 quizCheckButton.addEventListener("click", checkQuizAnswer);
 quizResetButton.addEventListener("click", resetQuizScore);
+quizStartOverButton.addEventListener("click", resetQuizScore);
 createUserToggle.addEventListener("click", toggleCreateUserPanel);
 methodTabs.forEach((tab) => {
   tab.addEventListener("click", () => setCreateMethod(tab.dataset.method));
