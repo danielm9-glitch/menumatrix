@@ -1640,7 +1640,8 @@ h1 {
   color: white;
 }
 
-.allergy-panel {
+.allergy-panel,
+.ingredient-panel {
   display: grid;
   gap: 11px;
   margin-bottom: 14px;
@@ -1648,6 +1649,14 @@ h1 {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--white);
+}
+
+.allergy-panel {
+  border-left: 4px solid var(--tomato);
+}
+
+.ingredient-panel {
+  border-left: 4px solid var(--aqua);
 }
 
 .section-heading {
@@ -1665,13 +1674,15 @@ h1 {
   font-size: 1rem;
 }
 
-.allergy-chips {
+.allergy-chips,
+.ingredient-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.allergy-chip {
+.allergy-chip,
+.ingredient-chip {
   min-height: 34px;
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -1686,6 +1697,18 @@ h1 {
   border-color: var(--tomato);
   background: #fbebe8;
   color: var(--tomato);
+}
+
+.ingredient-chip.is-active {
+  border-color: var(--aqua);
+  background: #eaf4f6;
+  color: var(--aqua);
+}
+
+.empty-filter-note {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
 }
 
 .matrix-card {
@@ -1829,25 +1852,58 @@ h1 {
   line-height: 1.25;
 }
 
-.allergen-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
+.item-tag-groups {
+  display: grid;
+  gap: 7px;
   margin-top: 8px;
 }
 
-.allergen-tag {
+.item-tag-group {
+  display: grid;
+  gap: 5px;
+}
+
+.tag-label {
+  color: var(--muted);
+  font-size: 0.58rem;
+  font-weight: 950;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.allergen-list,
+.ingredient-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.allergen-tag,
+.ingredient-tag {
   border-radius: 999px;
   padding: 3px 7px;
-  background: #f6eee4;
-  color: #8a5a28;
   font-size: 0.65rem;
   font-weight: 850;
+}
+
+.allergen-tag {
+  background: #fbebe8;
+  color: var(--tomato);
+}
+
+.ingredient-tag {
+  background: #eaf4f6;
+  color: var(--aqua);
 }
 
 .allergen-tag.none {
   background: #edf5ef;
   color: var(--leaf);
+}
+
+.ingredient-tag.none {
+  background: #f3f0e8;
+  color: var(--muted);
 }
 
 .pill {
@@ -2347,7 +2403,8 @@ h1 {
   #menuPage .menu-title-panel,
   #menuPage .quick-menu-actions,
   #menuPage .controls,
-  #menuPage .allergy-panel {
+  #menuPage .allergy-panel,
+  #menuPage .ingredient-panel {
     grid-column: 1;
   }
 
@@ -2389,7 +2446,8 @@ h1 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .allergy-panel {
+  .allergy-panel,
+  .ingredient-panel {
     margin-bottom: 0;
   }
 

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Menu Matrix</title>
-    <link rel="stylesheet" href="styles.css?v=user-menu-access" />
+    <link rel="stylesheet" href="styles.css?v=ingredients-tap-expand" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -194,6 +194,13 @@
           <p class="kicker">Allergy check</p>
         </div>
         <div id="allergyChips" class="allergy-chips"></div>
+      </section>
+
+      <section class="ingredient-panel" aria-label="Ingredient filters">
+        <div class="section-heading">
+          <p class="kicker">Ingredient finder</p>
+        </div>
+        <div id="ingredientChips" class="ingredient-chips"></div>
       </section>
 
       <section class="matrix-card" aria-label="Menu matrix">
@@ -900,7 +907,16 @@
             <button class="row-edit-button" type="button" hidden>Edit</button>
           </div>
           <p></p>
-          <div class="allergen-list"></div>
+          <div class="item-tag-groups">
+            <div class="item-tag-group allergy-tag-group">
+              <span class="tag-label">Allergy</span>
+              <div class="allergen-list"></div>
+            </div>
+            <div class="item-tag-group ingredient-tag-group">
+              <span class="tag-label">Ingredients</span>
+              <div class="ingredient-list"></div>
+            </div>
+          </div>
         </div>
         <span class="pill diet-pill"></span>
         <span class="heat-meter" aria-label="Heat level"></span>
@@ -922,6 +938,6 @@
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js?v=user-menu-access"></script>
+    <script src="app.js?v=ingredients-tap-expand"></script>
   </body>
 </html>

@@ -1934,6 +1934,7 @@ const state = {
   category: "all",
   query: "",
   allergies: new Set(),
+  ingredients: new Set(),
   openItems: new Set(),
   currentUser: loadCurrentUser(),
   sharedMenu: null,
@@ -2032,6 +2033,7 @@ const menuGrid = document.querySelector("#menuGrid");
 const template = document.querySelector("#menuRowTemplate");
 const searchInput = document.querySelector("#searchInput");
 const allergyChips = document.querySelector("#allergyChips");
+const ingredientChips = document.querySelector("#ingredientChips");
 const categoryTabs = document.querySelector("#categoryTabs");
 let tabs = [...document.querySelectorAll(".tab")];
 const drawerOpenButton = document.querySelector("#drawerOpenButton");
@@ -3026,6 +3028,7 @@ function openSharedMenuSnapshot({ code, menu, categories: sharedCategories = [] 
   state.query = "";
   state.openItems.clear();
   state.allergies.clear();
+  state.ingredients.clear();
   searchInput.value = "";
   saveSharedCodeLocally(normalizedCode, sharedMenu.name, sharedMenu);
   syncActiveRestaurantMenuData();
@@ -3791,6 +3794,7 @@ function openRestaurantMenu(menuId) {
   state.query = "";
   state.openItems.clear();
   state.allergies.clear();
+  state.ingredients.clear();
   searchInput.value = "";
   setActiveCategoryTab();
   syncActiveRestaurantMenuData();
@@ -3908,6 +3912,7 @@ function deleteActiveRestaurantMenu() {
   state.query = "";
   state.openItems.clear();
   state.allergies.clear();
+  state.ingredients.clear();
   searchInput.value = "";
   setActiveCategoryTab();
   state.editing = false;
@@ -4010,16 +4015,22 @@ function createBlankRestaurantMenu() {
 
 function getVisibleItems() {
   const query = state.query.trim().toLowerCase();
+  const selectedIngredients = [...state.ingredients];
 
   return menuItems.filter((item) => {
+    const ingredientText = getItemIngredientText(item);
+    const ingredientTerms = getItemIngredientTerms(item);
+    const ingredientSource = `${ingredientText} ${ingredientTerms.join(" ")}`.toLowerCase();
     const matchesCategory = state.category === "all" || item.category === state.category;
-    const matchesQuery = [item.name, item.description, item.diet, item.category, ...item.allergens]
+    const matchesQuery = [item.name, item.description, item.diet, item.category, ...item.allergens, ingredientText, ...ingredientTerms]
       .join(" ")
       .toLowerCase()
       .includes(query);
     const avoidsAllergies = !item.allergens.some((allergen) => state.allergies.has(allergen));
+    const matchesIngredients =
+      !selectedIngredients.length || selectedIngredients.every((ingredient) => ingredientSource.includes(ingredient.toLowerCase()));
 
-    return matchesCategory && matchesQuery && avoidsAllergies;
+    return matchesCategory && matchesQuery && avoidsAllergies && matchesIngredients;
   });
 }
 
@@ -4029,6 +4040,7 @@ function renderHeat(level) {
 }
 
 function renderMenu() {
+  renderIngredientChips();
   const items = getVisibleItems();
   menuGrid.replaceChildren();
 
@@ -4049,13 +4061,20 @@ function renderMenu() {
 
     const itemToggle = row.querySelector(".item-toggle");
     itemToggle.setAttribute("aria-expanded", String(state.openItems.has(item.id)));
-    itemToggle.addEventListener("click", () => toggleItemDetails(item.id));
+    itemToggle.addEventListener("click", (event) => {
+      event.stopPropagation();
+      toggleItemDetails(item.id);
+    });
 
     const rowEditButton = row.querySelector(".row-edit-button");
     const canEditItem = state.editing && canEditCategory(item.category);
     const canSwipeItem = !state.sharedMenu && canEditCategory(item.category);
     rowEditButton.hidden = !canEditItem;
-    rowEditButton.addEventListener("click", () => openItemDialog(item.id));
+    rowEditButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      openItemDialog(item.id);
+    });
+    attachRowTapHandler(row, item);
     if (canSwipeItem) {
       row.classList.add("is-swipe-enabled");
       attachRowSwipeHandlers(row, item);
@@ -4068,6 +4087,16 @@ function renderMenu() {
       tag.className = `allergen-tag${item.allergens.length ? "" : " none"}`;
       tag.textContent = allergen;
       allergenList.append(tag);
+    });
+
+    const ingredientList = row.querySelector(".ingredient-list");
+    const ingredients = getItemIngredientTerms(item).slice(0, 6);
+    const ingredientLabels = ingredients.length ? ingredients : ["No ingredient notes"];
+    ingredientLabels.forEach((ingredient) => {
+      const tag = document.createElement("span");
+      tag.className = `ingredient-tag${ingredients.length ? "" : " none"}`;
+      tag.textContent = ingredient;
+      ingredientList.append(tag);
     });
 
     const pill = row.querySelector(".diet-pill");
@@ -4084,8 +4113,9 @@ function renderMenu() {
     button.classList.toggle("editing", canEditItem);
     button.classList.toggle("locked", state.editing && !canEditItem);
     button.setAttribute("aria-label", canEditItem ? `Edit ${item.name}` : `${item.name} costs ${priceLabel}`);
-    button.addEventListener("click", () => {
+    button.addEventListener("click", (event) => {
       if (canEditItem) {
+        event.stopPropagation();
         openItemDialog(item.id);
       }
     });
@@ -4098,6 +4128,20 @@ function renderMenu() {
     itemDetails.querySelector(".detail-copy").textContent = item.details;
 
     menuGrid.append(row);
+  });
+}
+
+function attachRowTapHandler(row, item) {
+  row.addEventListener("click", (event) => {
+    if (row.dataset.suppressClick === "true") {
+      event.preventDefault();
+      delete row.dataset.suppressClick;
+      return;
+    }
+
+    if (event.target.closest(".row-edit-button")) return;
+    if (event.target.closest("input, textarea, select, a")) return;
+    toggleItemDetails(item.id);
   });
 }
 
@@ -4146,7 +4190,9 @@ function handleRowSwipeEnd(event) {
 
   const deltaX = event.clientX - rowSwipeState.startX;
   const { row, item } = rowSwipeState;
+  const wasSwipeGesture = rowSwipeState.active || Math.abs(deltaX) > 12;
   cancelRowSwipe();
+  if (wasSwipeGesture) suppressNextRowClick(row);
 
   if (Math.abs(deltaX) < 82) return;
 
@@ -4159,6 +4205,13 @@ function handleRowSwipeEnd(event) {
   }
 
   requestDeleteMenuItem(item.id);
+}
+
+function suppressNextRowClick(row) {
+  row.dataset.suppressClick = "true";
+  window.setTimeout(() => {
+    if (row.dataset.suppressClick === "true") delete row.dataset.suppressClick;
+  }, 240);
 }
 
 function cancelRowSwipe() {
@@ -6052,6 +6105,7 @@ function exitSharedMenu() {
   state.query = "";
   state.openItems.clear();
   state.allergies.clear();
+  state.ingredients.clear();
   searchInput.value = "";
   restaurantMenus = loadRestaurantMenus(getActiveUser());
   state.activeRestaurantMenu = getVisibleRestaurantMenus()[0]?.id || "";
@@ -6074,6 +6128,7 @@ function resetMenuViewForCurrentUser() {
   state.query = "";
   state.openItems.clear();
   state.allergies.clear();
+  state.ingredients.clear();
   searchInput.value = "";
   setActiveCategoryTab();
   syncActiveRestaurantMenuData();
@@ -7384,6 +7439,49 @@ function saveItem(event) {
   saveMenuItems();
   closeItemDialog();
   renderAllergyChips();
+  renderMenu();
+}
+
+function getIngredientFilterOptions() {
+  return uniqueValues(menuItems.flatMap((item) => getItemIngredientTerms(item))).sort((a, b) => a.localeCompare(b));
+}
+
+function renderIngredientChips() {
+  if (!ingredientChips) return;
+
+  ingredientChips.replaceChildren();
+  const options = getIngredientFilterOptions();
+  state.ingredients.forEach((ingredient) => {
+    if (!options.includes(ingredient)) state.ingredients.delete(ingredient);
+  });
+  if (!options.length) {
+    const empty = document.createElement("span");
+    empty.className = "empty-filter-note";
+    empty.textContent = "No ingredients listed yet.";
+    ingredientChips.append(empty);
+    return;
+  }
+
+  options.forEach((ingredient) => {
+    const chip = document.createElement("button");
+    chip.className = "ingredient-chip";
+    chip.type = "button";
+    chip.textContent = ingredient;
+    chip.classList.toggle("is-active", state.ingredients.has(ingredient));
+    chip.setAttribute("aria-pressed", String(state.ingredients.has(ingredient)));
+    chip.addEventListener("click", () => toggleIngredient(ingredient));
+    ingredientChips.append(chip);
+  });
+}
+
+function toggleIngredient(ingredient) {
+  if (state.ingredients.has(ingredient)) {
+    state.ingredients.delete(ingredient);
+  } else {
+    state.ingredients.add(ingredient);
+  }
+
+  renderIngredientChips();
   renderMenu();
 }
 
