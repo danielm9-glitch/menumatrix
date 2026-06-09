@@ -1310,6 +1310,12 @@ h1 {
   background: #222;
 }
 
+.menu-sidebar {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
 .floating-edit-button {
   position: absolute;
   right: 12px;
@@ -2399,18 +2405,20 @@ h1 {
     padding-bottom: 6px;
   }
 
-  #menuPage .hero,
-  #menuPage .menu-title-panel,
-  #menuPage .quick-menu-actions,
-  #menuPage .controls,
-  #menuPage .allergy-panel,
-  #menuPage .ingredient-panel {
+  #menuPage .menu-sidebar {
+    position: sticky;
+    top: 18px;
     grid-column: 1;
+    grid-row: 2;
+    align-self: start;
+    max-height: calc(100vh - 104px);
+    overflow-y: auto;
+    padding-right: 4px;
   }
 
   #menuPage .matrix-card {
     grid-column: 2;
-    grid-row: 2 / span 6;
+    grid-row: 2;
     align-self: start;
   }
 

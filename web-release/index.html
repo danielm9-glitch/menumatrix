@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Menu Matrix</title>
-    <link rel="stylesheet" href="styles.css?v=ingredients-tap-expand" />
+    <link rel="stylesheet" href="styles.css?v=browser-sidebar" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -147,61 +147,63 @@
         </button>
       </header>
 
-      <section class="hero logo-hero" aria-label="Mott 32 logo">
-        <img id="heroImage" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 260'%3E%3Crect width='640' height='260' fill='%23f7f1e6'/%3E%3Ctext x='320' y='116' text-anchor='middle' font-family='Georgia%2C serif' font-size='84' font-weight='700' fill='%2319211d'%3EMOTT 32%3C/text%3E%3Ctext x='320' y='168' text-anchor='middle' font-family='Arial%2C sans-serif' font-size='22' letter-spacing='8' fill='%2366716b'%3ELAS VEGAS%3C/text%3E%3C/svg%3E" alt="Mott 32 restaurant logo" />
-        <button id="editHeroButton" class="floating-edit-button" type="button" hidden>Edit image</button>
-      </section>
+      <aside class="menu-sidebar" aria-label="Menu controls">
+        <section class="hero logo-hero" aria-label="Mott 32 logo">
+          <img id="heroImage" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 260'%3E%3Crect width='640' height='260' fill='%23f7f1e6'/%3E%3Ctext x='320' y='116' text-anchor='middle' font-family='Georgia%2C serif' font-size='84' font-weight='700' fill='%2319211d'%3EMOTT 32%3C/text%3E%3Ctext x='320' y='168' text-anchor='middle' font-family='Arial%2C sans-serif' font-size='22' letter-spacing='8' fill='%2366716b'%3ELAS VEGAS%3C/text%3E%3C/svg%3E" alt="Mott 32 restaurant logo" />
+          <button id="editHeroButton" class="floating-edit-button" type="button" hidden>Edit image</button>
+        </section>
 
-      <section class="menu-title-panel" aria-label="Current restaurant menu">
-        <div>
-          <p class="kicker">Restaurant menu</p>
-          <h2 id="currentMenuTitle">Mott 32 Las Vegas</h2>
-        </div>
-        <div class="menu-title-actions">
-          <button id="topAddItemButton" class="top-add-item-button" type="button" hidden>
-            <span aria-hidden="true">+</span>
-            Add item
-          </button>
-          <button id="renameMenuButton" class="small-icon-action" type="button" aria-label="Rename menu" hidden>
-            <span aria-hidden="true">&#9998;</span>
-          </button>
-        </div>
-      </section>
+        <section class="menu-title-panel" aria-label="Current restaurant menu">
+          <div>
+            <p class="kicker">Restaurant menu</p>
+            <h2 id="currentMenuTitle">Mott 32 Las Vegas</h2>
+          </div>
+          <div class="menu-title-actions">
+            <button id="topAddItemButton" class="top-add-item-button" type="button" hidden>
+              <span aria-hidden="true">+</span>
+              Add item
+            </button>
+            <button id="renameMenuButton" class="small-icon-action" type="button" aria-label="Rename menu" hidden>
+              <span aria-hidden="true">&#9998;</span>
+            </button>
+          </div>
+        </section>
 
-      <section id="quickMenuActions" class="quick-menu-actions" aria-label="Menu actions">
-        <button id="quickEditModeButton" class="quick-action-button" type="button" hidden>Edit menu</button>
-        <button id="quickScanMenuButton" class="quick-action-button" type="button" hidden>Scan menu photo</button>
-        <button id="quickImportPdfButton" class="quick-action-button" type="button" hidden>Import PDF</button>
-        <button id="quickPdfBuilderButton" class="quick-action-button" type="button" hidden>Create PDF</button>
-        <button id="quickCategoryButton" class="quick-action-button" type="button" hidden>Categories</button>
-        <button id="quickShareMenuButton" class="quick-action-button" type="button" hidden>Share</button>
-        <button id="quickFlashcardButton" class="quick-action-button" type="button" hidden>Flash cards</button>
-        <button id="quickQuizButton" class="quick-action-button" type="button" hidden>Quiz</button>
-      </section>
+        <section id="quickMenuActions" class="quick-menu-actions" aria-label="Menu actions">
+          <button id="quickEditModeButton" class="quick-action-button" type="button" hidden>Edit menu</button>
+          <button id="quickScanMenuButton" class="quick-action-button" type="button" hidden>Scan menu photo</button>
+          <button id="quickImportPdfButton" class="quick-action-button" type="button" hidden>Import PDF</button>
+          <button id="quickPdfBuilderButton" class="quick-action-button" type="button" hidden>Create PDF</button>
+          <button id="quickCategoryButton" class="quick-action-button" type="button" hidden>Categories</button>
+          <button id="quickShareMenuButton" class="quick-action-button" type="button" hidden>Share</button>
+          <button id="quickFlashcardButton" class="quick-action-button" type="button" hidden>Flash cards</button>
+          <button id="quickQuizButton" class="quick-action-button" type="button" hidden>Quiz</button>
+        </section>
 
-      <section class="controls" aria-label="Menu filters">
-        <label class="search-box">
-          <span>Search</span>
-          <input id="searchInput" type="search" placeholder="ramen, salad, vegan..." autocomplete="off" />
-        </label>
-        <div id="categoryTabs" class="tabs" role="tablist" aria-label="Menu categories">
-          <button class="tab is-active" type="button" data-category="all">All</button>
-        </div>
-      </section>
+        <section class="controls" aria-label="Menu filters">
+          <label class="search-box">
+            <span>Search</span>
+            <input id="searchInput" type="search" placeholder="ramen, salad, vegan..." autocomplete="off" />
+          </label>
+          <div id="categoryTabs" class="tabs" role="tablist" aria-label="Menu categories">
+            <button class="tab is-active" type="button" data-category="all">All</button>
+          </div>
+        </section>
 
-      <section class="allergy-panel" aria-label="Allergy filters">
-        <div class="section-heading">
-          <p class="kicker">Allergy check</p>
-        </div>
-        <div id="allergyChips" class="allergy-chips"></div>
-      </section>
+        <section class="allergy-panel" aria-label="Allergy filters">
+          <div class="section-heading">
+            <p class="kicker">Allergy check</p>
+          </div>
+          <div id="allergyChips" class="allergy-chips"></div>
+        </section>
 
-      <section class="ingredient-panel" aria-label="Ingredient filters">
-        <div class="section-heading">
-          <p class="kicker">Ingredient finder</p>
-        </div>
-        <div id="ingredientChips" class="ingredient-chips"></div>
-      </section>
+        <section class="ingredient-panel" aria-label="Ingredient filters">
+          <div class="section-heading">
+            <p class="kicker">Ingredient finder</p>
+          </div>
+          <div id="ingredientChips" class="ingredient-chips"></div>
+        </section>
+      </aside>
 
       <section class="matrix-card" aria-label="Menu matrix">
         <div class="matrix-header" role="row">
@@ -938,6 +940,6 @@
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js?v=ingredients-tap-expand"></script>
+    <script src="app.js?v=browser-sidebar"></script>
   </body>
 </html>
