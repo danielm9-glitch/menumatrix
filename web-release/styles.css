@@ -2052,6 +2052,10 @@ h1 {
   display: none;
 }
 
+.item-details.no-photo {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .item-details img {
   width: 96px;
   aspect-ratio: 1;

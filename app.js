@@ -2458,15 +2458,21 @@ function createDefaultRestaurantMenu() {
     owner: primaryAdminUsername,
     label: "Chinese menu training",
     categories: [...categories],
-    items: loadMenuItems(),
+    items: clearDefaultStockImagesForMenuItems(loadMenuItems()),
     designSettings: loadDesignSettings()
   };
 }
 
 function normalizeRestaurantMenu(menu, index = 0) {
   const isDefaultMenu = menu.id === defaultRestaurantMenuId || (!menu.id && index === 0);
+  const id = menu.id || `menu-${Date.now()}-${index}`;
+  const name = menu.name || (isDefaultMenu ? "Mott 32 Las Vegas" : `Blank Menu ${index + 1}`);
+  const menuIsMott32 = isMott32Menu({ id, name });
   const design = menu.designSettings || (isDefaultMenu ? loadDesignSettings() : { ...defaultDesign, heroImage: "" });
   const items = Array.isArray(menu.items) ? menu.items : isDefaultMenu ? loadMenuItems() : [];
+  const normalizedItems = menuIsMott32
+    ? clearDefaultStockImagesForMenuItems(items.map(normalizeMenuItem))
+    : items.map(normalizeMenuItem);
   const normalizedDesign = normalizeDesignSettings(design);
 
   if ((isDefaultMenu && !normalizedDesign.heroImage) || shouldUseBuiltInMott32Hero(menu, normalizedDesign.heroImage)) {
@@ -2474,14 +2480,14 @@ function normalizeRestaurantMenu(menu, index = 0) {
   }
 
   return {
-    id: menu.id || `menu-${Date.now()}-${index}`,
-    name: menu.name || (isDefaultMenu ? "Mott 32 Las Vegas" : `Blank Menu ${index + 1}`),
+    id,
+    name,
     restaurantName: menu.restaurantName || menu.restaurant || (isDefaultMenu ? "Mott 32 Las Vegas" : ""),
     owner: menu.owner || primaryAdminUsername,
     label: menu.label || (isDefaultMenu ? "Chinese menu training" : "Blank menu"),
     shareCode: typeof menu.shareCode === "string" ? menu.shareCode : "",
     categories: getUniqueCategories(menu.categories || categories),
-    items: items.map(normalizeMenuItem),
+    items: normalizedItems,
     stats: normalizeMenuStats(menu.stats),
     quizResults: normalizeQuizResults(menu.quizResults),
     designSettings: normalizedDesign
@@ -2558,8 +2564,31 @@ function normalizeMenuItem(item) {
     ...item,
     category: categories.includes(category) ? category : categories[0] || "starters",
     details: item.details || defaultMatch?.details || "Key ingredients, flavor notes, and service talking points can go here.",
-    image: item.image || defaultMatch?.image || "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80"
+    image: item.image || ""
   };
+}
+
+function isDefaultStockItemImage(imageUrl) {
+  const source = String(imageUrl || "").trim();
+  if (!source) return false;
+
+  if (!isDefaultStockItemImage.urls) {
+    isDefaultStockItemImage.urls = new Set(
+      defaultMenuItems
+        .map((item) => String(item.image || "").trim())
+        .filter(Boolean)
+    );
+    isDefaultStockItemImage.urls.add("https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80");
+  }
+
+  return isDefaultStockItemImage.urls.has(source);
+}
+
+function clearDefaultStockImagesForMenuItems(items = []) {
+  return items.map((item) => ({
+    ...item,
+    image: isDefaultStockItemImage(item.image) ? "" : item.image || ""
+  }));
 }
 
 function saveMenuItems() {
@@ -4196,8 +4225,15 @@ function renderMenu() {
 
     const itemDetails = row.querySelector(".item-details");
     const image = itemDetails.querySelector("img");
+    const hasItemImage = Boolean(item.image);
     itemDetails.hidden = !state.openItems.has(item.id);
-    image.src = item.image;
+    itemDetails.classList.toggle("no-photo", !hasItemImage);
+    image.hidden = !hasItemImage;
+    if (hasItemImage) {
+      image.src = item.image;
+    } else {
+      image.removeAttribute("src");
+    }
     image.alt = item.name;
     itemDetails.querySelector(".detail-copy").textContent = item.details;
 
@@ -5519,7 +5555,7 @@ function getPrintableHtml(items) {
 }
 
 function getPrintableItemMarkup(item) {
-  const photo = pdfIncludePhotos.checked ? `<img src="${escapeAttribute(item.image)}" alt="" />` : "";
+  const photo = pdfIncludePhotos.checked && item.image ? `<img src="${escapeAttribute(item.image)}" alt="" />` : "";
   const price = pdfIncludePrices.checked ? ` <span class="price">${formatMenuPrice(item.price)}</span>` : "";
   const allergens = pdfIncludeAllergens.checked
     ? `<p class="meta">Allergens: ${escapeHtml(item.allergens.length ? item.allergens.join(", ") : "No major allergens")}</p>`
@@ -7613,7 +7649,7 @@ function createImportedMenuItem(parts, fallbackCategory, price, index) {
     heat,
     allergens: getImportedAllergens(fullText),
     details: description,
-    image: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    image: "",
     price
   };
 }
@@ -7697,7 +7733,7 @@ function parseScannedItem(text, category) {
     heat: 0,
     allergens: [],
     details: description,
-    image: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    image: "",
     price: Number.isFinite(price) ? price : 0
   };
 }
@@ -7800,7 +7836,7 @@ function getFormItem() {
     name: itemName.value.trim(),
     description: itemDescription.value.trim(),
     details: itemDetails.value.trim() || "Key ingredients, flavor notes, and service talking points can go here.",
-    image: itemImage.value.trim() || "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80",
+    image: itemImage.value.trim(),
     category,
     diet: itemDiet.value,
     style: getStyleForItem(category, heat),
