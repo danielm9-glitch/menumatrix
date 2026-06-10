@@ -1948,6 +1948,7 @@ const state = {
   sharedMenu: null,
   sharedCode: "",
   editing: false,
+  photoSlides: {},
   screen: loadCurrentUser() ? "menus" : "login",
   activeRestaurantMenu: initialRestaurantMenu?.id || defaultRestaurantMenuId,
   dashboardTab: "users",
@@ -4397,31 +4398,131 @@ function renderMenu() {
     itemDetails.classList.toggle("no-photo", !hasItemImage);
     gallery.hidden = !hasItemImage;
     gallery.classList.toggle("single", itemImages.length === 1);
-    renderItemPhotoGallery(gallery, itemImages, item.name);
+    renderItemPhotoGallery(gallery, itemImages, item.name, item.id);
     itemDetails.querySelector(".detail-copy").textContent = item.details;
 
     menuGrid.append(row);
   });
 }
 
-function renderItemPhotoGallery(gallery, images, itemName) {
+function renderItemPhotoGallery(gallery, images, itemName, itemId) {
   gallery.replaceChildren();
   if (!images.length) return;
 
-  const visibleImages = images.slice(0, 4);
-  visibleImages.forEach((imageUrl, index) => {
-    if (index === 3 && images.length > 4) {
-      const badge = document.createElement("span");
-      badge.className = "photo-count-badge";
-      badge.textContent = `+${images.length - 3}`;
-      gallery.append(badge);
-      return;
-    }
+  const slideIndex = getItemPhotoSlideIndex(itemId, images.length);
+  gallery.dataset.itemId = itemId;
+  gallery.setAttribute("role", "group");
+  gallery.setAttribute("aria-label", `${itemName} photos`);
 
+  const viewport = document.createElement("div");
+  viewport.className = "item-photo-viewport";
+
+  const track = document.createElement("div");
+  track.className = "item-photo-track";
+  track.style.transform = `translateX(-${slideIndex * 100}%)`;
+
+  images.forEach((imageUrl, index) => {
+    const slide = document.createElement("div");
+    slide.className = "item-photo-slide";
     const image = document.createElement("img");
     image.src = imageUrl;
     image.alt = `${itemName} photo ${index + 1}`;
-    gallery.append(image);
+    slide.append(image);
+    track.append(slide);
+  });
+
+  viewport.append(track);
+  gallery.append(viewport);
+  attachPhotoSwipeHandlers(gallery, itemId, images.length);
+
+  if (images.length > 1) {
+    const previousButton = createPhotoNavButton("previous", itemId, images.length, -1);
+    const nextButton = createPhotoNavButton("next", itemId, images.length, 1);
+    const dots = createPhotoDots(itemId, images.length, slideIndex);
+    const counter = document.createElement("span");
+    counter.className = "photo-slide-counter";
+    counter.textContent = `${slideIndex + 1}/${images.length}`;
+
+    gallery.append(previousButton, nextButton, dots, counter);
+  }
+}
+
+function getItemPhotoSlideIndex(itemId, imageCount) {
+  const fallbackIndex = 0;
+  const currentIndex = Number(state.photoSlides[itemId]);
+  const safeIndex = Number.isFinite(currentIndex) ? currentIndex : fallbackIndex;
+  const clampedIndex = Math.max(0, Math.min(imageCount - 1, safeIndex));
+  state.photoSlides[itemId] = clampedIndex;
+  return clampedIndex;
+}
+
+function setItemPhotoSlide(itemId, imageCount, requestedIndex) {
+  if (imageCount <= 1) return;
+  state.photoSlides[itemId] = (requestedIndex + imageCount) % imageCount;
+  renderMenu();
+}
+
+function createPhotoNavButton(direction, itemId, imageCount, step) {
+  const button = document.createElement("button");
+  button.className = `photo-nav-button ${direction}`;
+  button.type = "button";
+  button.textContent = direction === "previous" ? "<" : ">";
+  button.setAttribute("aria-label", direction === "previous" ? "Previous photo" : "Next photo");
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    setItemPhotoSlide(itemId, imageCount, getItemPhotoSlideIndex(itemId, imageCount) + step);
+  });
+  return button;
+}
+
+function createPhotoDots(itemId, imageCount, activeIndex) {
+  const dots = document.createElement("div");
+  dots.className = "photo-slide-dots";
+
+  for (let index = 0; index < imageCount; index += 1) {
+    const dot = document.createElement("button");
+    dot.type = "button";
+    dot.className = "photo-slide-dot";
+    dot.classList.toggle("is-active", index === activeIndex);
+    dot.setAttribute("aria-label", `Show photo ${index + 1}`);
+    dot.addEventListener("click", (event) => {
+      event.stopPropagation();
+      setItemPhotoSlide(itemId, imageCount, index);
+    });
+    dots.append(dot);
+  }
+
+  return dots;
+}
+
+function attachPhotoSwipeHandlers(gallery, itemId, imageCount) {
+  let startX = 0;
+  let startY = 0;
+  let isSwiping = false;
+
+  gallery.addEventListener("click", (event) => event.stopPropagation());
+  gallery.addEventListener("pointerdown", (event) => {
+    event.stopPropagation();
+    startX = event.clientX;
+    startY = event.clientY;
+    isSwiping = true;
+    gallery.setPointerCapture?.(event.pointerId);
+  });
+  gallery.addEventListener("pointermove", (event) => {
+    if (!isSwiping) return;
+    event.stopPropagation();
+  });
+  gallery.addEventListener("pointerup", (event) => {
+    if (!isSwiping) return;
+    event.stopPropagation();
+    const deltaX = event.clientX - startX;
+    const deltaY = event.clientY - startY;
+    isSwiping = false;
+    if (Math.abs(deltaX) < 26 || Math.abs(deltaX) < Math.abs(deltaY)) return;
+    setItemPhotoSlide(itemId, imageCount, getItemPhotoSlideIndex(itemId, imageCount) + (deltaX < 0 ? 1 : -1));
+  });
+  gallery.addEventListener("pointercancel", () => {
+    isSwiping = false;
   });
 }
 
