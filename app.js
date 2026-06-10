@@ -16,6 +16,8 @@ const menuFullnessTarget = 12;
 const quizResultsLimit = 150;
 const legacyMott32HeroImage = "https://www.nicepng.com/png/detail/809-8099031_mott32-las-vegas-mott-32-logo.png";
 const defaultHeroImage = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 260'%3E%3Crect width='640' height='260' fill='%23f7f1e6'/%3E%3Ctext x='320' y='116' text-anchor='middle' font-family='Georgia%2C serif' font-size='84' font-weight='700' fill='%2319211d'%3EMOTT 32%3C/text%3E%3Ctext x='320' y='168' text-anchor='middle' font-family='Arial%2C sans-serif' font-size='22' letter-spacing='8' fill='%2366716b'%3ELAS VEGAS%3C/text%3E%3C/svg%3E";
+const defaultFrontMediaUrl = "assets/login-background.mp4";
+const maxInlineVideoUploadSize = 850000;
 const defaultDesign = {
   ink: "#19211d",
   leaf: "#2f7d56",
@@ -23,7 +25,11 @@ const defaultDesign = {
   aqua: "#317c8e",
   page: "#f8f2e8",
   panel: "#fbfaf6",
-  heroImage: defaultHeroImage
+  heroImage: defaultHeroImage,
+  frontMediaType: "video",
+  frontMediaUrl: defaultFrontMediaUrl,
+  frontMediaSize: 100,
+  frontVideoLength: 0
 };
 const defaultCategories = ["bbq", "steamed-dim-sum", "baked-fried", "starters", "soups", "birds-nest", "abalone", "market-seafood", "fresh-seafood", "clay-pot", "meat", "vegetables", "rice-noodles", "desserts", "out-of-menu"];
 let categories = loadCategories();
@@ -2166,6 +2172,10 @@ const newUserPermissionsSlot = document.querySelector("#newUserPermissionsSlot")
 const newUserMenuAccessSlot = document.querySelector("#newUserMenuAccessSlot");
 const userMessage = document.querySelector("#userMessage");
 const userList = document.querySelector("#userList");
+const authBackgroundImage = document.querySelector("#authBackgroundImage");
+const authBackgroundVideo = document.querySelector("#authBackgroundVideo");
+const registerBackgroundImage = document.querySelector("#registerBackgroundImage");
+const registerBackgroundVideo = document.querySelector("#registerBackgroundVideo");
 const itemDialog = document.querySelector("#itemDialog");
 const itemForm = document.querySelector("#itemForm");
 const closeDialogButton = document.querySelector("#closeDialogButton");
@@ -2260,6 +2270,16 @@ const heroUploadPreview = document.querySelector("#heroUploadPreview");
 const heroPreviewImage = document.querySelector("#heroPreviewImage");
 const heroUploadProgress = document.querySelector("#heroUploadProgress");
 const heroUploadStatus = document.querySelector("#heroUploadStatus");
+const frontMediaType = document.querySelector("#frontMediaType");
+const frontMediaUrl = document.querySelector("#frontMediaUrl");
+const frontMediaFile = document.querySelector("#frontMediaFile");
+const frontMediaSize = document.querySelector("#frontMediaSize");
+const frontMediaSizeValue = document.querySelector("#frontMediaSizeValue");
+const frontVideoLength = document.querySelector("#frontVideoLength");
+const frontMediaPreview = document.querySelector("#frontMediaPreview");
+const frontMediaPreviewFrame = document.querySelector("#frontMediaPreviewFrame");
+const frontMediaUploadProgress = document.querySelector("#frontMediaUploadProgress");
+const frontMediaUploadStatus = document.querySelector("#frontMediaUploadStatus");
 const dashboardTabs = [...document.querySelectorAll(".dashboard-tab")];
 const dashboardPanels = [...document.querySelectorAll(".dashboard-panel")];
 const dashboardAuthSummary = document.querySelector("#dashboardAuthSummary");
@@ -2549,10 +2569,22 @@ function normalizeQuizResults(results = []) {
 }
 
 function normalizeDesignSettings(settings = {}) {
+  const frontMediaType = settings.frontMediaType === "image" ? "image" : "video";
+  const frontMediaUrl =
+    typeof settings.frontMediaUrl === "string" && settings.frontMediaUrl.trim()
+      ? settings.frontMediaUrl.trim()
+      : defaultFrontMediaUrl;
+  const frontMediaSize = Math.max(80, Math.min(160, Number(settings.frontMediaSize) || defaultDesign.frontMediaSize));
+  const frontVideoLength = Math.max(0, Math.min(120, Number(settings.frontVideoLength) || 0));
+
   return {
     ...defaultDesign,
     ...settings,
-    heroImage: typeof settings.heroImage === "string" ? settings.heroImage : defaultHeroImage
+    heroImage: typeof settings.heroImage === "string" ? settings.heroImage : defaultHeroImage,
+    frontMediaType,
+    frontMediaUrl,
+    frontMediaSize,
+    frontVideoLength
   };
 }
 
@@ -2622,16 +2654,17 @@ function saveMenuItems() {
 
 function loadDesignSettings() {
   const savedDesign = localStorage.getItem(designStorageKey);
-  if (!savedDesign) return { ...defaultDesign };
+  if (!savedDesign) return normalizeDesignSettings(defaultDesign);
 
   try {
-    return { ...defaultDesign, ...JSON.parse(savedDesign) };
+    return normalizeDesignSettings(JSON.parse(savedDesign));
   } catch {
-    return { ...defaultDesign };
+    return normalizeDesignSettings(defaultDesign);
   }
 }
 
 function saveDesignSettings() {
+  designSettings = normalizeDesignSettings(designSettings);
   localStorage.setItem(designStorageKey, JSON.stringify(designSettings));
   persistActiveRestaurantMenuData();
 }
@@ -2692,12 +2725,14 @@ function saveRestaurantMenus({ sync = true } = {}) {
 }
 
 function applyDesignSettings() {
+  designSettings = normalizeDesignSettings(designSettings);
   document.documentElement.style.setProperty("--ink", designSettings.ink);
   document.documentElement.style.setProperty("--leaf", designSettings.leaf);
   document.documentElement.style.setProperty("--gold", designSettings.gold);
   document.documentElement.style.setProperty("--aqua", designSettings.aqua);
   document.documentElement.style.setProperty("--page-bg", designSettings.page);
   document.documentElement.style.setProperty("--panel-bg", designSettings.panel);
+  document.documentElement.style.setProperty("--front-media-size", `${designSettings.frontMediaSize}%`);
   const hasHeroImage = Boolean(designSettings.heroImage);
   heroImage.hidden = !hasHeroImage;
   heroImage.closest(".logo-hero")?.classList.toggle("is-empty", !hasHeroImage);
@@ -2706,7 +2741,60 @@ function applyDesignSettings() {
   } else {
     heroImage.removeAttribute("src");
   }
+  applyFrontMediaSettings();
   renderRestaurantList();
+}
+
+function applyFrontMediaSettings() {
+  const mediaUrl = designSettings.frontMediaUrl || defaultFrontMediaUrl;
+  const mediaType = designSettings.frontMediaType === "image" ? "image" : "video";
+  const authPairs = [
+    { image: authBackgroundImage, video: authBackgroundVideo },
+    { image: registerBackgroundImage, video: registerBackgroundVideo }
+  ];
+
+  authPairs.forEach(({ image, video }) => {
+    if (!image || !video) return;
+    image.hidden = mediaType !== "image";
+    video.hidden = mediaType !== "video";
+
+    if (mediaType === "image") {
+      image.src = mediaUrl;
+      pauseFrontVideo(video);
+      return;
+    }
+
+    image.removeAttribute("src");
+    setFrontVideoSource(video, mediaUrl);
+  });
+}
+
+function setFrontVideoSource(video, mediaUrl) {
+  if (video.dataset.mediaUrl !== mediaUrl) {
+    video.dataset.mediaUrl = mediaUrl;
+    video.src = mediaUrl;
+    video.load();
+  }
+
+  video.dataset.loopLength = String(designSettings.frontVideoLength || 0);
+  video.loop = true;
+  video.muted = true;
+  video.playsInline = true;
+  video.play?.().catch(() => {});
+}
+
+function pauseFrontVideo(video) {
+  video.pause?.();
+  video.removeAttribute("src");
+  video.dataset.mediaUrl = "";
+}
+
+function handleFrontVideoTimeUpdate(event) {
+  const video = event.currentTarget;
+  const loopLength = Number(video.dataset.loopLength) || 0;
+  if (!loopLength || video.currentTime < loopLength) return;
+  video.currentTime = 0;
+  video.play?.().catch(() => {});
 }
 
 function syncDesignForm() {
@@ -2718,6 +2806,12 @@ function syncDesignForm() {
   colorPanel.value = designSettings.panel;
   heroImageUrl.value = designSettings.heroImage;
   heroImageFile.value = "";
+  frontMediaType.value = designSettings.frontMediaType;
+  frontMediaUrl.value = designSettings.frontMediaUrl;
+  frontMediaFile.value = "";
+  frontMediaSize.value = String(designSettings.frontMediaSize);
+  frontMediaSizeValue.textContent = `${designSettings.frontMediaSize}%`;
+  frontVideoLength.value = String(designSettings.frontVideoLength);
   resetUploadPreview({
     preview: heroUploadPreview,
     image: heroPreviewImage,
@@ -2726,6 +2820,11 @@ function syncDesignForm() {
     imageUrl: designSettings.heroImage,
     message: designSettings.heroImage ? "Current header image. Choose a file to replace it." : "No header image selected yet."
   });
+  renderFrontMediaPreview(
+    designSettings.frontMediaUrl,
+    designSettings.frontMediaType,
+    designSettings.frontMediaUrl ? "Current front page media. Upload a file or paste a URL to replace it." : "No front page media selected yet."
+  );
 }
 
 function resetUploadPreview({ preview, image, progress, status, imageUrl = "", message = "Select an image to preview it." }) {
@@ -2740,6 +2839,31 @@ function resetUploadPreview({ preview, image, progress, status, imageUrl = "", m
   } else {
     image.removeAttribute("src");
   }
+}
+
+function renderFrontMediaPreview(mediaUrl = "", mediaType = "video", message = "Select a front image or video to preview it.") {
+  if (!frontMediaPreview || !frontMediaPreviewFrame || !frontMediaUploadProgress || !frontMediaUploadStatus) return;
+
+  const normalizedType = mediaType === "image" ? "image" : "video";
+  frontMediaPreviewFrame.replaceChildren();
+  frontMediaPreview.hidden = !mediaUrl;
+  frontMediaUploadProgress.value = mediaUrl ? 100 : 0;
+  frontMediaUploadProgress.hidden = !mediaUrl;
+  frontMediaUploadStatus.textContent = message;
+
+  if (!mediaUrl) return;
+
+  const media = document.createElement(normalizedType === "image" ? "img" : "video");
+  media.src = mediaUrl;
+  if (normalizedType === "video") {
+    media.muted = true;
+    media.loop = true;
+    media.playsInline = true;
+    media.autoplay = true;
+  } else {
+    media.alt = "";
+  }
+  frontMediaPreviewFrame.append(media);
 }
 
 function setUploadProgress({ preview, progress, status, percent, message }) {
@@ -3660,14 +3784,19 @@ function sanitizeRestaurantMenuForStorage(menu) {
 }
 
 function sanitizeDesignSettings(settings) {
+  const normalized = normalizeDesignSettings(settings);
   return {
-    ink: settings.ink || defaultDesign.ink,
-    leaf: settings.leaf || defaultDesign.leaf,
-    gold: settings.gold || defaultDesign.gold,
-    aqua: settings.aqua || defaultDesign.aqua,
-    page: settings.page || defaultDesign.page,
-    panel: settings.panel || defaultDesign.panel,
-    heroImage: typeof settings.heroImage === "string" ? settings.heroImage : defaultHeroImage
+    ink: normalized.ink || defaultDesign.ink,
+    leaf: normalized.leaf || defaultDesign.leaf,
+    gold: normalized.gold || defaultDesign.gold,
+    aqua: normalized.aqua || defaultDesign.aqua,
+    page: normalized.page || defaultDesign.page,
+    panel: normalized.panel || defaultDesign.panel,
+    heroImage: typeof normalized.heroImage === "string" ? normalized.heroImage : defaultHeroImage,
+    frontMediaType: normalized.frontMediaType,
+    frontMediaUrl: normalized.frontMediaUrl,
+    frontMediaSize: normalized.frontMediaSize,
+    frontVideoLength: normalized.frontVideoLength
   };
 }
 
@@ -5099,7 +5228,8 @@ function renderDashboardCustomizationSummary() {
     createCustomizationSwatch("Accent", designSettings.leaf),
     createCustomizationSwatch("Price", designSettings.gold),
     createCustomizationSwatch("Edit", designSettings.aqua),
-    createDashboardMetric("Header image", designSettings.heroImage ? "Set" : "Blank", "Current menu banner")
+    createDashboardMetric("Header image", designSettings.heroImage ? "Set" : "Blank", "Current menu banner"),
+    createDashboardMetric("Front media", designSettings.frontMediaType === "image" ? "Image" : "Video", `${designSettings.frontMediaSize}% size`)
   );
 }
 
@@ -5355,6 +5485,7 @@ function saveDesign(event) {
   const activeMenu = getActiveRestaurantMenu();
   const requestedHeroImage = heroImageUrl.value.trim();
   const heroImageValue = shouldUseBuiltInMott32Hero(activeMenu, requestedHeroImage) ? defaultHeroImage : requestedHeroImage;
+  const requestedFrontMedia = frontMediaUrl.value.trim() || defaultFrontMediaUrl;
   designSettings = {
     ...designSettings,
     ink: colorInk.value,
@@ -5363,7 +5494,11 @@ function saveDesign(event) {
     aqua: colorAqua.value,
     page: colorPage.value,
     panel: colorPanel.value,
-    heroImage: heroImageValue
+    heroImage: heroImageValue,
+    frontMediaType: frontMediaType.value === "image" ? "image" : "video",
+    frontMediaUrl: requestedFrontMedia,
+    frontMediaSize: Number(frontMediaSize.value) || defaultDesign.frontMediaSize,
+    frontVideoLength: Number(frontVideoLength.value) || 0
   };
 
   saveDesignSettings();
@@ -5373,7 +5508,7 @@ function saveDesign(event) {
 
 function resetDesign() {
   if (!isAdmin()) return;
-  designSettings = { ...defaultDesign };
+  designSettings = normalizeDesignSettings(defaultDesign);
   saveDesignSettings();
   applyDesignSettings();
   syncDesignForm();
@@ -7901,6 +8036,93 @@ async function updateHeroImageFromFile(event) {
   }
 }
 
+function inferFrontMediaTypeFromUrl(url) {
+  if (/^data:image\//i.test(url)) return "image";
+  if (/^data:video\//i.test(url)) return "video";
+  if (/\.(mp4|webm|mov|m4v)(?:[?#].*)?$/i.test(url)) return "video";
+  return /\.(png|jpe?g|webp|gif|avif|svg)(?:[?#].*)?$/i.test(url) ? "image" : "video";
+}
+
+function updateFrontMediaSizeLabel() {
+  frontMediaSizeValue.textContent = `${frontMediaSize.value}%`;
+}
+
+function previewFrontMediaFromFields() {
+  const mediaUrl = frontMediaUrl.value.trim();
+  const mediaType = frontMediaType.value;
+  renderFrontMediaPreview(
+    mediaUrl,
+    mediaType,
+    mediaUrl ? "Ready to save front page media." : "No front page media selected yet."
+  );
+}
+
+async function updateFrontMediaFromFile(event) {
+  const file = event.target.files?.[0];
+  if (!file || !isAdmin()) return;
+
+  const isImage = file.type.startsWith("image/");
+  const isVideo = file.type.startsWith("video/");
+  if (!isImage && !isVideo) {
+    renderFrontMediaPreview(frontMediaUrl.value.trim(), frontMediaType.value, "Choose an image or MP4/WebM video.");
+    return;
+  }
+
+  if (isVideo && file.size > maxInlineVideoUploadSize) {
+    frontMediaUploadProgress.hidden = false;
+    frontMediaUploadProgress.value = 0;
+    frontMediaPreview.hidden = false;
+    frontMediaPreviewFrame.replaceChildren();
+    frontMediaUploadStatus.textContent =
+      "This video is too large to save directly. Host the MP4 and paste its URL so Firebase stays synced.";
+    frontMediaFile.value = "";
+    return;
+  }
+
+  try {
+    if (isImage) {
+      const imageUrl = await prepareUploadedImage(file, {
+        maxWidth: 1400,
+        quality: 0.84,
+        preview: frontMediaPreview,
+        image: null,
+        progress: frontMediaUploadProgress,
+        status: frontMediaUploadStatus,
+        button: saveDesignButton
+      });
+      frontMediaType.value = "image";
+      frontMediaUrl.value = imageUrl;
+      renderFrontMediaPreview(imageUrl, "image", "Front image ready to save.");
+      return;
+    }
+
+    setUploadBusy(saveDesignButton, true);
+    setUploadProgress({
+      preview: frontMediaPreview,
+      progress: frontMediaUploadProgress,
+      status: frontMediaUploadStatus,
+      percent: 6,
+      message: "Reading video..."
+    });
+    const videoUrl = await readImageFile(file, (percent) => {
+      setUploadProgress({
+        preview: frontMediaPreview,
+        progress: frontMediaUploadProgress,
+        status: frontMediaUploadStatus,
+        percent,
+        message: "Reading video..."
+      });
+    });
+    frontMediaType.value = "video";
+    frontMediaUrl.value = videoUrl;
+    renderFrontMediaPreview(videoUrl, "video", "Front video ready to save.");
+  } catch (error) {
+    renderFrontMediaPreview(frontMediaUrl.value.trim(), frontMediaType.value, error?.message || "Could not read that media file.");
+  } finally {
+    setUploadBusy(saveDesignButton, false);
+  }
+}
+
 function getStyleForItem(category, heat) {
   if (category === "drinks") return "sea";
   if (heat > 1) return "fire";
@@ -8165,6 +8387,15 @@ userForm.addEventListener("submit", saveUser);
 itemImage.addEventListener("input", () => renderItemPhotoPreview(getItemImageFieldValues()));
 itemImageFile.addEventListener("change", updateItemImageFromFile);
 heroImageFile.addEventListener("change", updateHeroImageFromFile);
+frontMediaType.addEventListener("change", previewFrontMediaFromFields);
+frontMediaUrl.addEventListener("input", () => {
+  if (frontMediaUrl.value.trim()) frontMediaType.value = inferFrontMediaTypeFromUrl(frontMediaUrl.value.trim());
+  previewFrontMediaFromFields();
+});
+frontMediaFile.addEventListener("change", updateFrontMediaFromFile);
+frontMediaSize.addEventListener("input", updateFrontMediaSizeLabel);
+authBackgroundVideo.addEventListener("timeupdate", handleFrontVideoTimeUpdate);
+registerBackgroundVideo.addEventListener("timeupdate", handleFrontVideoTimeUpdate);
 designForm.addEventListener("submit", saveDesign);
 closeDesignButton.addEventListener("click", closeDesignDialog);
 resetDesignButton.addEventListener("click", resetDesign);

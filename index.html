@@ -4,12 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Menu Matrix</title>
-    <link rel="stylesheet" href="styles.css?v=multi-photo-video" />
+    <link rel="stylesheet" href="styles.css?v=front-media-customizer" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
       <div class="auth-background" aria-hidden="true">
-        <video class="auth-background-video" autoplay muted loop playsinline preload="metadata">
+        <img id="authBackgroundImage" class="auth-background-image" alt="" hidden />
+        <video id="authBackgroundVideo" class="auth-background-video" autoplay muted loop playsinline preload="metadata">
           <source src="assets/login-background.mp4" type="video/mp4" />
         </video>
       </div>
@@ -62,7 +63,8 @@
 
     <main id="registerPage" class="auth-page" aria-label="Create account" hidden>
       <div class="auth-background" aria-hidden="true">
-        <video class="auth-background-video" autoplay muted loop playsinline preload="metadata">
+        <img id="registerBackgroundImage" class="auth-background-image" alt="" hidden />
+        <video id="registerBackgroundVideo" class="auth-background-video" autoplay muted loop playsinline preload="metadata">
           <source src="assets/login-background.mp4" type="video/mp4" />
         </video>
       </div>
@@ -830,6 +832,47 @@
           </div>
         </div>
 
+        <section class="form-subsection">
+          <div>
+            <p class="kicker">Front page</p>
+            <strong>Login background</strong>
+          </div>
+          <div class="form-grid">
+            <label>
+              Media type
+              <select id="frontMediaType">
+                <option value="video">Video</option>
+                <option value="image">Image</option>
+              </select>
+            </label>
+            <label>
+              Size
+              <input id="frontMediaSize" type="range" min="80" max="160" step="5" />
+              <span id="frontMediaSizeValue" class="range-value">100%</span>
+            </label>
+          </div>
+          <label>
+            Front media URL
+            <input id="frontMediaUrl" placeholder="https://example.com/background.mp4" />
+          </label>
+          <label>
+            Upload front image or video
+            <input id="frontMediaFile" type="file" accept="image/*,video/mp4,video/webm,video/quicktime" />
+          </label>
+          <label>
+            Video loop length
+            <input id="frontVideoLength" type="number" min="0" max="120" step="1" />
+            <span class="range-value">Seconds. Use 0 for the full video.</span>
+          </label>
+          <div id="frontMediaPreview" class="upload-preview front-media-preview" hidden>
+            <div id="frontMediaPreviewFrame" class="front-media-preview-frame"></div>
+            <div>
+              <progress id="frontMediaUploadProgress" max="100" value="0"></progress>
+              <p id="frontMediaUploadStatus" class="upload-status">Select a front image or video to preview it.</p>
+            </div>
+          </div>
+        </section>
+
         <div class="form-actions">
           <button id="resetDesignButton" class="danger-button" type="button">Reset</button>
           <button id="saveDesignButton" class="save-button" type="submit">Save customization</button>
@@ -990,6 +1033,6 @@
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js?v=multi-photo-video"></script>
+    <script src="app.js?v=front-media-customizer"></script>
   </body>
 </html>

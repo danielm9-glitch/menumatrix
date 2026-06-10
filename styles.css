@@ -77,11 +77,18 @@ textarea {
   background: linear-gradient(rgba(13, 16, 14, 0.08), rgba(13, 16, 14, 0.42));
 }
 
+.auth-background-image,
 .auth-background-video {
+  position: absolute;
+  top: 50%;
+  left: 50%;
   display: block;
-  width: 100%;
-  height: 100%;
+  width: var(--front-media-size, 100%);
+  height: var(--front-media-size, 100%);
+  min-width: 100%;
+  min-height: 100%;
   object-fit: cover;
+  transform: translate(-50%, -50%);
 }
 
 .auth-page::after {
@@ -2152,6 +2159,7 @@ h1 {
 
 .item-dialog {
   width: min(calc(100% - 24px), 420px);
+  max-height: calc(100vh - 24px);
   border: 0;
   border-radius: 12px;
   padding: 0;
@@ -2167,6 +2175,8 @@ h1 {
 .item-form {
   display: grid;
   gap: 12px;
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
   padding: 16px;
 }
 
@@ -2272,6 +2282,43 @@ h1 {
   font-weight: 850;
   line-height: 1.35;
   text-transform: none;
+}
+
+.form-subsection {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.form-subsection strong {
+  font-size: 1rem;
+}
+
+.range-value {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 850;
+  text-transform: none;
+}
+
+.front-media-preview {
+  grid-template-columns: minmax(96px, 140px) minmax(0, 1fr);
+}
+
+.front-media-preview-frame {
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #f4f1ea;
+}
+
+.front-media-preview-frame img,
+.front-media-preview-frame video {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
 }
 
 .color-grid {
