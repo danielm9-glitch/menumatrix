@@ -66,7 +66,7 @@ textarea {
   background:
     linear-gradient(rgba(13, 16, 14, 0.1), rgba(13, 16, 14, 0.38)),
     url("https://images.unsplash.com/photo-1556911220-bff31c812dba?auto=format&fit=crop&w=1200&q=80") center / cover;
-  filter: blur(5px);
+  filter: blur(var(--front-media-blur, 6.5px));
   transform: scale(1.035);
 }
 

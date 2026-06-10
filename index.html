@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Menu Matrix</title>
-    <link rel="stylesheet" href="styles.css?v=front-media-customizer" />
+    <link rel="stylesheet" href="styles.css?v=front-blur-customizer" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -850,6 +850,11 @@
               <input id="frontMediaSize" type="range" min="80" max="160" step="5" />
               <span id="frontMediaSizeValue" class="range-value">100%</span>
             </label>
+            <label>
+              Blur
+              <input id="frontMediaBlur" type="range" min="0" max="18" step="0.5" />
+              <span id="frontMediaBlurValue" class="range-value">6.5px</span>
+            </label>
           </div>
           <label>
             Front media URL
@@ -1033,6 +1038,6 @@
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js?v=front-media-customizer"></script>
+    <script src="app.js?v=front-blur-customizer"></script>
   </body>
 </html>

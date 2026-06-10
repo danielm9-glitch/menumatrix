@@ -29,6 +29,7 @@ const defaultDesign = {
   frontMediaType: "video",
   frontMediaUrl: defaultFrontMediaUrl,
   frontMediaSize: 100,
+  frontMediaBlur: 6.5,
   frontVideoLength: 0
 };
 const defaultCategories = ["bbq", "steamed-dim-sum", "baked-fried", "starters", "soups", "birds-nest", "abalone", "market-seafood", "fresh-seafood", "clay-pot", "meat", "vegetables", "rice-noodles", "desserts", "out-of-menu"];
@@ -2275,6 +2276,8 @@ const frontMediaUrl = document.querySelector("#frontMediaUrl");
 const frontMediaFile = document.querySelector("#frontMediaFile");
 const frontMediaSize = document.querySelector("#frontMediaSize");
 const frontMediaSizeValue = document.querySelector("#frontMediaSizeValue");
+const frontMediaBlur = document.querySelector("#frontMediaBlur");
+const frontMediaBlurValue = document.querySelector("#frontMediaBlurValue");
 const frontVideoLength = document.querySelector("#frontVideoLength");
 const frontMediaPreview = document.querySelector("#frontMediaPreview");
 const frontMediaPreviewFrame = document.querySelector("#frontMediaPreviewFrame");
@@ -2575,6 +2578,10 @@ function normalizeDesignSettings(settings = {}) {
       ? settings.frontMediaUrl.trim()
       : defaultFrontMediaUrl;
   const frontMediaSize = Math.max(80, Math.min(160, Number(settings.frontMediaSize) || defaultDesign.frontMediaSize));
+  const parsedFrontMediaBlur = Number(settings.frontMediaBlur);
+  const frontMediaBlur = Number.isFinite(parsedFrontMediaBlur)
+    ? Math.max(0, Math.min(18, parsedFrontMediaBlur))
+    : defaultDesign.frontMediaBlur;
   const frontVideoLength = Math.max(0, Math.min(120, Number(settings.frontVideoLength) || 0));
 
   return {
@@ -2584,6 +2591,7 @@ function normalizeDesignSettings(settings = {}) {
     frontMediaType,
     frontMediaUrl,
     frontMediaSize,
+    frontMediaBlur,
     frontVideoLength
   };
 }
@@ -2733,6 +2741,7 @@ function applyDesignSettings() {
   document.documentElement.style.setProperty("--page-bg", designSettings.page);
   document.documentElement.style.setProperty("--panel-bg", designSettings.panel);
   document.documentElement.style.setProperty("--front-media-size", `${designSettings.frontMediaSize}%`);
+  document.documentElement.style.setProperty("--front-media-blur", `${designSettings.frontMediaBlur}px`);
   const hasHeroImage = Boolean(designSettings.heroImage);
   heroImage.hidden = !hasHeroImage;
   heroImage.closest(".logo-hero")?.classList.toggle("is-empty", !hasHeroImage);
@@ -2811,6 +2820,8 @@ function syncDesignForm() {
   frontMediaFile.value = "";
   frontMediaSize.value = String(designSettings.frontMediaSize);
   frontMediaSizeValue.textContent = `${designSettings.frontMediaSize}%`;
+  frontMediaBlur.value = String(designSettings.frontMediaBlur);
+  frontMediaBlurValue.textContent = `${designSettings.frontMediaBlur}px`;
   frontVideoLength.value = String(designSettings.frontVideoLength);
   resetUploadPreview({
     preview: heroUploadPreview,
@@ -3796,6 +3807,7 @@ function sanitizeDesignSettings(settings) {
     frontMediaType: normalized.frontMediaType,
     frontMediaUrl: normalized.frontMediaUrl,
     frontMediaSize: normalized.frontMediaSize,
+    frontMediaBlur: normalized.frontMediaBlur,
     frontVideoLength: normalized.frontVideoLength
   };
 }
@@ -5229,7 +5241,11 @@ function renderDashboardCustomizationSummary() {
     createCustomizationSwatch("Price", designSettings.gold),
     createCustomizationSwatch("Edit", designSettings.aqua),
     createDashboardMetric("Header image", designSettings.heroImage ? "Set" : "Blank", "Current menu banner"),
-    createDashboardMetric("Front media", designSettings.frontMediaType === "image" ? "Image" : "Video", `${designSettings.frontMediaSize}% size`)
+    createDashboardMetric(
+      "Front media",
+      designSettings.frontMediaType === "image" ? "Image" : "Video",
+      `${designSettings.frontMediaSize}% size, ${designSettings.frontMediaBlur}px blur`
+    )
   );
 }
 
@@ -5475,6 +5491,7 @@ function openDesignDialog() {
 }
 
 function closeDesignDialog() {
+  applyDesignSettings();
   designDialog.close();
 }
 
@@ -5498,6 +5515,7 @@ function saveDesign(event) {
     frontMediaType: frontMediaType.value === "image" ? "image" : "video",
     frontMediaUrl: requestedFrontMedia,
     frontMediaSize: Number(frontMediaSize.value) || defaultDesign.frontMediaSize,
+    frontMediaBlur: Number(frontMediaBlur.value),
     frontVideoLength: Number(frontVideoLength.value) || 0
   };
 
@@ -8045,6 +8063,13 @@ function inferFrontMediaTypeFromUrl(url) {
 
 function updateFrontMediaSizeLabel() {
   frontMediaSizeValue.textContent = `${frontMediaSize.value}%`;
+  document.documentElement.style.setProperty("--front-media-size", `${frontMediaSize.value}%`);
+}
+
+function updateFrontMediaBlurLabel() {
+  const blur = Number(frontMediaBlur.value) || 0;
+  frontMediaBlurValue.textContent = `${blur}px`;
+  document.documentElement.style.setProperty("--front-media-blur", `${blur}px`);
 }
 
 function previewFrontMediaFromFields() {
@@ -8394,6 +8419,7 @@ frontMediaUrl.addEventListener("input", () => {
 });
 frontMediaFile.addEventListener("change", updateFrontMediaFromFile);
 frontMediaSize.addEventListener("input", updateFrontMediaSizeLabel);
+frontMediaBlur.addEventListener("input", updateFrontMediaBlurLabel);
 authBackgroundVideo.addEventListener("timeupdate", handleFrontVideoTimeUpdate);
 registerBackgroundVideo.addEventListener("timeupdate", handleFrontVideoTimeUpdate);
 designForm.addEventListener("submit", saveDesign);
