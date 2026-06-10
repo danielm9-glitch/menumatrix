@@ -203,6 +203,18 @@ textarea {
   min-width: 0;
 }
 
+.brand-home-link {
+  border-radius: 8px;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.brand-home-link:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--leaf) 58%, transparent);
+  outline-offset: 4px;
+}
+
 .header-brand-icon {
   width: 44px;
   aspect-ratio: 1;

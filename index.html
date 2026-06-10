@@ -6,7 +6,7 @@
     <title>Menu Matrix</title>
     <link rel="icon" type="image/svg+xml" href="assets/app-icon.svg" />
     <link rel="apple-touch-icon" href="assets/app-icon-launcher-preview.png" />
-    <link rel="stylesheet" href="styles.css?v=item-photo-size-fix" />
+    <link rel="stylesheet" href="styles.css?v=logo-home-link" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -100,13 +100,13 @@
 
     <main id="menusPage" class="app-shell menus-page" aria-label="Restaurant menus" hidden>
       <header class="menus-top-bar">
-        <div class="brand-title">
+        <a id="menusHomeLink" class="brand-title brand-home-link" href="#front" aria-label="Go to front page">
           <img class="header-brand-icon" src="assets/app-icon-launcher-preview.png" alt="" aria-hidden="true" />
           <div>
             <p class="kicker">Restaurants</p>
             <h1>Menus</h1>
           </div>
-        </div>
+        </a>
         <div class="top-bar-actions">
           <button id="menusUserStatus" class="action-button compact-nav-button user-status-chip" type="button" disabled>Signed out</button>
           <button id="menusLogoutButton" class="action-button compact-nav-button" type="button">Log out</button>
@@ -147,13 +147,13 @@
     <main id="menuPage" class="app-shell" aria-label="Restaurant menu matrix app" hidden>
       <header class="top-bar">
         <button id="backToMenusButton" class="action-button compact-nav-button" type="button">Menus</button>
-        <div class="brand-title compact-brand-title">
+        <a id="menuHomeLink" class="brand-title compact-brand-title brand-home-link" href="#front" aria-label="Go to front page">
           <img class="header-brand-icon" src="assets/app-icon-launcher-preview.png" alt="" aria-hidden="true" />
           <div>
             <p class="kicker">Training</p>
             <h1>Menu Matrix</h1>
           </div>
-        </div>
+        </a>
         <button id="drawerOpenButton" class="icon-button" type="button" aria-label="Open admin menu">
           <span aria-hidden="true">≡</span>
         </button>
@@ -1052,6 +1052,6 @@
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js?v=item-photo-size-fix"></script>
+    <script src="app.js?v=logo-home-link"></script>
   </body>
 </html>

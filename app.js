@@ -2075,6 +2075,8 @@ const shareCodeInput = document.querySelector("#shareCodeInput");
 const savedShareCodes = document.querySelector("#savedShareCodes");
 const codeLoginMessage = document.querySelector("#codeLoginMessage");
 const restaurantList = document.querySelector("#restaurantList");
+const menusHomeLink = document.querySelector("#menusHomeLink");
+const menuHomeLink = document.querySelector("#menuHomeLink");
 const menusUserStatus = document.querySelector("#menusUserStatus");
 const menusLogoutButton = document.querySelector("#menusLogoutButton");
 const backToMenusButton = document.querySelector("#backToMenusButton");
@@ -3840,6 +3842,28 @@ function scrollToPageTop() {
     top: 0,
     behavior: "smooth"
   });
+}
+
+function goToFrontPage(event) {
+  event?.preventDefault();
+  closeDrawer();
+
+  if (state.sharedMenu && !getActiveUser()) {
+    exitSharedMenu();
+    scrollToPageTop();
+    return;
+  }
+
+  if (getActiveUser()) {
+    setEditMode(false);
+    showScreen("menus");
+    scrollToPageTop();
+    return;
+  }
+
+  state.screen = "login";
+  showScreen("login");
+  scrollToPageTop();
 }
 
 function normalizeScreen(activeUser, invitedUser) {
@@ -8510,6 +8534,8 @@ passwordSetupForm.addEventListener("submit", setupInvitedPassword);
 logoutButton.addEventListener("click", logoutAdmin);
 menusLogoutButton.addEventListener("click", logoutAdmin);
 createMenuButton.addEventListener("click", createBlankRestaurantMenu);
+menusHomeLink.addEventListener("click", goToFrontPage);
+menuHomeLink.addEventListener("click", goToFrontPage);
 backToMenusButton.addEventListener("click", () => {
   if (state.screen === "shared") {
     exitSharedMenu();
