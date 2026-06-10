@@ -4500,14 +4500,12 @@ function renderItemPhotoGallery(gallery, images, itemName, itemId) {
   attachPhotoSwipeHandlers(gallery, itemId, images.length);
 
   if (images.length > 1) {
-    const previousButton = createPhotoNavButton("previous", itemId, images.length, -1);
-    const nextButton = createPhotoNavButton("next", itemId, images.length, 1);
-    const dots = createPhotoDots(itemId, images.length, slideIndex);
+    const dots = createPhotoDots(images.length, slideIndex);
     const counter = document.createElement("span");
     counter.className = "photo-slide-counter";
     counter.textContent = `${slideIndex + 1}/${images.length}`;
 
-    gallery.append(previousButton, nextButton, dots, counter);
+    gallery.append(dots, counter);
   }
 }
 
@@ -4526,33 +4524,15 @@ function setItemPhotoSlide(itemId, imageCount, requestedIndex) {
   renderMenu();
 }
 
-function createPhotoNavButton(direction, itemId, imageCount, step) {
-  const button = document.createElement("button");
-  button.className = `photo-nav-button ${direction}`;
-  button.type = "button";
-  button.textContent = direction === "previous" ? "<" : ">";
-  button.setAttribute("aria-label", direction === "previous" ? "Previous photo" : "Next photo");
-  button.addEventListener("click", (event) => {
-    event.stopPropagation();
-    setItemPhotoSlide(itemId, imageCount, getItemPhotoSlideIndex(itemId, imageCount) + step);
-  });
-  return button;
-}
-
-function createPhotoDots(itemId, imageCount, activeIndex) {
+function createPhotoDots(imageCount, activeIndex) {
   const dots = document.createElement("div");
   dots.className = "photo-slide-dots";
+  dots.setAttribute("aria-hidden", "true");
 
   for (let index = 0; index < imageCount; index += 1) {
-    const dot = document.createElement("button");
-    dot.type = "button";
+    const dot = document.createElement("span");
     dot.className = "photo-slide-dot";
     dot.classList.toggle("is-active", index === activeIndex);
-    dot.setAttribute("aria-label", `Show photo ${index + 1}`);
-    dot.addEventListener("click", (event) => {
-      event.stopPropagation();
-      setItemPhotoSlide(itemId, imageCount, index);
-    });
     dots.append(dot);
   }
 
