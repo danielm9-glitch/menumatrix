@@ -2197,6 +2197,7 @@ const itemDiet = document.querySelector("#itemDiet");
 const itemHeat = document.querySelector("#itemHeat");
 const itemPrice = document.querySelector("#itemPrice");
 const itemAllergens = document.querySelector("#itemAllergens");
+const itemIngredients = document.querySelector("#itemIngredients");
 const saveItemButton = document.querySelector("#saveItemButton");
 const itemUploadPreview = document.querySelector("#itemUploadPreview");
 const itemPreviewList = document.querySelector("#itemPreviewList");
@@ -2613,9 +2614,21 @@ function normalizeMenuItem(item) {
     ...item,
     category: categories.includes(category) ? category : categories[0] || "starters",
     details: item.details || defaultMatch?.details || "Key ingredients, flavor notes, and service talking points can go here.",
+    ingredients: normalizeIngredientList(item.ingredients || defaultMatch?.ingredients || []),
     image: images[0] || "",
     images
   };
+}
+
+function normalizeIngredientList(values = []) {
+  const list = Array.isArray(values) ? values : [values];
+  return uniqueValues(
+    list.flatMap((value) =>
+      String(value || "")
+        .split(/[,;\n]/)
+        .map((ingredient) => ingredient.trim())
+    )
+  );
 }
 
 function normalizeItemImageList(images = []) {
@@ -3782,6 +3795,7 @@ function sanitizeMenuItemForCloud(item) {
     style: item.style || "",
     heat: Number(item.heat) || 0,
     allergens: Array.isArray(item.allergens) ? item.allergens : [],
+    ingredients: normalizeIngredientList(item.ingredients || []),
     details: item.details || "",
     image: images[0] || "",
     images,
@@ -4728,6 +4742,7 @@ function openItemDialog(id) {
       style: "",
       heat: 0,
       allergens: [],
+      ingredients: [],
       details: "",
       image: "",
       images: [],
@@ -4748,6 +4763,7 @@ function openItemDialog(id) {
   itemHeat.value = currentItem.heat;
   itemPrice.value = currentItem.price;
   itemAllergens.value = currentItem.allergens.join(", ");
+  itemIngredients.value = getItemIngredientTerms(currentItem).join(", ");
   deleteItemButton.hidden = isNew;
   itemDialog.showModal();
 }
@@ -5951,7 +5967,14 @@ function getItemAllergens(item) {
   return uniqueValues(Array.isArray(item?.allergens) ? item.allergens : []);
 }
 
+function getItemExplicitIngredients(item) {
+  return normalizeIngredientList(item?.ingredients || []);
+}
+
 function getItemIngredientText(item) {
+  const explicitIngredients = getItemExplicitIngredients(item);
+  if (explicitIngredients.length) return explicitIngredients.join(", ");
+
   const details = String(item?.details || "");
   const ingredientMatch = details.match(/Ingredients:\s*(.*?)(?:\.\s*(?:Portion|Accompaniments|Price not listed|Section):|$)/i);
   const rawText = ingredientMatch?.[1] || details || item?.description || "";
@@ -5965,8 +5988,8 @@ function getItemIngredientText(item) {
     .trim();
 }
 
-function getItemIngredientTerms(item) {
-  const source = `${getItemIngredientText(item)} ${item?.description || ""}`.toLowerCase();
+function inferIngredientTermsFromText(text) {
+  const source = String(text || "").toLowerCase();
   const vocabularyMatches = ingredientVocabulary.filter((term) => source.includes(term.toLowerCase()));
   if (vocabularyMatches.length) return uniqueValues(vocabularyMatches);
 
@@ -5978,6 +6001,13 @@ function getItemIngredientTerms(item) {
       .slice(0, 8)
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
   );
+}
+
+function getItemIngredientTerms(item) {
+  const explicitIngredients = getItemExplicitIngredients(item);
+  if (explicitIngredients.length) return explicitIngredients;
+
+  return inferIngredientTermsFromText(`${getItemIngredientText(item)} ${item?.description || ""}`);
 }
 
 function getStudyItemsWithAllergens() {
@@ -7975,6 +8005,7 @@ function createImportedMenuItem(parts, fallbackCategory, price, index) {
     style: getStyleForItem(category, heat),
     heat,
     allergens: getImportedAllergens(fullText),
+    ingredients: inferIngredientTermsFromText(fullText),
     details: description,
     image: "",
     images: [],
@@ -8060,6 +8091,7 @@ function parseScannedItem(text, category) {
     style: getStyleForItem(category, 0),
     heat: 0,
     allergens: [],
+    ingredients: inferIngredientTermsFromText(fullText),
     details: description,
     image: "",
     images: [],
@@ -8086,6 +8118,7 @@ function openItemDialogWithDraft(currentItem) {
   itemHeat.value = currentItem.heat;
   itemPrice.value = currentItem.price;
   itemAllergens.value = currentItem.allergens.join(", ");
+  itemIngredients.value = getItemIngredientTerms(currentItem).join(", ");
   deleteItemButton.hidden = true;
   itemDialog.showModal();
 }
@@ -8303,6 +8336,7 @@ function getFormItem() {
     .split(",")
     .map((allergen) => allergen.trim())
     .filter(Boolean);
+  const ingredients = normalizeIngredientList(itemIngredients.value);
 
   return {
     id: itemId.value,
@@ -8316,6 +8350,7 @@ function getFormItem() {
     style: getStyleForItem(category, heat),
     heat,
     allergens,
+    ingredients,
     price: Math.max(0, Number(itemPrice.value))
   };
 }
