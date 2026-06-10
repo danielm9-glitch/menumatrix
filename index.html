@@ -6,7 +6,7 @@
     <title>Menu Matrix</title>
     <link rel="icon" type="image/svg+xml" href="assets/app-icon.svg" />
     <link rel="apple-touch-icon" href="assets/app-icon-launcher-preview.png" />
-    <link rel="stylesheet" href="styles.css?v=item-ingredients-field" />
+    <link rel="stylesheet" href="styles.css?v=front-media-split-size" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -852,9 +852,14 @@
               </select>
             </label>
             <label>
-              Size
-              <input id="frontMediaSize" type="range" min="80" max="160" step="5" />
-              <span id="frontMediaSizeValue" class="range-value">100%</span>
+              Phone size
+              <input id="frontMediaPhoneSize" type="range" min="80" max="160" step="5" />
+              <span id="frontMediaPhoneSizeValue" class="range-value">100%</span>
+            </label>
+            <label>
+              Web size
+              <input id="frontMediaWebSize" type="range" min="80" max="180" step="5" />
+              <span id="frontMediaWebSizeValue" class="range-value">100%</span>
             </label>
             <label>
               Blur
@@ -1056,6 +1061,6 @@
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js?v=item-ingredients-field"></script>
+    <script src="app.js?v=front-media-split-size"></script>
   </body>
 </html>

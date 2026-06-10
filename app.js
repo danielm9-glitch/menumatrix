@@ -29,7 +29,8 @@ const defaultDesign = {
   itemPhotoSize: 96,
   frontMediaType: "video",
   frontMediaUrl: defaultFrontMediaUrl,
-  frontMediaSize: 100,
+  frontMediaPhoneSize: 100,
+  frontMediaWebSize: 100,
   frontMediaBlur: 6.5,
   frontVideoLength: 0
 };
@@ -2279,8 +2280,10 @@ const heroUploadStatus = document.querySelector("#heroUploadStatus");
 const frontMediaType = document.querySelector("#frontMediaType");
 const frontMediaUrl = document.querySelector("#frontMediaUrl");
 const frontMediaFile = document.querySelector("#frontMediaFile");
-const frontMediaSize = document.querySelector("#frontMediaSize");
-const frontMediaSizeValue = document.querySelector("#frontMediaSizeValue");
+const frontMediaPhoneSize = document.querySelector("#frontMediaPhoneSize");
+const frontMediaPhoneSizeValue = document.querySelector("#frontMediaPhoneSizeValue");
+const frontMediaWebSize = document.querySelector("#frontMediaWebSize");
+const frontMediaWebSizeValue = document.querySelector("#frontMediaWebSizeValue");
 const frontMediaBlur = document.querySelector("#frontMediaBlur");
 const frontMediaBlurValue = document.querySelector("#frontMediaBlurValue");
 const itemPhotoSize = document.querySelector("#itemPhotoSize");
@@ -2584,7 +2587,16 @@ function normalizeDesignSettings(settings = {}) {
     typeof settings.frontMediaUrl === "string" && settings.frontMediaUrl.trim()
       ? settings.frontMediaUrl.trim()
       : defaultFrontMediaUrl;
-  const frontMediaSize = Math.max(80, Math.min(160, Number(settings.frontMediaSize) || defaultDesign.frontMediaSize));
+  const legacyFrontMediaSize = Number(settings.frontMediaSize);
+  const fallbackFrontMediaSize = Number.isFinite(legacyFrontMediaSize) ? legacyFrontMediaSize : 100;
+  const frontMediaPhoneSize = Math.max(
+    80,
+    Math.min(160, Number(settings.frontMediaPhoneSize) || fallbackFrontMediaSize || defaultDesign.frontMediaPhoneSize)
+  );
+  const frontMediaWebSize = Math.max(
+    80,
+    Math.min(180, Number(settings.frontMediaWebSize) || fallbackFrontMediaSize || defaultDesign.frontMediaWebSize)
+  );
   const itemPhotoSize = Math.max(72, Math.min(180, Number(settings.itemPhotoSize) || defaultDesign.itemPhotoSize));
   const parsedFrontMediaBlur = Number(settings.frontMediaBlur);
   const frontMediaBlur = Number.isFinite(parsedFrontMediaBlur)
@@ -2599,7 +2611,8 @@ function normalizeDesignSettings(settings = {}) {
     itemPhotoSize,
     frontMediaType,
     frontMediaUrl,
-    frontMediaSize,
+    frontMediaPhoneSize,
+    frontMediaWebSize,
     frontMediaBlur,
     frontVideoLength
   };
@@ -2762,7 +2775,8 @@ function applyDesignSettings() {
   document.documentElement.style.setProperty("--page-bg", designSettings.page);
   document.documentElement.style.setProperty("--panel-bg", designSettings.panel);
   document.documentElement.style.setProperty("--item-photo-size", `${designSettings.itemPhotoSize}px`);
-  document.documentElement.style.setProperty("--front-media-size", `${designSettings.frontMediaSize}%`);
+  document.documentElement.style.setProperty("--front-media-phone-size", `${designSettings.frontMediaPhoneSize}%`);
+  document.documentElement.style.setProperty("--front-media-web-size", `${designSettings.frontMediaWebSize}%`);
   document.documentElement.style.setProperty("--front-media-blur", `${designSettings.frontMediaBlur}px`);
   const hasHeroImage = Boolean(designSettings.heroImage);
   heroImage.hidden = !hasHeroImage;
@@ -2842,8 +2856,10 @@ function syncDesignForm() {
   frontMediaType.value = designSettings.frontMediaType;
   frontMediaUrl.value = designSettings.frontMediaUrl;
   frontMediaFile.value = "";
-  frontMediaSize.value = String(designSettings.frontMediaSize);
-  frontMediaSizeValue.textContent = `${designSettings.frontMediaSize}%`;
+  frontMediaPhoneSize.value = String(designSettings.frontMediaPhoneSize);
+  frontMediaPhoneSizeValue.textContent = `${designSettings.frontMediaPhoneSize}%`;
+  frontMediaWebSize.value = String(designSettings.frontMediaWebSize);
+  frontMediaWebSizeValue.textContent = `${designSettings.frontMediaWebSize}%`;
   frontMediaBlur.value = String(designSettings.frontMediaBlur);
   frontMediaBlurValue.textContent = `${designSettings.frontMediaBlur}px`;
   frontVideoLength.value = String(designSettings.frontVideoLength);
@@ -3832,7 +3848,8 @@ function sanitizeDesignSettings(settings) {
     itemPhotoSize: normalized.itemPhotoSize,
     frontMediaType: normalized.frontMediaType,
     frontMediaUrl: normalized.frontMediaUrl,
-    frontMediaSize: normalized.frontMediaSize,
+    frontMediaPhoneSize: normalized.frontMediaPhoneSize,
+    frontMediaWebSize: normalized.frontMediaWebSize,
     frontMediaBlur: normalized.frontMediaBlur,
     frontVideoLength: normalized.frontVideoLength
   };
@@ -5395,7 +5412,7 @@ function renderDashboardCustomizationSummary() {
     createDashboardMetric(
       "Front media",
       designSettings.frontMediaType === "image" ? "Image" : "Video",
-      `${designSettings.frontMediaSize}% size, ${designSettings.frontMediaBlur}px blur`
+      `Phone ${designSettings.frontMediaPhoneSize}%, web ${designSettings.frontMediaWebSize}%, ${designSettings.frontMediaBlur}px blur`
     )
   );
 }
@@ -5666,7 +5683,8 @@ function saveDesign(event) {
     itemPhotoSize: Number(itemPhotoSize.value) || defaultDesign.itemPhotoSize,
     frontMediaType: frontMediaType.value === "image" ? "image" : "video",
     frontMediaUrl: requestedFrontMedia,
-    frontMediaSize: Number(frontMediaSize.value) || defaultDesign.frontMediaSize,
+    frontMediaPhoneSize: Number(frontMediaPhoneSize.value) || defaultDesign.frontMediaPhoneSize,
+    frontMediaWebSize: Number(frontMediaWebSize.value) || defaultDesign.frontMediaWebSize,
     frontMediaBlur: Number(frontMediaBlur.value),
     frontVideoLength: Number(frontVideoLength.value) || 0
   };
@@ -8230,9 +8248,14 @@ function inferFrontMediaTypeFromUrl(url) {
   return /\.(png|jpe?g|webp|gif|avif|svg)(?:[?#].*)?$/i.test(url) ? "image" : "video";
 }
 
-function updateFrontMediaSizeLabel() {
-  frontMediaSizeValue.textContent = `${frontMediaSize.value}%`;
-  document.documentElement.style.setProperty("--front-media-size", `${frontMediaSize.value}%`);
+function updateFrontMediaPhoneSizeLabel() {
+  frontMediaPhoneSizeValue.textContent = `${frontMediaPhoneSize.value}%`;
+  document.documentElement.style.setProperty("--front-media-phone-size", `${frontMediaPhoneSize.value}%`);
+}
+
+function updateFrontMediaWebSizeLabel() {
+  frontMediaWebSizeValue.textContent = `${frontMediaWebSize.value}%`;
+  document.documentElement.style.setProperty("--front-media-web-size", `${frontMediaWebSize.value}%`);
 }
 
 function updateItemPhotoSizeLabel() {
@@ -8597,7 +8620,8 @@ frontMediaUrl.addEventListener("input", () => {
 });
 frontMediaFile.addEventListener("change", updateFrontMediaFromFile);
 itemPhotoSize.addEventListener("input", updateItemPhotoSizeLabel);
-frontMediaSize.addEventListener("input", updateFrontMediaSizeLabel);
+frontMediaPhoneSize.addEventListener("input", updateFrontMediaPhoneSizeLabel);
+frontMediaWebSize.addEventListener("input", updateFrontMediaWebSizeLabel);
 frontMediaBlur.addEventListener("input", updateFrontMediaBlurLabel);
 authBackgroundVideo.addEventListener("timeupdate", handleFrontVideoTimeUpdate);
 registerBackgroundVideo.addEventListener("timeupdate", handleFrontVideoTimeUpdate);

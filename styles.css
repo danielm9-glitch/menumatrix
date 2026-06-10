@@ -83,8 +83,8 @@ textarea {
   top: 50%;
   left: 50%;
   display: block;
-  width: var(--front-media-size, 100%);
-  height: var(--front-media-size, 100%);
+  width: var(--front-media-phone-size, 100%);
+  height: var(--front-media-phone-size, 100%);
   min-width: 100%;
   min-height: 100%;
   object-fit: cover;
@@ -2542,6 +2542,12 @@ h1 {
 }
 
 @media (min-width: 720px) {
+  .auth-background-image,
+  .auth-background-video {
+    width: var(--front-media-web-size, 100%);
+    height: var(--front-media-web-size, 100%);
+  }
+
   body {
     padding: 0;
   }
