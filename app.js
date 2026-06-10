@@ -2092,6 +2092,10 @@ const menusDirectoryKicker = document.querySelector("#menusDirectoryKicker");
 const menusDirectoryTitle = document.querySelector("#menusDirectoryTitle");
 const syncStatus = document.querySelector("#syncStatus");
 const backToTopButton = document.querySelector("#backToTopButton");
+const photoLightboxDialog = document.querySelector("#photoLightboxDialog");
+const closePhotoLightboxButton = document.querySelector("#closePhotoLightboxButton");
+const photoLightboxImage = document.querySelector("#photoLightboxImage");
+const photoLightboxCaption = document.querySelector("#photoLightboxCaption");
 const setupPassword = document.querySelector("#setupPassword");
 const setupMessage = document.querySelector("#setupMessage");
 const inviteIntro = document.querySelector("#inviteIntro");
@@ -4475,6 +4479,7 @@ function renderItemPhotoGallery(gallery, images, itemName, itemId) {
 
   const slideIndex = getItemPhotoSlideIndex(itemId, images.length);
   gallery.dataset.itemId = itemId;
+  gallery.classList.toggle("is-draggable", images.length > 1);
   gallery.setAttribute("role", "group");
   gallery.setAttribute("aria-label", `${itemName} photos`);
 
@@ -4491,13 +4496,15 @@ function renderItemPhotoGallery(gallery, images, itemName, itemId) {
     const image = document.createElement("img");
     image.src = imageUrl;
     image.alt = `${itemName} photo ${index + 1}`;
+    image.draggable = false;
+    image.addEventListener("dragstart", (event) => event.preventDefault());
     slide.append(image);
     track.append(slide);
   });
 
   viewport.append(track);
   gallery.append(viewport);
-  attachPhotoSwipeHandlers(gallery, itemId, images.length);
+  attachPhotoSwipeHandlers(gallery, itemId, images, itemName);
 
   if (images.length > 1) {
     const dots = createPhotoDots(images.length, slideIndex);
@@ -4539,34 +4546,67 @@ function createPhotoDots(imageCount, activeIndex) {
   return dots;
 }
 
-function attachPhotoSwipeHandlers(gallery, itemId, imageCount) {
+function openPhotoLightbox(imageUrl, caption) {
+  if (!photoLightboxDialog || !photoLightboxImage || !photoLightboxCaption || !imageUrl) return;
+
+  photoLightboxImage.src = imageUrl;
+  photoLightboxImage.alt = caption;
+  photoLightboxCaption.textContent = caption;
+  if (!photoLightboxDialog.open) photoLightboxDialog.showModal();
+}
+
+function closePhotoLightbox() {
+  if (!photoLightboxDialog) return;
+  photoLightboxDialog.close();
+  photoLightboxImage?.removeAttribute("src");
+  if (photoLightboxCaption) photoLightboxCaption.textContent = "";
+}
+
+function attachPhotoSwipeHandlers(gallery, itemId, images, itemName) {
+  const imageCount = images.length;
   let startX = 0;
   let startY = 0;
   let isSwiping = false;
+  let hasDragged = false;
 
   gallery.addEventListener("click", (event) => event.stopPropagation());
+  gallery.addEventListener("dragstart", (event) => event.preventDefault());
   gallery.addEventListener("pointerdown", (event) => {
     event.stopPropagation();
+    if (event.button !== undefined && event.button !== 0) return;
     startX = event.clientX;
     startY = event.clientY;
     isSwiping = true;
+    hasDragged = false;
+    gallery.classList.add("is-dragging");
     gallery.setPointerCapture?.(event.pointerId);
   });
   gallery.addEventListener("pointermove", (event) => {
     if (!isSwiping) return;
     event.stopPropagation();
+    const deltaX = event.clientX - startX;
+    const deltaY = event.clientY - startY;
+    if (Math.abs(deltaX) > 8 || Math.abs(deltaY) > 8) hasDragged = true;
+    if (Math.abs(deltaX) > Math.abs(deltaY)) event.preventDefault();
   });
   gallery.addEventListener("pointerup", (event) => {
     if (!isSwiping) return;
     event.stopPropagation();
+    gallery.classList.remove("is-dragging");
     const deltaX = event.clientX - startX;
     const deltaY = event.clientY - startY;
     isSwiping = false;
+    const activeIndex = getItemPhotoSlideIndex(itemId, imageCount);
+    if (!hasDragged || (Math.abs(deltaX) < 8 && Math.abs(deltaY) < 8)) {
+      openPhotoLightbox(images[activeIndex], `${itemName} photo ${activeIndex + 1}`);
+      return;
+    }
     if (Math.abs(deltaX) < 26 || Math.abs(deltaX) < Math.abs(deltaY)) return;
-    setItemPhotoSlide(itemId, imageCount, getItemPhotoSlideIndex(itemId, imageCount) + (deltaX < 0 ? 1 : -1));
+    setItemPhotoSlide(itemId, imageCount, activeIndex + (deltaX < 0 ? 1 : -1));
   });
   gallery.addEventListener("pointercancel", () => {
     isSwiping = false;
+    gallery.classList.remove("is-dragging");
   });
 }
 
@@ -8611,6 +8651,10 @@ resetDesignButton.addEventListener("click", resetDesign);
 closeDialogButton.addEventListener("click", closeItemDialog);
 deleteItemButton.addEventListener("click", deleteItem);
 itemForm.addEventListener("submit", saveItem);
+closePhotoLightboxButton?.addEventListener("click", closePhotoLightbox);
+photoLightboxDialog?.addEventListener("click", (event) => {
+  if (event.target === photoLightboxDialog) closePhotoLightbox();
+});
 backToTopButton.addEventListener("click", scrollToPageTop);
 window.addEventListener("scroll", updateBackToTopButton, { passive: true });
 window.addEventListener("resize", updateBackToTopButton);

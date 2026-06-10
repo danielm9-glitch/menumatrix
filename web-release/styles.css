@@ -2096,7 +2096,17 @@ h1 {
   overflow: hidden;
   border-radius: 8px;
   background: #f4f1ea;
+  cursor: zoom-in;
   touch-action: pan-y;
+  user-select: none;
+}
+
+.item-photo-gallery.is-draggable {
+  cursor: grab;
+}
+
+.item-photo-gallery.is-dragging {
+  cursor: grabbing;
 }
 
 .item-photo-gallery[hidden] {
@@ -2127,6 +2137,8 @@ h1 {
   width: 100%;
   aspect-ratio: 1;
   object-fit: cover;
+  -webkit-user-drag: none;
+  user-select: none;
 }
 
 .photo-slide-dots {
@@ -2162,6 +2174,64 @@ h1 {
   color: var(--white);
   font-size: 0.66rem;
   font-weight: 950;
+}
+
+.photo-lightbox-dialog {
+  width: min(100vw - 24px, 1100px);
+  max-width: calc(100vw - 24px);
+  height: min(100vh - 24px, 820px);
+  max-height: calc(100vh - 24px);
+  border: 0;
+  border-radius: 10px;
+  padding: 0;
+  background: rgba(12, 15, 13, 0.94);
+  color: var(--white);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.4);
+}
+
+.photo-lightbox-dialog::backdrop {
+  background: rgba(8, 10, 9, 0.72);
+}
+
+.photo-lightbox-content {
+  position: relative;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  width: 100%;
+  height: 100%;
+  padding: 14px;
+}
+
+.photo-lightbox-content img {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: contain;
+}
+
+.photo-lightbox-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 999px;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--ink);
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.photo-lightbox-caption {
+  margin: 8px 42px 0;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.82rem;
+  font-weight: 850;
+  text-align: center;
 }
 
 .detail-copy {

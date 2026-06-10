@@ -6,7 +6,7 @@
     <title>Menu Matrix</title>
     <link rel="icon" type="image/svg+xml" href="assets/app-icon.svg" />
     <link rel="apple-touch-icon" href="assets/app-icon-launcher-preview.png" />
-    <link rel="stylesheet" href="styles.css?v=swipe-only-photos" />
+    <link rel="stylesheet" href="styles.css?v=photo-lightbox-swipe" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -1013,6 +1013,14 @@
       </form>
     </dialog>
 
+    <dialog id="photoLightboxDialog" class="photo-lightbox-dialog" aria-label="Item photo viewer">
+      <div class="photo-lightbox-content">
+        <button id="closePhotoLightboxButton" class="photo-lightbox-close" type="button" aria-label="Close photo">x</button>
+        <img id="photoLightboxImage" alt="" />
+        <p id="photoLightboxCaption" class="photo-lightbox-caption"></p>
+      </div>
+    </dialog>
+
     <button id="backToTopButton" class="back-to-top-button" type="button" hidden>Top</button>
 
     <footer class="app-footer">
@@ -1061,6 +1069,6 @@
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js?v=swipe-only-photos"></script>
+    <script src="app.js?v=photo-lightbox-swipe"></script>
   </body>
 </html>
