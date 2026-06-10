@@ -2755,7 +2755,7 @@ h1 {
 
   .item-details {
     grid-column: 1 / -1;
-    grid-template-columns: 128px minmax(0, 1fr);
+    grid-template-columns: var(--item-photo-size, 96px) minmax(0, 1fr);
     padding-top: 12px;
   }
 
