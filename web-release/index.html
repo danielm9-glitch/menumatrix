@@ -4,11 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Menu Matrix</title>
-    <link rel="stylesheet" href="styles.css?v=blank-item-photos" />
+    <link rel="stylesheet" href="styles.css?v=multi-photo-video" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
-      <div class="auth-background" aria-hidden="true"></div>
+      <div class="auth-background" aria-hidden="true">
+        <video class="auth-background-video" autoplay muted loop playsinline preload="metadata">
+          <source src="assets/login-background.mp4" type="video/mp4" />
+        </video>
+      </div>
       <section class="auth-panel">
         <div class="auth-brand">
           <img class="auth-brand-icon" src="assets/app-icon-launcher-preview.png" alt="Menu Matrix app icon" />
@@ -57,7 +61,11 @@
     </main>
 
     <main id="registerPage" class="auth-page" aria-label="Create account" hidden>
-      <div class="auth-background" aria-hidden="true"></div>
+      <div class="auth-background" aria-hidden="true">
+        <video class="auth-background-video" autoplay muted loop playsinline preload="metadata">
+          <source src="assets/login-background.mp4" type="video/mp4" />
+        </video>
+      </div>
       <section class="auth-panel">
         <div class="auth-brand">
           <img class="auth-brand-icon" src="assets/app-icon-launcher-preview.png" alt="Menu Matrix app icon" />
@@ -591,15 +599,15 @@
           <textarea id="itemDetails" rows="4" placeholder="Flavor profile, ingredients, prep, pairings..."></textarea>
         </label>
         <label>
-          Photo URL
-          <input id="itemImage" placeholder="https://example.com/dish.jpg" />
+          Photo URLs
+          <textarea id="itemImage" rows="3" placeholder="One photo URL per line"></textarea>
         </label>
         <label>
-          Upload photo
-          <input id="itemImageFile" type="file" accept="image/*" />
+          Upload photos
+          <input id="itemImageFile" type="file" accept="image/*" multiple />
         </label>
         <div id="itemUploadPreview" class="upload-preview" hidden>
-          <img id="itemPreviewImage" alt="" />
+          <div id="itemPreviewList" class="photo-preview-list"></div>
           <div>
             <progress id="itemUploadProgress" max="100" value="0"></progress>
             <p id="itemUploadStatus" class="upload-status">Select an image to preview it.</p>
@@ -966,7 +974,7 @@
         <span class="heat-meter" aria-label="Heat level"></span>
         <button class="price-button" type="button"></button>
         <div class="item-details" hidden>
-          <img alt="" />
+          <div class="item-photo-gallery" aria-label="Item photos"></div>
           <div>
             <p class="kicker">Menu notes</p>
             <p class="detail-copy"></p>
@@ -982,6 +990,6 @@
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js?v=blank-item-photos"></script>
+    <script src="app.js?v=multi-photo-video"></script>
   </body>
 </html>

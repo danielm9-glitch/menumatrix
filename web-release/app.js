@@ -2184,7 +2184,7 @@ const itemPrice = document.querySelector("#itemPrice");
 const itemAllergens = document.querySelector("#itemAllergens");
 const saveItemButton = document.querySelector("#saveItemButton");
 const itemUploadPreview = document.querySelector("#itemUploadPreview");
-const itemPreviewImage = document.querySelector("#itemPreviewImage");
+const itemPreviewList = document.querySelector("#itemPreviewList");
 const itemUploadProgress = document.querySelector("#itemUploadProgress");
 const itemUploadStatus = document.querySelector("#itemUploadStatus");
 const scanDialog = document.querySelector("#scanDialog");
@@ -2559,13 +2559,32 @@ function normalizeDesignSettings(settings = {}) {
 function normalizeMenuItem(item) {
   const defaultMatch = defaultMenuItems.find((defaultItem) => defaultItem.id === item.id);
   const category = normalizeCategoryValue(item.category);
+  const images = getItemImages(item);
 
   return {
     ...item,
     category: categories.includes(category) ? category : categories[0] || "starters",
     details: item.details || defaultMatch?.details || "Key ingredients, flavor notes, and service talking points can go here.",
-    image: item.image || ""
+    image: images[0] || "",
+    images
   };
+}
+
+function normalizeItemImageList(images = []) {
+  const seen = new Set();
+  return images
+    .flatMap((image) => String(image || "").split(/\r?\n/))
+    .map((image) => image.trim())
+    .filter((image) => {
+      if (!image || seen.has(image)) return false;
+      seen.add(image);
+      return true;
+    });
+}
+
+function getItemImages(item = {}) {
+  const savedImages = Array.isArray(item.images) ? item.images : [];
+  return normalizeItemImageList([...savedImages, item.image]);
 }
 
 function isDefaultStockItemImage(imageUrl) {
@@ -2585,10 +2604,14 @@ function isDefaultStockItemImage(imageUrl) {
 }
 
 function clearDefaultStockImagesForMenuItems(items = []) {
-  return items.map((item) => ({
-    ...item,
-    image: isDefaultStockItemImage(item.image) ? "" : item.image || ""
-  }));
+  return items.map((item) => {
+    const images = getItemImages(item).filter((image) => !isDefaultStockItemImage(image));
+    return {
+      ...item,
+      image: images[0] || "",
+      images
+    };
+  });
 }
 
 function saveMenuItems() {
@@ -3603,6 +3626,7 @@ async function uploadCloudSnapshot(reason) {
 
 function sanitizeMenuItemForCloud(item) {
   const category = normalizeCategoryValue(item.category);
+  const images = getItemImages(item);
   return {
     id: item.id || `item-${Date.now()}`,
     name: item.name || "",
@@ -3613,7 +3637,8 @@ function sanitizeMenuItemForCloud(item) {
     heat: Number(item.heat) || 0,
     allergens: Array.isArray(item.allergens) ? item.allergens : [],
     details: item.details || "",
-    image: item.image || "",
+    image: images[0] || "",
+    images,
     price: Number(item.price) || 0
   };
 }
@@ -4224,20 +4249,38 @@ function renderMenu() {
     });
 
     const itemDetails = row.querySelector(".item-details");
-    const image = itemDetails.querySelector("img");
-    const hasItemImage = Boolean(item.image);
+    const gallery = itemDetails.querySelector(".item-photo-gallery");
+    const itemImages = getItemImages(item);
+    const hasItemImage = itemImages.length > 0;
     itemDetails.hidden = !state.openItems.has(item.id);
     itemDetails.classList.toggle("no-photo", !hasItemImage);
-    image.hidden = !hasItemImage;
-    if (hasItemImage) {
-      image.src = item.image;
-    } else {
-      image.removeAttribute("src");
-    }
-    image.alt = item.name;
+    gallery.hidden = !hasItemImage;
+    gallery.classList.toggle("single", itemImages.length === 1);
+    renderItemPhotoGallery(gallery, itemImages, item.name);
     itemDetails.querySelector(".detail-copy").textContent = item.details;
 
     menuGrid.append(row);
+  });
+}
+
+function renderItemPhotoGallery(gallery, images, itemName) {
+  gallery.replaceChildren();
+  if (!images.length) return;
+
+  const visibleImages = images.slice(0, 4);
+  visibleImages.forEach((imageUrl, index) => {
+    if (index === 3 && images.length > 4) {
+      const badge = document.createElement("span");
+      badge.className = "photo-count-badge";
+      badge.textContent = `+${images.length - 3}`;
+      gallery.append(badge);
+      return;
+    }
+
+    const image = document.createElement("img");
+    image.src = imageUrl;
+    image.alt = `${itemName} photo ${index + 1}`;
+    gallery.append(image);
   });
 }
 
@@ -4412,8 +4455,10 @@ function openItemDialog(id) {
       allergens: [],
       details: "",
       image: "",
+      images: [],
       price: 0
     };
+  const currentImages = getItemImages(currentItem);
 
   renderCategorySelect(itemCategory, { editableOnly: true, selectedValue: currentItem.category });
   dialogTitle.textContent = isNew ? "Add item" : "Edit item";
@@ -4421,16 +4466,8 @@ function openItemDialog(id) {
   itemName.value = currentItem.name;
   itemDescription.value = currentItem.description;
   itemDetails.value = currentItem.details;
-  itemImage.value = currentItem.image;
+  setItemImageField(currentImages, currentImages.length ? "Current item photos. Add more URLs or upload more photos." : "No item photos selected yet.");
   itemImageFile.value = "";
-  resetUploadPreview({
-    preview: itemUploadPreview,
-    image: itemPreviewImage,
-    progress: itemUploadProgress,
-    status: itemUploadStatus,
-    imageUrl: currentItem.image,
-    message: currentItem.image ? "Current item photo. Choose a file to replace it." : "No item photo selected yet."
-  });
   itemCategory.value = currentItem.category;
   itemDiet.value = currentItem.diet;
   itemHeat.value = currentItem.heat;
@@ -5555,7 +5592,8 @@ function getPrintableHtml(items) {
 }
 
 function getPrintableItemMarkup(item) {
-  const photo = pdfIncludePhotos.checked && item.image ? `<img src="${escapeAttribute(item.image)}" alt="" />` : "";
+  const firstPhoto = getItemImages(item)[0] || "";
+  const photo = pdfIncludePhotos.checked && firstPhoto ? `<img src="${escapeAttribute(firstPhoto)}" alt="" />` : "";
   const price = pdfIncludePrices.checked ? ` <span class="price">${formatMenuPrice(item.price)}</span>` : "";
   const allergens = pdfIncludeAllergens.checked
     ? `<p class="meta">Allergens: ${escapeHtml(item.allergens.length ? item.allergens.join(", ") : "No major allergens")}</p>`
@@ -7650,6 +7688,7 @@ function createImportedMenuItem(parts, fallbackCategory, price, index) {
     allergens: getImportedAllergens(fullText),
     details: description,
     image: "",
+    images: [],
     price
   };
 }
@@ -7734,6 +7773,7 @@ function parseScannedItem(text, category) {
     allergens: [],
     details: description,
     image: "",
+    images: [],
     price: Number.isFinite(price) ? price : 0
   };
 }
@@ -7743,22 +7783,15 @@ function cleanScannedLine(line) {
 }
 
 function openItemDialogWithDraft(currentItem) {
+  const currentImages = getItemImages(currentItem);
   renderCategorySelect(itemCategory, { editableOnly: true, selectedValue: currentItem.category });
   dialogTitle.textContent = "Add item";
   itemId.value = currentItem.id;
   itemName.value = currentItem.name;
   itemDescription.value = currentItem.description;
   itemDetails.value = currentItem.details;
-  itemImage.value = currentItem.image;
+  setItemImageField(currentImages, currentImages.length ? "Current item photos. Add more URLs or upload more photos." : "No item photos selected yet.");
   itemImageFile.value = "";
-  resetUploadPreview({
-    preview: itemUploadPreview,
-    image: itemPreviewImage,
-    progress: itemUploadProgress,
-    status: itemUploadStatus,
-    imageUrl: currentItem.image,
-    message: currentItem.image ? "Current item photo. Choose a file to replace it." : "No item photo selected yet."
-  });
   itemCategory.value = currentItem.category;
   itemDiet.value = currentItem.diet;
   itemHeat.value = currentItem.heat;
@@ -7781,21 +7814,72 @@ function readImageFile(file, onProgress = null) {
   });
 }
 
-async function updateItemImageFromFile(event) {
-  const file = event.target.files?.[0];
-  if (!file) return;
-  try {
-    itemImage.value = await prepareUploadedImage(file, {
-      maxWidth: 900,
-      quality: 0.82,
-      preview: itemUploadPreview,
-      image: itemPreviewImage,
-      progress: itemUploadProgress,
-      status: itemUploadStatus,
-      button: saveItemButton
+function getItemImageFieldValues() {
+  return normalizeItemImageList(itemImage.value.split(/\r?\n/));
+}
+
+function setItemImageField(images, message = "") {
+  const normalizedImages = normalizeItemImageList(images);
+  itemImage.value = normalizedImages.join("\n");
+  renderItemPhotoPreview(normalizedImages, message);
+}
+
+function renderItemPhotoPreview(images = getItemImageFieldValues(), message = "") {
+  if (!itemUploadPreview || !itemPreviewList || !itemUploadProgress || !itemUploadStatus) return;
+
+  itemPreviewList.replaceChildren();
+  itemUploadPreview.hidden = images.length === 0;
+  itemUploadProgress.value = images.length ? 100 : 0;
+  itemUploadProgress.hidden = images.length === 0;
+  itemUploadStatus.textContent =
+    message || (images.length ? `${images.length} photo${images.length === 1 ? "" : "s"} ready.` : "No item photos selected yet.");
+
+  images.forEach((imageUrl, index) => {
+    const card = document.createElement("div");
+    card.className = "photo-preview-card";
+
+    const image = document.createElement("img");
+    image.src = imageUrl;
+    image.alt = `Item photo ${index + 1}`;
+
+    const removeButton = document.createElement("button");
+    removeButton.type = "button";
+    removeButton.textContent = "x";
+    removeButton.setAttribute("aria-label", `Remove photo ${index + 1}`);
+    removeButton.addEventListener("click", () => {
+      const nextImages = getItemImageFieldValues().filter((_, imageIndex) => imageIndex !== index);
+      setItemImageField(nextImages);
+      itemImageFile.value = "";
     });
-  } catch {
-    itemImage.value = "";
+
+    card.append(image, removeButton);
+    itemPreviewList.append(card);
+  });
+}
+
+async function updateItemImageFromFile(event) {
+  const files = [...(event.target.files || [])];
+  if (!files.length) return;
+  const uploadedImages = [];
+
+  try {
+    for (const file of files) {
+      const compressedImage = await prepareUploadedImage(file, {
+        maxWidth: 900,
+        quality: 0.82,
+        preview: itemUploadPreview,
+        image: null,
+        progress: itemUploadProgress,
+        status: itemUploadStatus,
+        button: saveItemButton
+      });
+      uploadedImages.push(compressedImage);
+    }
+
+    const nextImages = normalizeItemImageList([...getItemImageFieldValues(), ...uploadedImages]);
+    setItemImageField(nextImages, `Added ${uploadedImages.length} photo${uploadedImages.length === 1 ? "" : "s"}. ${nextImages.length} total.`);
+  } catch (error) {
+    renderItemPhotoPreview(getItemImageFieldValues(), error?.message || "Could not read one of those images.");
   }
 }
 
@@ -7826,6 +7910,7 @@ function getStyleForItem(category, heat) {
 function getFormItem() {
   const heat = Math.max(0, Math.min(3, Number(itemHeat.value)));
   const category = itemCategory.value;
+  const images = getItemImageFieldValues();
   const allergens = itemAllergens.value
     .split(",")
     .map((allergen) => allergen.trim())
@@ -7836,7 +7921,8 @@ function getFormItem() {
     name: itemName.value.trim(),
     description: itemDescription.value.trim(),
     details: itemDetails.value.trim() || "Key ingredients, flavor notes, and service talking points can go here.",
-    image: itemImage.value.trim(),
+    image: images[0] || "",
+    images,
     category,
     diet: itemDiet.value,
     style: getStyleForItem(category, heat),
@@ -8076,6 +8162,7 @@ showCodeLoginButton.addEventListener("click", toggleCodeLoginPanel);
 codeLoginForm.addEventListener("submit", handleCodeLogin);
 selfRegisterForm.addEventListener("submit", registerAccount);
 userForm.addEventListener("submit", saveUser);
+itemImage.addEventListener("input", () => renderItemPhotoPreview(getItemImageFieldValues()));
 itemImageFile.addEventListener("change", updateItemImageFromFile);
 heroImageFile.addEventListener("change", updateHeroImageFromFile);
 designForm.addEventListener("submit", saveDesign);
