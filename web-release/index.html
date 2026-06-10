@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Menu Matrix</title>
-    <link rel="stylesheet" href="styles.css?v=photo-slideshow" />
+    <link rel="stylesheet" href="styles.css?v=item-photo-size" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -878,6 +878,18 @@
           </div>
         </section>
 
+        <section class="form-subsection">
+          <div>
+            <p class="kicker">Menu items</p>
+            <strong>Photo slideshow</strong>
+          </div>
+          <label>
+            Item photo size
+            <input id="itemPhotoSize" type="range" min="72" max="180" step="4" />
+            <span id="itemPhotoSizeValue" class="range-value">96px</span>
+          </label>
+        </section>
+
         <div class="form-actions">
           <button id="resetDesignButton" class="danger-button" type="button">Reset</button>
           <button id="saveDesignButton" class="save-button" type="submit">Save customization</button>
@@ -1038,6 +1050,6 @@
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js?v=photo-slideshow"></script>
+    <script src="app.js?v=item-photo-size"></script>
   </body>
 </html>

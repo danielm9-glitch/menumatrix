@@ -26,6 +26,7 @@ const defaultDesign = {
   page: "#f8f2e8",
   panel: "#fbfaf6",
   heroImage: defaultHeroImage,
+  itemPhotoSize: 96,
   frontMediaType: "video",
   frontMediaUrl: defaultFrontMediaUrl,
   frontMediaSize: 100,
@@ -2279,6 +2280,8 @@ const frontMediaSize = document.querySelector("#frontMediaSize");
 const frontMediaSizeValue = document.querySelector("#frontMediaSizeValue");
 const frontMediaBlur = document.querySelector("#frontMediaBlur");
 const frontMediaBlurValue = document.querySelector("#frontMediaBlurValue");
+const itemPhotoSize = document.querySelector("#itemPhotoSize");
+const itemPhotoSizeValue = document.querySelector("#itemPhotoSizeValue");
 const frontVideoLength = document.querySelector("#frontVideoLength");
 const frontMediaPreview = document.querySelector("#frontMediaPreview");
 const frontMediaPreviewFrame = document.querySelector("#frontMediaPreviewFrame");
@@ -2579,6 +2582,7 @@ function normalizeDesignSettings(settings = {}) {
       ? settings.frontMediaUrl.trim()
       : defaultFrontMediaUrl;
   const frontMediaSize = Math.max(80, Math.min(160, Number(settings.frontMediaSize) || defaultDesign.frontMediaSize));
+  const itemPhotoSize = Math.max(72, Math.min(180, Number(settings.itemPhotoSize) || defaultDesign.itemPhotoSize));
   const parsedFrontMediaBlur = Number(settings.frontMediaBlur);
   const frontMediaBlur = Number.isFinite(parsedFrontMediaBlur)
     ? Math.max(0, Math.min(18, parsedFrontMediaBlur))
@@ -2589,6 +2593,7 @@ function normalizeDesignSettings(settings = {}) {
     ...defaultDesign,
     ...settings,
     heroImage: typeof settings.heroImage === "string" ? settings.heroImage : defaultHeroImage,
+    itemPhotoSize,
     frontMediaType,
     frontMediaUrl,
     frontMediaSize,
@@ -2741,6 +2746,7 @@ function applyDesignSettings() {
   document.documentElement.style.setProperty("--aqua", designSettings.aqua);
   document.documentElement.style.setProperty("--page-bg", designSettings.page);
   document.documentElement.style.setProperty("--panel-bg", designSettings.panel);
+  document.documentElement.style.setProperty("--item-photo-size", `${designSettings.itemPhotoSize}px`);
   document.documentElement.style.setProperty("--front-media-size", `${designSettings.frontMediaSize}%`);
   document.documentElement.style.setProperty("--front-media-blur", `${designSettings.frontMediaBlur}px`);
   const hasHeroImage = Boolean(designSettings.heroImage);
@@ -2816,6 +2822,8 @@ function syncDesignForm() {
   colorPanel.value = designSettings.panel;
   heroImageUrl.value = designSettings.heroImage;
   heroImageFile.value = "";
+  itemPhotoSize.value = String(designSettings.itemPhotoSize);
+  itemPhotoSizeValue.textContent = `${designSettings.itemPhotoSize}px`;
   frontMediaType.value = designSettings.frontMediaType;
   frontMediaUrl.value = designSettings.frontMediaUrl;
   frontMediaFile.value = "";
@@ -3805,6 +3813,7 @@ function sanitizeDesignSettings(settings) {
     page: normalized.page || defaultDesign.page,
     panel: normalized.panel || defaultDesign.panel,
     heroImage: typeof normalized.heroImage === "string" ? normalized.heroImage : defaultHeroImage,
+    itemPhotoSize: normalized.itemPhotoSize,
     frontMediaType: normalized.frontMediaType,
     frontMediaUrl: normalized.frontMediaUrl,
     frontMediaSize: normalized.frontMediaSize,
@@ -5342,6 +5351,7 @@ function renderDashboardCustomizationSummary() {
     createCustomizationSwatch("Price", designSettings.gold),
     createCustomizationSwatch("Edit", designSettings.aqua),
     createDashboardMetric("Header image", designSettings.heroImage ? "Set" : "Blank", "Current menu banner"),
+    createDashboardMetric("Item photos", `${designSettings.itemPhotoSize}px`, "Expanded slideshow size"),
     createDashboardMetric(
       "Front media",
       designSettings.frontMediaType === "image" ? "Image" : "Video",
@@ -5613,6 +5623,7 @@ function saveDesign(event) {
     page: colorPage.value,
     panel: colorPanel.value,
     heroImage: heroImageValue,
+    itemPhotoSize: Number(itemPhotoSize.value) || defaultDesign.itemPhotoSize,
     frontMediaType: frontMediaType.value === "image" ? "image" : "video",
     frontMediaUrl: requestedFrontMedia,
     frontMediaSize: Number(frontMediaSize.value) || defaultDesign.frontMediaSize,
@@ -8167,6 +8178,11 @@ function updateFrontMediaSizeLabel() {
   document.documentElement.style.setProperty("--front-media-size", `${frontMediaSize.value}%`);
 }
 
+function updateItemPhotoSizeLabel() {
+  itemPhotoSizeValue.textContent = `${itemPhotoSize.value}px`;
+  document.documentElement.style.setProperty("--item-photo-size", `${itemPhotoSize.value}px`);
+}
+
 function updateFrontMediaBlurLabel() {
   const blur = Number(frontMediaBlur.value) || 0;
   frontMediaBlurValue.textContent = `${blur}px`;
@@ -8519,6 +8535,7 @@ frontMediaUrl.addEventListener("input", () => {
   previewFrontMediaFromFields();
 });
 frontMediaFile.addEventListener("change", updateFrontMediaFromFile);
+itemPhotoSize.addEventListener("input", updateItemPhotoSizeLabel);
 frontMediaSize.addEventListener("input", updateFrontMediaSizeLabel);
 frontMediaBlur.addEventListener("input", updateFrontMediaBlurLabel);
 authBackgroundVideo.addEventListener("timeupdate", handleFrontVideoTimeUpdate);

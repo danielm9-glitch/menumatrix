@@ -2064,7 +2064,7 @@ h1 {
   z-index: 1;
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: 96px minmax(0, 1fr);
+  grid-template-columns: var(--item-photo-size, 96px) minmax(0, 1fr);
   gap: 12px;
   align-items: start;
   padding-top: 10px;
@@ -2080,7 +2080,7 @@ h1 {
 
 .item-photo-gallery {
   position: relative;
-  width: 96px;
+  width: var(--item-photo-size, 96px);
   overflow: hidden;
   border-radius: 8px;
   background: #f4f1ea;
@@ -2092,7 +2092,7 @@ h1 {
 }
 
 .item-photo-gallery.single {
-  width: 96px;
+  width: var(--item-photo-size, 96px);
 }
 
 .item-photo-viewport {
@@ -2757,11 +2757,6 @@ h1 {
     grid-column: 1 / -1;
     grid-template-columns: 128px minmax(0, 1fr);
     padding-top: 12px;
-  }
-
-  .item-photo-gallery,
-  .item-photo-gallery.single {
-    width: 128px;
   }
 
   .users-page {
