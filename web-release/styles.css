@@ -468,10 +468,14 @@ textarea {
   justify-content: center;
   gap: 10px 14px;
   flex-wrap: wrap;
+  border-top: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(251, 250, 246, 0.76);
   color: color-mix(in srgb, var(--muted) 88%, var(--ink));
   font-size: 0.74rem;
   font-weight: 850;
   text-align: center;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
 }
 
 .app-footer a {
