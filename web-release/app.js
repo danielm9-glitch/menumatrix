@@ -2347,7 +2347,7 @@ function normalizeCategoryValue(value) {
 }
 
 function getUniqueCategories(values = []) {
-  return getUniqueCategoryValues([...defaultCategories, ...values]);
+  return getUniqueCategoryValues(values);
 }
 
 function getUniqueCategoryValues(values = []) {
@@ -2361,13 +2361,13 @@ function getUniqueCategoryValues(values = []) {
 
 function loadCategories() {
   const savedCategories = localStorage.getItem(categoriesStorageKey);
-  if (!savedCategories) return getUniqueCategories();
+  if (!savedCategories) return getUniqueCategories(defaultCategories);
 
   try {
     const parsed = JSON.parse(savedCategories);
-    return Array.isArray(parsed) ? getUniqueCategories(parsed) : getUniqueCategories();
+    return Array.isArray(parsed) ? getUniqueCategories(parsed) : getUniqueCategories(defaultCategories);
   } catch {
-    return getUniqueCategories();
+    return getUniqueCategories(defaultCategories);
   }
 }
 
@@ -7578,23 +7578,76 @@ function renderCategoryList() {
   categoryList.replaceChildren();
 
   categories.forEach((category) => {
+    const activeMenuItemCount = menuItems.filter((item) => item.category === category).length;
+    const totalItemCount = restaurantMenus.reduce(
+      (total, menu) => total + (Array.isArray(menu.items) ? menu.items.filter((item) => item.category === category).length : 0),
+      0
+    );
     const row = document.createElement("div");
     row.className = "category-list-row";
 
-    const copy = document.createElement("span");
-    const title = document.createElement("strong");
+    const fields = document.createElement("div");
+    fields.className = "category-edit-fields";
+    const input = document.createElement("input");
+    input.className = "category-name-input";
+    input.value = getCategoryLabel(category);
+    input.setAttribute("aria-label", `Edit ${getCategoryLabel(category)} category name`);
+    input.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      renameCategory(category, input.value);
+    });
+
+    const meta = document.createElement("span");
+    meta.className = "category-row-meta";
     const detail = document.createElement("small");
-    title.textContent = getCategoryLabel(category);
-    detail.textContent = `${menuItems.filter((item) => item.category === category).length} items in this menu`;
-    copy.append(title, detail);
+    detail.textContent = `${activeMenuItemCount} items in this menu`;
+    if (totalItemCount !== activeMenuItemCount) detail.textContent += ` - ${totalItemCount} total`;
 
     const badge = document.createElement("span");
-    badge.className = "dashboard-badge";
+    badge.className = "category-key";
     badge.textContent = category;
 
-    row.append(copy, badge);
+    meta.append(detail, badge);
+    fields.append(input, meta);
+
+    const actions = document.createElement("div");
+    actions.className = "category-row-actions";
+
+    const saveButton = document.createElement("button");
+    saveButton.className = "small-success";
+    saveButton.type = "button";
+    saveButton.textContent = "Save";
+    saveButton.addEventListener("click", () => renameCategory(category, input.value));
+
+    const deleteButton = document.createElement("button");
+    deleteButton.className = "small-danger";
+    deleteButton.type = "button";
+    deleteButton.textContent = "Delete";
+    deleteButton.title = totalItemCount ? "Move or rename items before deleting this category." : "Delete category";
+    deleteButton.addEventListener("click", () => deleteCategory(category));
+
+    actions.append(saveButton, deleteButton);
+    row.append(fields, actions);
     categoryList.append(row);
   });
+}
+
+function refreshCategoryManagementUi(message) {
+  saveCategories();
+  saveRestaurantMenus();
+  saveUsers();
+  syncActiveRestaurantMenuData();
+  renderCategoryTabs();
+  renderCategoryList();
+  renderAllergyChips();
+  renderIngredientChips();
+  renderMenu();
+  renderRestaurantList();
+  renderUserList();
+  renderActiveMenuHeader();
+  if (!createUserPanel.hidden) renderNewUserAccessControls();
+  if (message) categoryMessage.textContent = message;
 }
 
 function addCategory(event) {
@@ -7637,6 +7690,85 @@ function addCategory(event) {
   if (!createUserPanel.hidden) renderNewUserAccessControls();
   newCategoryName.value = "";
   categoryMessage.textContent = `${getCategoryLabel(category)} added.`;
+}
+
+function renameCategory(category, value) {
+  if (!canManageCategories()) return;
+
+  const nextCategory = normalizeCategoryValue(value);
+  if (!nextCategory) {
+    categoryMessage.textContent = "Enter a category name.";
+    return;
+  }
+
+  if (nextCategory === category) {
+    categoryMessage.textContent = `${getCategoryLabel(category)} is already up to date.`;
+    return;
+  }
+
+  if (categories.includes(nextCategory)) {
+    categoryMessage.textContent = `${getCategoryLabel(nextCategory)} already exists.`;
+    return;
+  }
+
+  categories = getUniqueCategories(categories.map((savedCategory) => (savedCategory === category ? nextCategory : savedCategory)));
+  restaurantMenus = restaurantMenus.map((menu) => {
+    const items = Array.isArray(menu.items)
+      ? menu.items.map((item) => (item.category === category ? { ...item, category: nextCategory } : item))
+      : [];
+    const menuCategories = getUniqueCategories(
+      [...(menu.categories || categories).map((savedCategory) => (savedCategory === category ? nextCategory : savedCategory)), ...items.map((item) => item.category)]
+    );
+    return {
+      ...menu,
+      categories: menuCategories,
+      items
+    };
+  });
+  users = users.map((user) => ({
+    ...user,
+    permissions: Array.isArray(user.permissions)
+      ? getUniqueCategories(user.permissions.map((permission) => (permission === category ? nextCategory : permission)))
+      : user.permissions
+  }));
+  if (state.category === category) state.category = nextCategory;
+
+  refreshCategoryManagementUi(`${getCategoryLabel(category)} renamed to ${getCategoryLabel(nextCategory)}.`);
+}
+
+function deleteCategory(category) {
+  if (!canManageCategories()) return;
+
+  const label = getCategoryLabel(category);
+  const totalItemCount = restaurantMenus.reduce(
+    (total, menu) => total + (Array.isArray(menu.items) ? menu.items.filter((item) => item.category === category).length : 0),
+    0
+  );
+
+  if (totalItemCount) {
+    categoryMessage.textContent = `${label} has ${totalItemCount} menu item${totalItemCount === 1 ? "" : "s"}. Rename it or move those items before deleting.`;
+    return;
+  }
+
+  if (categories.length <= 1) {
+    categoryMessage.textContent = "Keep at least one category.";
+    return;
+  }
+
+  if (!window.confirm(`Delete ${label}? This removes it from category tabs and user permissions.`)) return;
+
+  categories = categories.filter((savedCategory) => savedCategory !== category);
+  restaurantMenus = restaurantMenus.map((menu) => ({
+    ...menu,
+    categories: getUniqueCategories((menu.categories || []).filter((savedCategory) => savedCategory !== category))
+  }));
+  users = users.map((user) => ({
+    ...user,
+    permissions: Array.isArray(user.permissions) ? user.permissions.filter((permission) => permission !== category) : user.permissions
+  }));
+  if (state.category === category) state.category = "all";
+
+  refreshCategoryManagementUi(`${label} deleted.`);
 }
 
 function closeItemDialog() {
