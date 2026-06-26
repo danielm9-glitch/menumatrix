@@ -6,7 +6,7 @@
     <title>Menu Matrix</title>
     <link rel="icon" type="image/svg+xml" href="assets/app-icon.svg" />
     <link rel="apple-touch-icon" href="assets/app-icon-launcher-preview.png" />
-    <link rel="stylesheet" href="styles.css?v=photo-lightbox-swipe" />
+    <link rel="stylesheet" href="styles.css?v=filter-dropdowns" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -202,19 +202,29 @@
           </div>
         </section>
 
-        <section class="allergy-panel" aria-label="Allergy filters">
-          <div class="section-heading">
-            <p class="kicker">Allergy check</p>
-          </div>
-          <div id="allergyChips" class="allergy-chips"></div>
-        </section>
+        <details class="filter-dropdown allergy-panel">
+          <summary class="filter-dropdown-summary" aria-label="Open allergy filters">
+            <span>
+              <span class="kicker">Allergy check</span>
+              <strong>Avoid allergens</strong>
+            </span>
+            <span id="allergyFilterCount" class="filter-count">0 selected</span>
+            <span class="filter-chevron" aria-hidden="true"></span>
+          </summary>
+          <div id="allergyChips" class="allergy-chips filter-dropdown-content"></div>
+        </details>
 
-        <section class="ingredient-panel" aria-label="Ingredient filters">
-          <div class="section-heading">
-            <p class="kicker">Ingredient finder</p>
-          </div>
-          <div id="ingredientChips" class="ingredient-chips"></div>
-        </section>
+        <details class="filter-dropdown ingredient-panel">
+          <summary class="filter-dropdown-summary" aria-label="Open ingredient filters">
+            <span>
+              <span class="kicker">Ingredient finder</span>
+              <strong>Find ingredients</strong>
+            </span>
+            <span id="ingredientFilterCount" class="filter-count">0 selected</span>
+            <span class="filter-chevron" aria-hidden="true"></span>
+          </summary>
+          <div id="ingredientChips" class="ingredient-chips filter-dropdown-content"></div>
+        </details>
       </aside>
 
       <section class="matrix-card" aria-label="Menu matrix">
@@ -1069,6 +1079,6 @@
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js?v=photo-lightbox-swipe"></script>
+    <script src="app.js?v=filter-dropdowns"></script>
   </body>
 </html>

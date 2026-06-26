@@ -2048,6 +2048,8 @@ const template = document.querySelector("#menuRowTemplate");
 const searchInput = document.querySelector("#searchInput");
 const allergyChips = document.querySelector("#allergyChips");
 const ingredientChips = document.querySelector("#ingredientChips");
+const allergyFilterCount = document.querySelector("#allergyFilterCount");
+const ingredientFilterCount = document.querySelector("#ingredientFilterCount");
 const categoryTabs = document.querySelector("#categoryTabs");
 let tabs = [...document.querySelectorAll(".tab")];
 const drawerOpenButton = document.querySelector("#drawerOpenButton");
@@ -4725,6 +4727,9 @@ function toggleItemDetails(id) {
 
 function renderAllergyChips() {
   allergyChips.replaceChildren();
+  if (allergyFilterCount) {
+    allergyFilterCount.textContent = state.allergies.size ? `${state.allergies.size} selected` : "0 selected";
+  }
 
   allergyOptions.forEach((allergen) => {
     const chip = document.createElement("button");
@@ -8433,6 +8438,9 @@ function renderIngredientChips() {
   state.ingredients.forEach((ingredient) => {
     if (!options.includes(ingredient)) state.ingredients.delete(ingredient);
   });
+  if (ingredientFilterCount) {
+    ingredientFilterCount.textContent = state.ingredients.size ? `${state.ingredients.size} selected` : "0 selected";
+  }
   if (!options.length) {
     const empty = document.createElement("span");
     empty.className = "empty-filter-note";
