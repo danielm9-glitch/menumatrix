@@ -5836,6 +5836,7 @@ function generatePdf() {
 }
 
 function getPrintableHtml(items) {
+  const activeMenu = getActiveRestaurantMenu();
   const groupedItems = categories
     .map((category) => ({
       category,
@@ -5861,76 +5862,217 @@ function getPrintableHtml(items) {
         <meta charset="utf-8" />
         <title>Menu Matrix PDF</title>
         <style>
-          @page { margin: 0.55in; }
+          @page { margin: 0.45in; }
           * { box-sizing: border-box; }
+          :root {
+            --ink: ${designSettings.ink};
+            --muted: #66716b;
+            --line: #ded9cd;
+            --leaf: ${designSettings.leaf};
+            --gold: ${designSettings.gold};
+            --aqua: ${designSettings.aqua};
+            --paper: ${designSettings.panel};
+            --page: ${designSettings.page};
+          }
           body {
             margin: 0;
-            color: ${designSettings.ink};
-            font-family: Arial, sans-serif;
+            background: var(--page);
+            color: var(--ink);
+            font-family: Inter, Arial, sans-serif;
             line-height: 1.35;
           }
           header {
-            display: flex;
+            display: grid;
+            grid-template-columns: 120px minmax(0, 1fr);
             align-items: center;
-            gap: 18px;
-            border-bottom: 2px solid ${designSettings.leaf};
-            padding-bottom: 16px;
-            margin-bottom: 20px;
+            gap: 20px;
+            margin-bottom: 18px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 16px;
+            background: #fffdfa;
+            break-inside: avoid;
           }
-          header img {
-            width: 110px;
-            max-height: 72px;
+          .hero-logo {
+            display: grid;
+            width: 120px;
+            height: 82px;
+            place-items: center;
+            overflow: hidden;
+            border-radius: 8px;
+            background: #f4f1ea;
+          }
+          .hero-logo img {
+            width: 100%;
+            height: 100%;
             object-fit: contain;
+          }
+          .kicker {
+            margin: 0 0 4px;
+            color: var(--leaf);
+            font-size: 10px;
+            font-weight: 900;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
           }
           h1 {
             margin: 0;
             font-size: 28px;
+            line-height: 1;
+          }
+          .subtitle {
+            margin: 8px 0 0;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 700;
+          }
+          .category {
+            margin-top: 16px;
           }
           h2 {
-            margin: 22px 0 10px;
-            color: ${designSettings.leaf};
-            font-size: 18px;
+            margin: 0 0 8px;
+            border-radius: 8px;
+            padding: 9px 12px;
+            background: var(--ink);
+            color: white;
+            font-size: 13px;
+            letter-spacing: 0.08em;
             text-transform: uppercase;
           }
           .item {
             display: grid;
-            grid-template-columns: ${pdfIncludePhotos.checked ? "92px 1fr" : "1fr"};
+            grid-template-columns: ${pdfIncludePhotos.checked ? "118px minmax(0, 1fr)" : "1fr"};
             gap: 14px;
-            border-bottom: 1px solid #ddd8cc;
-            padding: 12px 0;
+            margin-bottom: 10px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 12px;
+            background: #fffdfa;
             break-inside: avoid;
           }
-          .item img {
-            width: 92px;
-            height: 92px;
+          .photo-box {
+            display: grid;
+            width: 118px;
+            min-height: 118px;
+            place-items: center;
+            overflow: hidden;
+            border: 1px solid #eee6d8;
             border-radius: 8px;
+            background: #f4f1ea;
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 900;
+            text-align: center;
+            text-transform: uppercase;
+          }
+          .photo-box img {
+            width: 100%;
+            height: 100%;
             object-fit: cover;
           }
+          .item-main {
+            min-width: 0;
+          }
+          .item-head {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 12px;
+            align-items: start;
+            margin-bottom: 6px;
+          }
           h3 {
-            margin: 0 0 4px;
+            margin: 0;
             font-size: 16px;
+            line-height: 1.15;
           }
           .price {
-            color: ${designSettings.gold};
-            font-weight: 700;
+            border: 1px solid rgba(217, 157, 43, 0.32);
+            border-radius: 999px;
+            padding: 4px 9px;
+            background: #fff6dd;
+            color: var(--gold);
+            font-size: 12px;
+            font-weight: 900;
+            white-space: nowrap;
           }
           p {
             margin: 4px 0;
             font-size: 12px;
           }
+          .description {
+            color: var(--ink);
+            font-size: 12px;
+          }
+          .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+            margin-top: 10px;
+          }
+          .detail-block {
+            border: 1px solid #eee6d8;
+            border-radius: 8px;
+            padding: 8px;
+            background: #fbfaf6;
+          }
           .meta {
-            color: #5e6862;
+            margin: 0 0 6px;
+            color: var(--muted);
+            font-size: 9px;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+          }
+          .chip-list {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+          }
+          .chip {
+            border-radius: 999px;
+            padding: 4px 7px;
+            font-size: 10px;
+            font-weight: 800;
+          }
+          .allergy-chip {
+            border: 1px solid rgba(201, 79, 61, 0.24);
+            background: #fbebe8;
+            color: #b54233;
+          }
+          .ingredient-chip {
+            border: 1px solid rgba(49, 124, 142, 0.24);
+            background: #eaf4f6;
+            color: var(--aqua);
+          }
+          .item-notes {
+            margin-top: 10px;
+            border-top: 1px solid #eee6d8;
+            padding-top: 8px;
+            color: var(--muted);
             font-size: 11px;
-            font-weight: 700;
+          }
+          @media print {
+            body {
+              background: white;
+            }
+            .item,
+            header,
+            h2 {
+              print-color-adjust: exact;
+              -webkit-print-color-adjust: exact;
+            }
           }
         </style>
       </head>
       <body>
         <header>
-          <img src="${escapeAttribute(designSettings.heroImage)}" alt="Restaurant logo" />
+          <div class="hero-logo">
+            ${designSettings.heroImage ? `<img src="${escapeAttribute(designSettings.heroImage)}" alt="Restaurant logo" />` : "Logo"}
+          </div>
           <div>
-            <h1>Menu Matrix</h1>
-            <p>Selected menu items</p>
+            <p class="kicker">Menu Matrix Export</p>
+            <h1>${escapeHtml(activeMenu?.name || "Selected Menu")}</h1>
+            <p class="subtitle">${escapeHtml(activeMenu?.restaurantName || "Selected menu items")} - ${items.length} item${items.length === 1 ? "" : "s"}</p>
           </div>
         </header>
         ${itemMarkup}
@@ -5941,20 +6083,45 @@ function getPrintableHtml(items) {
 
 function getPrintableItemMarkup(item) {
   const firstPhoto = getItemImages(item)[0] || "";
-  const photo = pdfIncludePhotos.checked && firstPhoto ? `<img src="${escapeAttribute(firstPhoto)}" alt="" />` : "";
-  const price = pdfIncludePrices.checked ? ` <span class="price">${formatMenuPrice(item.price)}</span>` : "";
-  const allergens = pdfIncludeAllergens.checked
-    ? `<p class="meta">Allergens: ${escapeHtml(item.allergens.length ? item.allergens.join(", ") : "No major allergens")}</p>`
+  const photo = pdfIncludePhotos.checked
+    ? `<div class="photo-box">${firstPhoto ? `<img src="${escapeAttribute(firstPhoto)}" alt="" />` : "No photo"}</div>`
     : "";
-  const notes = pdfIncludeNotes.checked ? `<p>${escapeHtml(item.details)}</p>` : "";
+  const price = pdfIncludePrices.checked ? `<span class="price">${formatMenuPrice(item.price)}</span>` : "";
+  const allergens = getItemAllergens(item);
+  const ingredients = getItemIngredientTerms(item).slice(0, 12);
+  const allergenMarkup = pdfIncludeAllergens.checked
+    ? `
+      <section class="detail-block">
+        <p class="meta">Allergies</p>
+        <div class="chip-list">
+          ${(allergens.length ? allergens : ["No major allergens"]).map((allergen) => `<span class="chip allergy-chip">${escapeHtml(allergen)}</span>`).join("")}
+        </div>
+      </section>
+    `
+    : "";
+  const ingredientMarkup = `
+    <section class="detail-block">
+      <p class="meta">Ingredients</p>
+      <div class="chip-list">
+        ${(ingredients.length ? ingredients : ["No ingredient notes"]).map((ingredient) => `<span class="chip ingredient-chip">${escapeHtml(ingredient)}</span>`).join("")}
+      </div>
+    </section>
+  `;
+  const notes = pdfIncludeNotes.checked ? `<p class="item-notes">${escapeHtml(item.details)}</p>` : "";
 
   return `
     <article class="item">
       ${photo}
-      <div>
-        <h3>${escapeHtml(item.name)}${price}</h3>
-        <p>${escapeHtml(item.description)}</p>
-        ${allergens}
+      <div class="item-main">
+        <div class="item-head">
+          <h3>${escapeHtml(item.name)}</h3>
+          ${price}
+        </div>
+        <p class="description">${escapeHtml(item.description)}</p>
+        <div class="detail-grid">
+          ${ingredientMarkup}
+          ${allergenMarkup}
+        </div>
         ${notes}
       </div>
     </article>
