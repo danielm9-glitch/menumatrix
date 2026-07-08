@@ -3732,6 +3732,7 @@ function applyCloudSnapshot(data) {
   if (!data) return;
 
   cloudSync.applying = true;
+  const menuWasVisible = !menuPage.hidden && (state.screen === "menu" || state.screen === "shared");
 
   try {
     const workspaceOwner = getWorkspaceOwner();
@@ -3771,7 +3772,7 @@ function applyCloudSnapshot(data) {
     applyDesignSettings();
     renderAdminState();
     renderAllergyChips();
-    renderMenu();
+    renderMenu({ preserveScroll: menuWasVisible });
   } finally {
     cloudSync.applying = false;
   }
@@ -4379,7 +4380,54 @@ function renderHeat(level) {
   return ["Mild", "Low", "Med", "Hot"][level] || "Hot";
 }
 
-function renderMenu() {
+function getMenuRowById(itemId) {
+  if (!menuGrid || !itemId) return null;
+  return [...menuGrid.querySelectorAll(".menu-row")].find((row) => row.dataset.itemId === itemId) || null;
+}
+
+function getFirstVisibleMenuRow() {
+  if (!menuGrid) return null;
+
+  return (
+    [...menuGrid.querySelectorAll(".menu-row")].find((row) => {
+      const rect = row.getBoundingClientRect();
+      return rect.bottom > 0 && rect.top < window.innerHeight;
+    }) || null
+  );
+}
+
+function captureMenuScrollSnapshot(anchorItemId = "") {
+  const anchorRow = getMenuRowById(anchorItemId) || getFirstVisibleMenuRow();
+  return {
+    itemId: anchorRow?.dataset.itemId || "",
+    itemTop: anchorRow?.getBoundingClientRect().top || 0,
+    scrollX: window.scrollX,
+    scrollY: window.scrollY
+  };
+}
+
+function restoreMenuScrollSnapshot(snapshot) {
+  if (!snapshot) return;
+
+  const restore = () => {
+    const anchorRow = getMenuRowById(snapshot.itemId);
+    const nextScrollY = anchorRow ? window.scrollY + anchorRow.getBoundingClientRect().top - snapshot.itemTop : snapshot.scrollY;
+    window.scrollTo({
+      left: snapshot.scrollX,
+      top: Math.max(0, nextScrollY),
+      behavior: "auto"
+    });
+    updateBackToTopButton();
+  };
+
+  window.requestAnimationFrame(() => {
+    restore();
+    window.setTimeout(restore, 80);
+  });
+}
+
+function renderMenu({ preserveScroll = false, anchorItemId = "", scrollSnapshot = null } = {}) {
+  const menuScrollSnapshot = scrollSnapshot || (preserveScroll ? captureMenuScrollSnapshot(anchorItemId) : null);
   renderIngredientChips();
   const items = getVisibleItems();
   menuGrid.replaceChildren();
@@ -4389,6 +4437,7 @@ function renderMenu() {
     empty.className = "empty-state";
     empty.textContent = menuItems.length ? "No matching dishes." : "No menu items yet.";
     menuGrid.append(empty);
+    restoreMenuScrollSnapshot(menuScrollSnapshot);
     return;
   }
 
@@ -4473,6 +4522,8 @@ function renderMenu() {
 
     menuGrid.append(row);
   });
+
+  restoreMenuScrollSnapshot(menuScrollSnapshot);
 }
 
 function renderItemPhotoGallery(gallery, images, itemName, itemId) {
@@ -4530,7 +4581,7 @@ function getItemPhotoSlideIndex(itemId, imageCount) {
 function setItemPhotoSlide(itemId, imageCount, requestedIndex) {
   if (imageCount <= 1) return;
   state.photoSlides[itemId] = (requestedIndex + imageCount) % imageCount;
-  renderMenu();
+  renderMenu({ preserveScroll: true, anchorItemId: itemId });
 }
 
 function createPhotoDots(imageCount, activeIndex) {
@@ -4722,7 +4773,7 @@ function toggleItemDetails(id) {
     state.openItems.add(id);
   }
 
-  renderMenu();
+  renderMenu({ preserveScroll: true, anchorItemId: id });
 }
 
 function renderAllergyChips() {
@@ -4751,7 +4802,7 @@ function toggleAllergy(allergen) {
   }
 
   renderAllergyChips();
-  renderMenu();
+  renderMenu({ preserveScroll: true });
 }
 
 function setEditMode(isEditing) {
@@ -4763,7 +4814,7 @@ function setEditMode(isEditing) {
   addItemButton.hidden = !isEditing || !canEditAnyCategory();
   updateDeleteMenuButton();
   renderActiveMenuHeader();
-  renderMenu();
+  renderMenu({ preserveScroll: true });
 }
 
 function openItemDialog(id) {
@@ -6738,6 +6789,7 @@ function formatQuizDate(value) {
 }
 
 function renderAdminState() {
+  const menuWasVisible = !menuPage.hidden && (state.screen === "menu" || state.screen === "shared");
   const activeUser = getActiveUser();
   const invitedUser = getInvitedUser();
   normalizeScreen(activeUser, invitedUser);
@@ -6806,7 +6858,7 @@ function renderAdminState() {
     renderUserList();
     if (!createUserPanel.hidden) renderNewUserAccessControls();
   }
-  renderMenu();
+  renderMenu({ preserveScroll: menuWasVisible });
   renderFlashcard();
   renderQuiz();
   window.requestAnimationFrame(updateBackToTopButton);
@@ -7801,6 +7853,7 @@ function renderCategoryList() {
 }
 
 function refreshCategoryManagementUi(message) {
+  const menuScrollSnapshot = captureMenuScrollSnapshot();
   saveCategories();
   saveRestaurantMenus();
   saveUsers();
@@ -7809,7 +7862,7 @@ function refreshCategoryManagementUi(message) {
   renderCategoryList();
   renderAllergyChips();
   renderIngredientChips();
-  renderMenu();
+  renderMenu({ scrollSnapshot: menuScrollSnapshot });
   renderRestaurantList();
   renderUserList();
   renderActiveMenuHeader();
@@ -7849,10 +7902,11 @@ function addCategory(event) {
   saveCategories();
   saveRestaurantMenus();
   saveUsers();
+  const menuScrollSnapshot = captureMenuScrollSnapshot();
   renderCategoryTabs();
   renderCategoryList();
   renderAllergyChips();
-  renderMenu();
+  renderMenu({ scrollSnapshot: menuScrollSnapshot });
   renderUserList();
   if (!createUserPanel.hidden) renderNewUserAccessControls();
   newCategoryName.value = "";
@@ -8399,6 +8453,7 @@ function importPdfItems() {
     return;
   }
 
+  const menuScrollSnapshot = captureMenuScrollSnapshot();
   if (pdfImportMode.value === "replace") {
     menuItems = menuItems.filter((item) => !canEditCategory(item.category));
   }
@@ -8406,7 +8461,7 @@ function importPdfItems() {
   menuItems = [...menuItems, ...pdfImportDraftItems.map(normalizeMenuItem)];
   saveMenuItems();
   renderAllergyChips();
-  renderMenu();
+  renderMenu({ scrollSnapshot: menuScrollSnapshot });
   renderPdfItemList();
   pdfImportMessage.textContent = `${pdfImportDraftItems.length} items imported.`;
   closePdfImportDialog();
@@ -8708,6 +8763,7 @@ function saveItem(event) {
   const item = getFormItem();
   const itemIndex = menuItems.findIndex((menuItem) => menuItem.id === item.id);
   const previousItem = menuItems[itemIndex];
+  const menuScrollSnapshot = captureMenuScrollSnapshot(item.id);
 
   if (!canEditCategory(item.category) || (previousItem && !canEditCategory(previousItem.category))) {
     return;
@@ -8722,7 +8778,7 @@ function saveItem(event) {
   saveMenuItems();
   closeItemDialog();
   renderAllergyChips();
-  renderMenu();
+  renderMenu({ scrollSnapshot: menuScrollSnapshot });
 }
 
 function getIngredientFilterOptions() {
@@ -8768,18 +8824,19 @@ function toggleIngredient(ingredient) {
   }
 
   renderIngredientChips();
-  renderMenu();
+  renderMenu({ preserveScroll: true });
 }
 
 function deleteMenuItemById(id) {
   const item = menuItems.find((menuItem) => menuItem.id === id);
   if (!item || !canEditCategory(item.category) || state.sharedMenu) return false;
+  const menuScrollSnapshot = captureMenuScrollSnapshot(id);
 
   menuItems = menuItems.filter((item) => item.id !== id);
   saveMenuItems();
   state.openItems.delete(id);
   renderAllergyChips();
-  renderMenu();
+  renderMenu({ scrollSnapshot: menuScrollSnapshot });
   return true;
 }
 
@@ -8800,7 +8857,7 @@ function deleteItem() {
 
 searchInput.addEventListener("input", (event) => {
   state.query = event.target.value;
-  renderMenu();
+  renderMenu({ preserveScroll: true });
 });
 
 editModeButton.addEventListener("click", () => {
