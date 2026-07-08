@@ -1988,6 +1988,8 @@ let accountDeleteSliderProgress = 0;
 let accountDeletionBusy = false;
 let pdfImportDraftItems = [];
 let rowSwipeState = null;
+let menuRevealObserver = null;
+let menuRevealSequence = 0;
 let sharedQuizResultsPulling = false;
 let sharedQuizResultsPulledAt = 0;
 
@@ -4704,11 +4706,122 @@ function restoreMenuScrollSnapshot(snapshot) {
   });
 }
 
+function prefersReducedMenuMotion() {
+  return Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches);
+}
+
+function prepareMenuRevealObserver() {
+  menuRevealObserver?.disconnect();
+  menuRevealObserver = null;
+  menuRevealSequence = 0;
+
+  if (prefersReducedMenuMotion() || !("IntersectionObserver" in window)) return;
+
+  menuRevealObserver = new IntersectionObserver(
+    (entries) => {
+      entries
+        .filter((entry) => entry.isIntersecting)
+        .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
+        .forEach((entry) => {
+          const delay = Math.min(180, (menuRevealSequence % 6) * 36);
+          menuRevealSequence += 1;
+          entry.target.style.setProperty("--row-reveal-delay", `${delay}ms`);
+          entry.target.classList.add("is-visible");
+          window.setTimeout(() => {
+            entry.target.style.setProperty("--row-reveal-delay", "0ms");
+          }, delay + 460);
+          menuRevealObserver?.unobserve(entry.target);
+        });
+    },
+    {
+      root: null,
+      rootMargin: "0px 0px -8% 0px",
+      threshold: 0.12
+    }
+  );
+}
+
+function observeMenuRowReveal(row) {
+  if (!row) return;
+
+  if (!menuRevealObserver) {
+    row.classList.add("is-visible");
+    row.style.setProperty("--row-reveal-delay", "0ms");
+    return;
+  }
+
+  menuRevealObserver.observe(row);
+}
+
+function clearItemDetailsMotionStyles(itemDetails) {
+  itemDetails.style.removeProperty("max-height");
+  itemDetails.style.removeProperty("opacity");
+  itemDetails.style.removeProperty("padding-top");
+  itemDetails.style.removeProperty("transform");
+}
+
+function animateItemDetails(itemDetails, isOpen) {
+  if (!itemDetails) return;
+
+  window.clearTimeout(itemDetails._menuDetailsTimer);
+  if (prefersReducedMenuMotion()) {
+    itemDetails.hidden = !isOpen;
+    clearItemDetailsMotionStyles(itemDetails);
+    updateBackToTopButton();
+    return;
+  }
+
+  if (isOpen) {
+    itemDetails.hidden = false;
+    const openPadding = getComputedStyle(itemDetails).paddingTop || "10px";
+    itemDetails.style.maxHeight = "0px";
+    itemDetails.style.opacity = "0";
+    itemDetails.style.paddingTop = "0px";
+    itemDetails.style.transform = "translateY(-6px)";
+    itemDetails.offsetHeight;
+
+    window.requestAnimationFrame(() => {
+      itemDetails.style.paddingTop = openPadding;
+      itemDetails.style.maxHeight = `${itemDetails.scrollHeight}px`;
+      itemDetails.style.opacity = "1";
+      itemDetails.style.transform = "translateY(0)";
+    });
+
+    itemDetails._menuDetailsTimer = window.setTimeout(() => {
+      clearItemDetailsMotionStyles(itemDetails);
+      updateBackToTopButton();
+    }, 320);
+    return;
+  }
+
+  const currentPadding = getComputedStyle(itemDetails).paddingTop || "10px";
+  itemDetails.hidden = false;
+  itemDetails.style.maxHeight = `${itemDetails.scrollHeight}px`;
+  itemDetails.style.opacity = "1";
+  itemDetails.style.paddingTop = currentPadding;
+  itemDetails.style.transform = "translateY(0)";
+  itemDetails.offsetHeight;
+
+  window.requestAnimationFrame(() => {
+    itemDetails.style.maxHeight = "0px";
+    itemDetails.style.opacity = "0";
+    itemDetails.style.paddingTop = "0px";
+    itemDetails.style.transform = "translateY(-6px)";
+  });
+
+  itemDetails._menuDetailsTimer = window.setTimeout(() => {
+    itemDetails.hidden = true;
+    clearItemDetailsMotionStyles(itemDetails);
+    updateBackToTopButton();
+  }, 300);
+}
+
 function renderMenu({ preserveScroll = false, anchorItemId = "", scrollSnapshot = null } = {}) {
   const menuScrollSnapshot = scrollSnapshot || (preserveScroll ? captureMenuScrollSnapshot(anchorItemId) : null);
   renderIngredientChips();
   const items = getVisibleItems();
   menuGrid.replaceChildren();
+  prepareMenuRevealObserver();
 
   if (items.length === 0) {
     const empty = document.createElement("p");
@@ -4799,6 +4912,7 @@ function renderMenu({ preserveScroll = false, anchorItemId = "", scrollSnapshot 
     itemDetails.querySelector(".detail-copy").textContent = item.details;
 
     menuGrid.append(row);
+    observeMenuRowReveal(row);
   });
 
   restoreMenuScrollSnapshot(menuScrollSnapshot);
@@ -4855,7 +4969,7 @@ function updateMenuRowExpandedState(itemId, isOpen) {
   const itemDetails = row.querySelector(".item-details");
   row.classList.toggle("is-open", isOpen);
   itemToggle?.setAttribute("aria-expanded", String(isOpen));
-  if (itemDetails) itemDetails.hidden = !isOpen;
+  animateItemDetails(itemDetails, isOpen);
 
   window.requestAnimationFrame(updateBackToTopButton);
   return true;

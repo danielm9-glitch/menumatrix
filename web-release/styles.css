@@ -1955,14 +1955,28 @@ h1 {
 }
 
 .menu-row {
+  --row-reveal-y: 18px;
+  --row-reveal-scale: 0.985;
   position: relative;
   min-height: 96px;
   padding: 12px;
   border-top: 1px solid var(--line);
   overflow: hidden;
-  transform: translateX(calc(var(--swipe-offset, 0px) * 0.18));
-  transition: transform 180ms ease, background 180ms ease;
+  opacity: 0;
+  transform: translateX(calc(var(--swipe-offset, 0px) * 0.18)) translateY(var(--row-reveal-y)) scale(var(--row-reveal-scale));
+  transition:
+    opacity 320ms ease,
+    transform 420ms cubic-bezier(0.2, 0.78, 0.22, 1),
+    background 180ms ease;
+  transition-delay: var(--row-reveal-delay, 0ms);
   touch-action: pan-y;
+  will-change: opacity, transform;
+}
+
+.menu-row.is-visible {
+  --row-reveal-y: 0px;
+  --row-reveal-scale: 1;
+  opacity: 1;
 }
 
 .menu-row::before {
@@ -2008,7 +2022,7 @@ h1 {
 .menu-row.swipe-commit-edit,
 .menu-row.swipe-commit-delete {
   --swipe-offset: 0px;
-  transform: scale(0.985);
+  --row-reveal-scale: 0.985;
 }
 
 .menu-row.swipe-commit-edit::before,
@@ -2205,7 +2219,16 @@ h1 {
   grid-template-columns: var(--item-photo-size, 96px) minmax(0, 1fr);
   gap: 12px;
   align-items: start;
+  overflow: hidden;
   padding-top: 10px;
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    max-height 280ms cubic-bezier(0.2, 0.72, 0.22, 1),
+    opacity 200ms ease,
+    transform 260ms cubic-bezier(0.2, 0.72, 0.22, 1),
+    padding-top 260ms ease;
+  will-change: max-height, opacity, transform;
 }
 
 .item-details[hidden] {
@@ -3004,5 +3027,19 @@ h1 {
 
   #menuPage {
     grid-template-columns: 360px minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-row {
+    --row-reveal-y: 0px;
+    --row-reveal-scale: 1;
+    opacity: 1;
+    transition: background 180ms ease;
+  }
+
+  .item-details,
+  .item-photo-track {
+    transition: none;
   }
 }
