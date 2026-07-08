@@ -1950,6 +1950,8 @@ const state = {
   sharedMenu: null,
   sharedCode: "",
   editing: false,
+  localItemEditTimes: {},
+  localDeletedItemTimes: {},
   photoSlides: {},
   screen: loadCurrentUser() ? "menus" : "login",
   activeRestaurantMenu: initialRestaurantMenu?.id || defaultRestaurantMenuId,
@@ -2587,6 +2589,29 @@ function normalizeQuizResults(results = []) {
   return Array.isArray(results) ? mergeQuizResults([], results) : [];
 }
 
+function getTimestampMs(value) {
+  if (typeof value !== "string" || !value) return 0;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function getMenuItemUpdatedAtMs(item = {}) {
+  return getTimestampMs(item.updatedAt || item.modifiedAt || item.createdAt || "");
+}
+
+function markLocalItemEdit(item) {
+  if (!item?.id) return;
+  const timestamp = getMenuItemUpdatedAtMs(item) || Date.now();
+  state.localItemEditTimes[item.id] = timestamp;
+  delete state.localDeletedItemTimes[item.id];
+}
+
+function markLocalItemDelete(itemId) {
+  if (!itemId) return;
+  state.localDeletedItemTimes[itemId] = Date.now();
+  delete state.localItemEditTimes[itemId];
+}
+
 function normalizeDesignSettings(settings = {}) {
   const frontMediaType = settings.frontMediaType === "image" ? "image" : "video";
   const frontMediaUrl =
@@ -2635,7 +2660,8 @@ function normalizeMenuItem(item) {
     details: item.details || defaultMatch?.details || "Key ingredients, flavor notes, and service talking points can go here.",
     ingredients: normalizeIngredientList(item.ingredients || defaultMatch?.ingredients || []),
     image: images[0] || "",
-    images
+    images,
+    updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : ""
   };
 }
 
@@ -3818,11 +3844,105 @@ function connectCloudWorkspaceForCurrentUser() {
   );
 }
 
+function mergeCloudItemsWithLocal(cloudItems = [], localItems = []) {
+  const localById = new Map(localItems.map((item) => [item.id, normalizeMenuItem(item)]));
+  const seenIds = new Set();
+  let hasLocalPreserves = false;
+
+  const items = cloudItems
+    .map(normalizeMenuItem)
+    .flatMap((cloudItem) => {
+      seenIds.add(cloudItem.id);
+      const localItem = localById.get(cloudItem.id);
+      const cloudUpdatedAt = getMenuItemUpdatedAtMs(cloudItem);
+      const localUpdatedAt = Math.max(getMenuItemUpdatedAtMs(localItem), Number(state.localItemEditTimes[cloudItem.id]) || 0);
+      const localDeletedAt = Number(state.localDeletedItemTimes[cloudItem.id]) || 0;
+
+      if (localDeletedAt > cloudUpdatedAt) {
+        hasLocalPreserves = true;
+        return [];
+      }
+
+      if (localItem && localUpdatedAt > cloudUpdatedAt) {
+        hasLocalPreserves = true;
+        return [localItem];
+      }
+
+      if (localItem && getItemImages(localItem).length && !getItemImages(cloudItem).length && localUpdatedAt >= cloudUpdatedAt) {
+        const images = getItemImages(localItem);
+        hasLocalPreserves = true;
+        return [
+          {
+            ...cloudItem,
+            image: images[0] || "",
+            images,
+            updatedAt: localItem.updatedAt || cloudItem.updatedAt || new Date().toISOString()
+          }
+        ];
+      }
+
+      if (localUpdatedAt && cloudUpdatedAt >= localUpdatedAt) {
+        delete state.localItemEditTimes[cloudItem.id];
+      }
+      if (localDeletedAt && cloudUpdatedAt >= localDeletedAt) {
+        delete state.localDeletedItemTimes[cloudItem.id];
+      }
+
+      return [cloudItem];
+    });
+
+  localById.forEach((localItem, itemId) => {
+    if (seenIds.has(itemId)) return;
+    const localUpdatedAt = Math.max(getMenuItemUpdatedAtMs(localItem), Number(state.localItemEditTimes[itemId]) || 0);
+    const localDeletedAt = Number(state.localDeletedItemTimes[itemId]) || 0;
+    if (!localUpdatedAt || localDeletedAt > localUpdatedAt) return;
+
+    hasLocalPreserves = true;
+    items.push(localItem);
+  });
+
+  return { items, hasLocalPreserves };
+}
+
+function mergeCloudMenusWithLocal(cloudMenus = [], workspaceOwner = primaryAdminUsername) {
+  const localById = new Map(restaurantMenus.map((menu) => [menu.id, menu]));
+  let hasLocalPreserves = false;
+
+  const menus = cloudMenus.map((menu, index) => {
+    const cloudMenu = normalizeRestaurantMenu({ ...menu, owner: menu.owner || workspaceOwner }, index);
+    const localMenu = localById.get(cloudMenu.id);
+    if (!localMenu) return cloudMenu;
+
+    const mergedItems = mergeCloudItemsWithLocal(cloudMenu.items, localMenu.items || []);
+    if (mergedItems.hasLocalPreserves) hasLocalPreserves = true;
+
+    return {
+      ...cloudMenu,
+      items: mergedItems.items
+    };
+  });
+
+  localById.forEach((localMenu, menuId) => {
+    if (menus.some((menu) => menu.id === menuId)) return;
+    const hasEditedItems = (localMenu.items || []).some((item) => {
+      const itemId = item.id;
+      return getMenuItemUpdatedAtMs(item) || Number(state.localItemEditTimes[itemId]) || getItemImages(item).length;
+    });
+    if (!hasEditedItems) return;
+
+    hasLocalPreserves = true;
+    menus.push(normalizeRestaurantMenu(localMenu, menus.length));
+  });
+
+  return { menus, hasLocalPreserves };
+}
+
 function applyCloudSnapshot(data) {
   if (!data) return;
 
   cloudSync.applying = true;
   const menuWasVisible = !menuPage.hidden && (state.screen === "menu" || state.screen === "shared");
+  let shouldResaveLocalPreserves = false;
 
   try {
     const workspaceOwner = getWorkspaceOwner();
@@ -3830,9 +3950,9 @@ function applyCloudSnapshot(data) {
       mergeCategories(data.categories, { sync: false });
     }
     if (Array.isArray(data.menus) && data.menus.length) {
-      restaurantMenus = data.menus.map((menu, index) =>
-        normalizeRestaurantMenu({ ...menu, owner: menu.owner || workspaceOwner }, index)
-      );
+      const mergedSnapshot = mergeCloudMenusWithLocal(data.menus, workspaceOwner);
+      restaurantMenus = mergedSnapshot.menus;
+      shouldResaveLocalPreserves = mergedSnapshot.hasLocalPreserves;
       const visibleMenus = getVisibleRestaurantMenus();
       if (!visibleMenus.some((menu) => menu.id === state.activeRestaurantMenu)) {
         state.activeRestaurantMenu = visibleMenus[0]?.id || "";
@@ -3865,6 +3985,7 @@ function applyCloudSnapshot(data) {
     renderMenu({ preserveScroll: menuWasVisible });
   } finally {
     cloudSync.applying = false;
+    if (shouldResaveLocalPreserves) scheduleCloudSave();
   }
 }
 
@@ -3912,6 +4033,8 @@ function sanitizeMenuItemForCloud(item) {
     details: item.details || "",
     image: images[0] || "",
     images,
+    createdAt: typeof item.createdAt === "string" ? item.createdAt : "",
+    updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : "",
     price: Number(item.price) || 0
   };
 }
@@ -8681,8 +8804,8 @@ async function updateItemImageFromFile(event) {
     for (const [index, file] of files.entries()) {
       const fileLabel = totalFiles > 1 ? ` ${index + 1} of ${totalFiles}` : "";
       const compressedImage = await prepareUploadedImage(file, {
-        maxWidth: useCloudStorage ? 1400 : 700,
-        quality: useCloudStorage ? 0.78 : 0.62,
+        maxWidth: useCloudStorage ? 1400 : 640,
+        quality: useCloudStorage ? 0.78 : 0.58,
         preview: itemUploadPreview,
         image: null,
         progress: itemUploadProgress,
@@ -8881,6 +9004,7 @@ function getFormItem() {
   const heat = Math.max(0, Math.min(3, Number(itemHeat.value)));
   const category = itemCategory.value;
   const images = getItemImageFieldValues();
+  const updatedAt = new Date().toISOString();
   const allergens = itemAllergens.value
     .split(",")
     .map((allergen) => allergen.trim())
@@ -8894,6 +9018,7 @@ function getFormItem() {
     details: itemDetails.value.trim() || "Key ingredients, flavor notes, and service talking points can go here.",
     image: images[0] || "",
     images,
+    updatedAt,
     category,
     diet: itemDiet.value,
     style: getStyleForItem(category, heat),
@@ -8917,11 +9042,21 @@ function saveItem(event) {
   }
 
   if (itemIndex >= 0) {
-    menuItems[itemIndex] = item;
+    menuItems[itemIndex] = {
+      ...item,
+      createdAt: previousItem?.createdAt || item.updatedAt
+    };
   } else {
-    menuItems = [item, ...menuItems];
+    menuItems = [
+      {
+        ...item,
+        createdAt: item.updatedAt
+      },
+      ...menuItems
+    ];
   }
 
+  markLocalItemEdit(item);
   saveMenuItems();
   closeItemDialog();
   renderAllergyChips();
@@ -8979,6 +9114,7 @@ function deleteMenuItemById(id) {
   if (!item || !canEditCategory(item.category) || state.sharedMenu) return false;
   const menuScrollSnapshot = captureMenuScrollSnapshot(id);
 
+  markLocalItemDelete(id);
   menuItems = menuItems.filter((item) => item.id !== id);
   saveMenuItems();
   state.openItems.delete(id);
