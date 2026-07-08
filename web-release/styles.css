@@ -1934,10 +1934,10 @@ h1 {
 }
 
 .matrix-card {
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--white);
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .matrix-header,
@@ -1952,22 +1952,28 @@ h1 {
 
 .menu-grid {
   display: grid;
+  gap: 10px;
 }
 
 .menu-row {
-  --row-reveal-y: 18px;
-  --row-reveal-scale: 0.985;
+  --row-reveal-y: -24px;
+  --row-reveal-scale: 0.975;
   position: relative;
   min-height: 96px;
   padding: 12px;
-  border-top: 1px solid var(--line);
+  border: 1px solid rgba(25, 33, 29, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 22px rgba(25, 33, 29, 0.06);
   overflow: hidden;
   opacity: 0;
   transform: translateX(calc(var(--swipe-offset, 0px) * 0.18)) translateY(var(--row-reveal-y)) scale(var(--row-reveal-scale));
   transition:
     opacity 320ms ease,
     transform 420ms cubic-bezier(0.2, 0.78, 0.22, 1),
-    background 180ms ease;
+    background 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
   transition-delay: var(--row-reveal-delay, 0ms);
   touch-action: pan-y;
   will-change: opacity, transform;
@@ -1977,6 +1983,11 @@ h1 {
   --row-reveal-y: 0px;
   --row-reveal-scale: 1;
   opacity: 1;
+}
+
+.menu-row.is-open {
+  border-color: rgba(47, 125, 86, 0.22);
+  box-shadow: 0 12px 30px rgba(25, 33, 29, 0.09);
 }
 
 .menu-row::before {
@@ -2919,6 +2930,9 @@ h1 {
     display: grid;
     grid-template-columns: minmax(320px, 1fr) 76px 86px 96px;
     gap: 12px;
+    margin-bottom: 10px;
+    border: 1px solid rgba(25, 33, 29, 0.08);
+    border-radius: 8px;
     padding: 12px 14px;
     background: #f5f1e8;
     color: var(--muted);

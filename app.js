@@ -4723,7 +4723,7 @@ function prepareMenuRevealObserver() {
         .filter((entry) => entry.isIntersecting)
         .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
         .forEach((entry) => {
-          const delay = Math.min(180, (menuRevealSequence % 6) * 36);
+          const delay = Math.min(220, (menuRevealSequence % 6) * 44);
           menuRevealSequence += 1;
           entry.target.style.setProperty("--row-reveal-delay", `${delay}ms`);
           entry.target.classList.add("is-visible");
