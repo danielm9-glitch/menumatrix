@@ -4847,6 +4847,20 @@ function renderItemPhotoGallery(gallery, images, itemName, itemId) {
   }
 }
 
+function updateMenuRowExpandedState(itemId, isOpen) {
+  const row = getMenuRowById(itemId);
+  if (!row) return false;
+
+  const itemToggle = row.querySelector(".item-toggle");
+  const itemDetails = row.querySelector(".item-details");
+  row.classList.toggle("is-open", isOpen);
+  itemToggle?.setAttribute("aria-expanded", String(isOpen));
+  if (itemDetails) itemDetails.hidden = !isOpen;
+
+  window.requestAnimationFrame(updateBackToTopButton);
+  return true;
+}
+
 function getItemPhotoSlideIndex(itemId, imageCount) {
   const fallbackIndex = 0;
   const currentIndex = Number(state.photoSlides[itemId]);
@@ -5051,7 +5065,10 @@ function toggleItemDetails(id) {
     state.openItems.add(id);
   }
 
-  renderMenu({ preserveScroll: true, anchorItemId: id });
+  const isOpen = state.openItems.has(id);
+  if (!updateMenuRowExpandedState(id, isOpen)) {
+    renderMenu({ preserveScroll: true, anchorItemId: id });
+  }
 }
 
 function renderAllergyChips() {
