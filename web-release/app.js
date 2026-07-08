@@ -18,6 +18,7 @@ const legacyMott32HeroImage = "https://www.nicepng.com/png/detail/809-8099031_mo
 const defaultHeroImage = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 260'%3E%3Crect width='640' height='260' fill='%23f7f1e6'/%3E%3Ctext x='320' y='116' text-anchor='middle' font-family='Georgia%2C serif' font-size='84' font-weight='700' fill='%2319211d'%3EMOTT 32%3C/text%3E%3Ctext x='320' y='168' text-anchor='middle' font-family='Arial%2C sans-serif' font-size='22' letter-spacing='8' fill='%2366716b'%3ELAS VEGAS%3C/text%3E%3C/svg%3E";
 const defaultFrontMediaUrl = "assets/login-background.mp4";
 const maxInlineVideoUploadSize = 850000;
+const itemPhotoCloudUploadsEnabled = window.MENU_MATRIX_ENABLE_STORAGE_UPLOADS === true;
 const defaultDesign = {
   ink: "#19211d",
   leaf: "#2f7d56",
@@ -2977,11 +2978,11 @@ async function prepareUploadedImage(file, { maxWidth = 1200, quality = 0.82, pre
         preview,
         progress,
         status,
-        percent: Math.round(percent * 0.45),
+        percent: 6 + Math.round(percent * 0.24),
         message: "Reading image..."
       });
     });
-    setUploadProgress({ preview, progress, status, percent: 56, message: "Preparing preview..." });
+    setUploadProgress({ preview, progress, status, percent: 54, message: "Compressing image..." });
 
     const compressedDataUrl = await compressImageDataUrl(originalDataUrl, { maxWidth, quality });
     if (image) image.src = compressedDataUrl;
@@ -3026,7 +3027,7 @@ function getCloudStorageClient() {
 
 function canUploadItemPhotosToCloud() {
   const storage = getCloudStorageClient();
-  return Boolean(storage?.ref && getActiveUser());
+  return Boolean(itemPhotoCloudUploadsEnabled && storage?.ref && getActiveUser());
 }
 
 function getSafeStorageSegment(value, fallback = "file") {
@@ -8897,21 +8898,25 @@ async function updateItemImageFromFile(event) {
             percent: 62,
             message: `Uploading photo${fileLabel}...`
           });
-          const cloudUrl = await uploadItemPhotoToCloud(compressedImage, {
-            itemId: itemDraftId,
-            file,
-            index,
-            total: totalFiles,
-            onProgress: (percent) => {
-              setUploadProgress({
-                preview: itemUploadPreview,
-                progress: itemUploadProgress,
-                status: itemUploadStatus,
-                percent: 62 + Math.round(percent * 0.36),
-                message: `Uploading photo${fileLabel}...`
-              });
-            }
-          });
+          const cloudUrl = await withTimeout(
+            uploadItemPhotoToCloud(compressedImage, {
+              itemId: itemDraftId,
+              file,
+              index,
+              total: totalFiles,
+              onProgress: (percent) => {
+                setUploadProgress({
+                  preview: itemUploadPreview,
+                  progress: itemUploadProgress,
+                  status: itemUploadStatus,
+                  percent: 62 + Math.round(percent * 0.36),
+                  message: `Uploading photo${fileLabel}...`
+                });
+              }
+            }),
+            12000,
+            "Photo upload took too long."
+          );
           uploadedImages.push(cloudUrl);
         } catch (uploadError) {
           console.warn("Item photo cloud upload failed; using compact local copy.", uploadError);
@@ -8923,7 +8928,7 @@ async function updateItemImageFromFile(event) {
             progress: itemUploadProgress,
             status: itemUploadStatus,
             percent: 100,
-            message: "Firebase Storage is not set up yet. Saved a smaller local copy."
+            message: "Cloud upload is unavailable. Photo ready as a smaller copy."
           });
         }
       } else {
@@ -8933,7 +8938,7 @@ async function updateItemImageFromFile(event) {
 
     const nextImages = normalizeItemImageList([...getItemImageFieldValues(), ...uploadedImages]);
     const storageNote = usedLocalFallback
-      ? "Added a smaller local copy. Set up Firebase Storage for full cloud photo uploads."
+      ? "Photo ready to save."
       : "Uploaded and ready to save.";
     setItemImageField(
       nextImages,
