@@ -3380,14 +3380,32 @@ function canShareActiveMenu() {
   return Boolean(getActiveUser() && getActiveRestaurantMenu() && (isAdmin() || ownsActiveMenu()));
 }
 
+function getFirebaseDb() {
+  return cloudSync.client?.db || window.menuMatrixFirebase?.db || null;
+}
+
 function getShareCollection() {
-  return cloudSync.client?.db?.collection("menuShares") || null;
+  return getFirebaseDb()?.collection("menuShares") || null;
 }
 
 function getShareDocument(code) {
   const collection = getShareCollection();
   const normalizedCode = normalizeShareCode(code);
   return collection && normalizedCode ? collection.doc(normalizedCode) : null;
+}
+
+async function ensureSharedFirebaseAccess() {
+  const client = await waitForFirebaseClient();
+  if (!client?.enabled || !client.db) return null;
+
+  cloudSync.client = cloudSync.client || client;
+  await waitForFirebaseAuthReady(client, 7000);
+
+  if (client.auth && !client.auth.currentUser) {
+    await withTimeout(client.auth.signInAnonymously(), 9000, "Firebase sign-in timed out.");
+  }
+
+  return client;
 }
 
 async function validateShareCodeAvailability(code) {
@@ -3493,8 +3511,26 @@ async function syncSharedMenuSnapshots() {
 
 async function loadSharedMenuFromCode(code) {
   const normalizedCode = normalizeShareCode(code);
+  const submitButton = codeLoginForm?.querySelector('button[type="submit"]');
   if (!normalizedCode) {
     codeLoginMessage.textContent = "Enter a share code.";
+    return;
+  }
+
+  codeLoginMessage.textContent = "Loading shared menu...";
+  if (submitButton) submitButton.disabled = true;
+
+  try {
+    await ensureSharedFirebaseAccess();
+  } catch {
+    const savedEntry = getSavedShareCodeEntry(normalizedCode);
+    if (savedEntry?.menu) {
+      openSharedMenuSnapshot(savedEntry);
+      if (submitButton) submitButton.disabled = false;
+      return;
+    }
+    codeLoginMessage.textContent = "Could not connect to Firebase on this device. Check your connection and try again.";
+    if (submitButton) submitButton.disabled = false;
     return;
   }
 
@@ -3503,20 +3539,21 @@ async function loadSharedMenuFromCode(code) {
     const savedEntry = getSavedShareCodeEntry(normalizedCode);
     if (savedEntry?.menu) {
       openSharedMenuSnapshot(savedEntry);
+      if (submitButton) submitButton.disabled = false;
       return;
     }
-    codeLoginMessage.textContent = "Firebase is still connecting. Try again in a moment.";
+    codeLoginMessage.textContent = "Firebase is not ready on this device. Close and reopen the page, then try again.";
+    if (submitButton) submitButton.disabled = false;
     return;
   }
 
-  codeLoginMessage.textContent = "Loading shared menu...";
-
   try {
-    const snapshot = await doc.get();
+    const snapshot = await withTimeout(doc.get(), 12000, "Shared menu lookup timed out.");
     if (!snapshot.exists) {
       const savedEntry = getSavedShareCodeEntry(normalizedCode);
       if (savedEntry?.menu) {
         openSharedMenuSnapshot(savedEntry);
+        if (submitButton) submitButton.disabled = false;
         return;
       }
       codeLoginMessage.textContent = "That code was not found.";
@@ -3539,13 +3576,18 @@ async function loadSharedMenuFromCode(code) {
       },
       categories: data.categories
     });
-  } catch {
+  } catch (error) {
     const savedEntry = getSavedShareCodeEntry(normalizedCode);
     if (savedEntry?.menu) {
       openSharedMenuSnapshot(savedEntry);
       return;
     }
-    codeLoginMessage.textContent = "Could not load that code. Check Firebase rules or try again.";
+    codeLoginMessage.textContent =
+      error?.message === "Shared menu lookup timed out."
+        ? "The menu took too long to load. Check your connection and try again."
+        : "Could not load that code. Check the code and try again.";
+  } finally {
+    if (submitButton) submitButton.disabled = false;
   }
 }
 
@@ -3629,6 +3671,27 @@ function setSyncStatus(message, tone = "") {
   syncStatus.classList.toggle("error", tone === "error");
 }
 
+function withTimeout(promise, timeoutMs, message = "Request timed out.") {
+  let timeoutId = null;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+
+  return Promise.race([Promise.resolve(promise), timeout]).finally(() => {
+    window.clearTimeout(timeoutId);
+  });
+}
+
+async function waitForFirebaseAuthReady(client, timeoutMs = 8000) {
+  if (!client?.authReady) return client?.auth?.currentUser || null;
+
+  try {
+    return await withTimeout(client.authReady, timeoutMs, "Firebase took too long to connect.");
+  } catch {
+    return client.auth?.currentUser || null;
+  }
+}
+
 function waitForFirebaseClient() {
   if (window.menuMatrixFirebase) {
     return Promise.resolve(window.menuMatrixFirebase);
@@ -3650,7 +3713,7 @@ function waitForFirebaseClient() {
 async function getFirebaseAuth() {
   const client = await waitForFirebaseClient();
   if (!client?.enabled || !client.auth) return null;
-  await client.authReady;
+  await waitForFirebaseAuthReady(client);
   return client.auth;
 }
 
@@ -3667,7 +3730,7 @@ async function restoreAnonymousAuth() {
 
   try {
     if (!client.auth.currentUser) {
-      await client.auth.signInAnonymously();
+      await withTimeout(client.auth.signInAnonymously(), 9000, "Anonymous Firebase sign-in timed out.");
     }
   } catch {
     // The UI already reports Firebase connection issues through sync status.
@@ -3692,6 +3755,7 @@ function getAuthErrorMessage(error) {
   if (code === "auth/too-many-requests") {
     return "Firebase temporarily blocked this device because of too many login or email attempts. Stop trying for a while, then try again later.";
   }
+  if (error?.message?.includes("timed out")) return "Firebase took too long to respond. Check the connection and try again.";
   if (code === "auth/network-request-failed") return "Network error. Try again in a moment.";
   return error?.message || "Authentication failed.";
 }
@@ -3737,8 +3801,8 @@ async function initializeCloudSync() {
   }
 
   setSyncStatus("Connecting to Firebase...");
-  await client.authReady;
   cloudSync.client = client;
+  await waitForFirebaseAuthReady(client, 8000);
   connectCloudUsers();
   connectCloudWorkspaceForCurrentUser();
 }
@@ -7130,7 +7194,11 @@ async function loginWithFirebaseAccount(identity, password) {
   if (!email) return false;
 
   try {
-    const credential = await auth.signInWithEmailAndPassword(email, password);
+    const credential = await withTimeout(
+      auth.signInWithEmailAndPassword(email, password),
+      15000,
+      "Firebase login timed out."
+    );
     await credential.user.reload();
 
     if (!credential.user.emailVerified && existingUser?.status !== "active") {
@@ -7218,35 +7286,42 @@ async function resendVerificationFromLogin() {
 async function loginAdmin(event) {
   event.preventDefault();
 
+  const submitButton = adminLoginForm?.querySelector('button[type="submit"]');
   const identity = adminUsername.value.trim().toLowerCase();
   const password = adminPassword.value;
   setResendVerificationVisible(false);
-  const user = getVisibleUsers().find((savedUser) => {
-    const username = savedUser.username.toLowerCase();
-    const email = (savedUser.email || "").toLowerCase();
-    return (
-      savedUser.role !== "owner" &&
-      (username === identity || email === identity) &&
-      savedUser.password === password &&
-      savedUser.status !== "pending"
-    );
-  });
+  if (submitButton) submitButton.disabled = true;
 
-  if (!user) {
-    loginMessage.textContent = "Checking Firebase account...";
-    const handledByFirebase = await loginWithFirebaseAccount(identity, password);
-    if (!handledByFirebase) {
-      loginMessage.textContent = "Invalid login.";
+  try {
+    const user = getVisibleUsers().find((savedUser) => {
+      const username = savedUser.username.toLowerCase();
+      const email = (savedUser.email || "").toLowerCase();
+      return (
+        savedUser.role !== "owner" &&
+        (username === identity || email === identity) &&
+        savedUser.password === password &&
+        savedUser.status !== "pending"
+      );
+    });
+
+    if (!user) {
+      loginMessage.textContent = "Checking Firebase account...";
+      const handledByFirebase = await loginWithFirebaseAccount(identity, password);
+      if (!handledByFirebase) {
+        loginMessage.textContent = "Invalid login.";
+      }
+      return;
     }
-    return;
-  }
 
-  state.currentUser = user.username;
-  state.screen = "menus";
-  localStorage.setItem(currentUserKey, user.username);
-  activateWorkspaceForCurrentUser();
-  adminLoginForm.reset();
-  renderAdminState();
+    state.currentUser = user.username;
+    state.screen = "menus";
+    localStorage.setItem(currentUserKey, user.username);
+    activateWorkspaceForCurrentUser();
+    adminLoginForm.reset();
+    renderAdminState();
+  } finally {
+    if (submitButton) submitButton.disabled = false;
+  }
 }
 
 function openRegisterPage() {
@@ -7276,9 +7351,9 @@ function toggleCodeLoginPanel() {
   }
 }
 
-function handleCodeLogin(event) {
+async function handleCodeLogin(event) {
   event.preventDefault();
-  loadSharedMenuFromCode(shareCodeInput.value);
+  await loadSharedMenuFromCode(shareCodeInput.value);
 }
 
 function openShareMenuDialog() {

@@ -24,12 +24,51 @@ try {
   const auth = window.firebase.auth();
   const db = window.firebase.firestore();
   const storage = window.firebase.storage ? window.firebase.storage() : null;
-  const authReady = auth.currentUser
-    ? Promise.resolve(auth.currentUser)
-    : auth.signInAnonymously().catch((error) => {
-        window.menuMatrixFirebase.error = error;
-        return null;
-      });
+  const authReady = new Promise((resolve) => {
+    let settled = false;
+    let unsubscribe = null;
+    const finish = (user = null) => {
+      if (settled) return;
+      settled = true;
+      if (unsubscribe) unsubscribe();
+      resolve(user || auth.currentUser || null);
+    };
+
+    window.setTimeout(() => finish(auth.currentUser || null), 7000);
+
+    try {
+      unsubscribe = auth.onAuthStateChanged(
+        (user) => {
+          if (user) finish(user);
+        },
+        (error) => {
+          window.menuMatrixFirebase.error = error;
+          finish(null);
+        }
+      );
+
+      if (auth.currentUser) {
+        finish(auth.currentUser);
+      } else {
+        Promise.resolve()
+          .then(() => {
+            const persistence = window.firebase.auth.Auth.Persistence;
+            return auth.setPersistence(persistence.LOCAL).catch(() =>
+              auth.setPersistence(persistence.SESSION).catch(() => auth.setPersistence(persistence.NONE))
+            );
+          })
+          .then(() => auth.signInAnonymously())
+          .then((credential) => finish(credential.user))
+          .catch((error) => {
+            window.menuMatrixFirebase.error = error;
+            finish(auth.currentUser || null);
+          });
+      }
+    } catch (error) {
+      window.menuMatrixFirebase.error = error;
+      finish(auth.currentUser || null);
+    }
+  });
 
   window.menuMatrixFirebase = {
     app,
