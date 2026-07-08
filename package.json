@@ -8,6 +8,7 @@
     "cap:sync": "cap sync android",
     "cap:open": "cap open android",
     "firebase:deploy": "firebase deploy --only hosting,firestore:rules",
+    "firebase:deploy:all": "firebase deploy --only hosting,firestore:rules,storage",
     "firebase:deploy:hosting": "firebase deploy --only hosting"
   },
   "keywords": [],

@@ -23,6 +23,7 @@ try {
     : window.firebase.initializeApp(firebaseConfig);
   const auth = window.firebase.auth();
   const db = window.firebase.firestore();
+  const storage = window.firebase.storage ? window.firebase.storage() : null;
   const authReady = auth.currentUser
     ? Promise.resolve(auth.currentUser)
     : auth.signInAnonymously().catch((error) => {
@@ -35,6 +36,7 @@ try {
     auth,
     authReady,
     db,
+    storage,
     enabled: true,
     error: null
   };

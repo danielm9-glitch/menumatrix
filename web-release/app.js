@@ -2994,6 +2994,96 @@ function compressImageDataUrl(dataUrl, { maxWidth, quality }) {
   });
 }
 
+function getCloudStorageClient() {
+  return cloudSync.client?.storage || window.menuMatrixFirebase?.storage || null;
+}
+
+function canUploadItemPhotosToCloud() {
+  const storage = getCloudStorageClient();
+  return Boolean(storage?.ref && getActiveUser());
+}
+
+function getSafeStorageSegment(value, fallback = "file") {
+  const segment = String(value || fallback)
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+  return segment || fallback;
+}
+
+function getFileExtensionFromType(contentType = "") {
+  if (/png/i.test(contentType)) return "png";
+  if (/webp/i.test(contentType)) return "webp";
+  if (/gif/i.test(contentType)) return "gif";
+  return "jpg";
+}
+
+function dataUrlToBlob(dataUrl) {
+  const match = String(dataUrl || "").match(/^data:([^;,]+)?(;base64)?,(.*)$/);
+  if (!match) throw new Error("Could not prepare image upload.");
+
+  const contentType = match[1] || "image/jpeg";
+  const isBase64 = Boolean(match[2]);
+  const source = match[3] || "";
+  const binary = isBase64 ? atob(source) : decodeURIComponent(source);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return new Blob([bytes], { type: contentType });
+}
+
+async function uploadItemPhotoToCloud(dataUrl, { itemId, file, index, total, onProgress }) {
+  const storage = getCloudStorageClient();
+  if (!storage?.ref) throw new Error("Firebase Storage is not ready.");
+
+  const blob = dataUrlToBlob(dataUrl);
+  const activeMenuId = state.activeRestaurantMenu || getActiveRestaurantMenu()?.id || defaultRestaurantMenuId;
+  const workspaceId = getWorkspaceDocumentId();
+  const uploadId =
+    window.crypto?.randomUUID?.() ||
+    `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const fileBase = getSafeStorageSegment((file?.name || `photo-${index + 1}`).replace(/\.[^.]+$/, ""), "photo");
+  const extension = getFileExtensionFromType(blob.type);
+  const path = [
+    "item-photos",
+    getSafeStorageSegment(workspaceId, "workspace"),
+    getSafeStorageSegment(activeMenuId, "menu"),
+    getSafeStorageSegment(itemId, "item"),
+    `${Date.now()}-${index + 1}-${fileBase}-${uploadId}.${extension}`
+  ].join("/");
+
+  const task = storage.ref().child(path).put(blob, {
+    contentType: blob.type || "image/jpeg",
+    customMetadata: {
+      menuId: activeMenuId,
+      owner: getActiveUser()?.username || "",
+      originalName: file?.name || `photo-${index + 1}`,
+      totalPhotos: String(total || 1)
+    }
+  });
+
+  return new Promise((resolve, reject) => {
+    task.on(
+      "state_changed",
+      (snapshot) => {
+        if (!snapshot.totalBytes) return;
+        onProgress?.(Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100));
+      },
+      reject,
+      async () => {
+        try {
+          resolve(await task.snapshot.ref.getDownloadURL());
+        } catch (error) {
+          reject(error);
+        }
+      }
+    );
+  });
+}
+
 function loadUsers() {
   const savedUsers = localStorage.getItem(usersStorageKey);
   if (!savedUsers) return ensureDefaultAdmin(defaultUsers);
@@ -8580,25 +8670,82 @@ async function updateItemImageFromFile(event) {
   const files = [...(event.target.files || [])];
   if (!files.length) return;
   const uploadedImages = [];
+  const totalFiles = files.length;
+  const itemDraftId = itemId.value || `item-${Date.now()}`;
+  itemId.value = itemDraftId;
+  const useCloudStorage = canUploadItemPhotosToCloud();
+  let usedLocalFallback = !useCloudStorage;
 
+  setUploadBusy(saveItemButton, true);
   try {
-    for (const file of files) {
+    for (const [index, file] of files.entries()) {
+      const fileLabel = totalFiles > 1 ? ` ${index + 1} of ${totalFiles}` : "";
       const compressedImage = await prepareUploadedImage(file, {
-        maxWidth: 900,
-        quality: 0.82,
+        maxWidth: useCloudStorage ? 1400 : 700,
+        quality: useCloudStorage ? 0.78 : 0.62,
         preview: itemUploadPreview,
         image: null,
         progress: itemUploadProgress,
         status: itemUploadStatus,
-        button: saveItemButton
+        button: null
       });
-      uploadedImages.push(compressedImage);
+
+      if (useCloudStorage) {
+        try {
+          setUploadProgress({
+            preview: itemUploadPreview,
+            progress: itemUploadProgress,
+            status: itemUploadStatus,
+            percent: 62,
+            message: `Uploading photo${fileLabel}...`
+          });
+          const cloudUrl = await uploadItemPhotoToCloud(compressedImage, {
+            itemId: itemDraftId,
+            file,
+            index,
+            total: totalFiles,
+            onProgress: (percent) => {
+              setUploadProgress({
+                preview: itemUploadPreview,
+                progress: itemUploadProgress,
+                status: itemUploadStatus,
+                percent: 62 + Math.round(percent * 0.36),
+                message: `Uploading photo${fileLabel}...`
+              });
+            }
+          });
+          uploadedImages.push(cloudUrl);
+        } catch (uploadError) {
+          console.warn("Item photo cloud upload failed; using compact local copy.", uploadError);
+          const fallbackImage = await compressImageDataUrl(compressedImage, { maxWidth: 640, quality: 0.58 });
+          uploadedImages.push(fallbackImage);
+          usedLocalFallback = true;
+          setUploadProgress({
+            preview: itemUploadPreview,
+            progress: itemUploadProgress,
+            status: itemUploadStatus,
+            percent: 100,
+            message: "Firebase Storage is not set up yet. Saved a smaller local copy."
+          });
+        }
+      } else {
+        uploadedImages.push(compressedImage);
+      }
     }
 
     const nextImages = normalizeItemImageList([...getItemImageFieldValues(), ...uploadedImages]);
-    setItemImageField(nextImages, `Added ${uploadedImages.length} photo${uploadedImages.length === 1 ? "" : "s"}. ${nextImages.length} total.`);
+    const storageNote = usedLocalFallback
+      ? "Added a smaller local copy. Set up Firebase Storage for full cloud photo uploads."
+      : "Uploaded and ready to save.";
+    setItemImageField(
+      nextImages,
+      `${storageNote} Added ${uploadedImages.length} photo${uploadedImages.length === 1 ? "" : "s"}. ${nextImages.length} total.`
+    );
+    itemImageFile.value = "";
   } catch (error) {
-    renderItemPhotoPreview(getItemImageFieldValues(), error?.message || "Could not read one of those images.");
+    renderItemPhotoPreview(getItemImageFieldValues(), error?.message || "Could not upload one of those images.");
+  } finally {
+    setUploadBusy(saveItemButton, false);
   }
 }
 
