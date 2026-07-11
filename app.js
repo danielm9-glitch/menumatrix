@@ -4723,20 +4723,20 @@ function prepareMenuRevealObserver() {
         .filter((entry) => entry.isIntersecting)
         .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
         .forEach((entry) => {
-          const delay = Math.min(220, (menuRevealSequence % 6) * 44);
+          const delay = Math.min(260, (menuRevealSequence % 6) * 52);
           menuRevealSequence += 1;
           entry.target.style.setProperty("--row-reveal-delay", `${delay}ms`);
           entry.target.classList.add("is-visible");
           window.setTimeout(() => {
             entry.target.style.setProperty("--row-reveal-delay", "0ms");
-          }, delay + 460);
+          }, delay + 720);
           menuRevealObserver?.unobserve(entry.target);
         });
     },
     {
       root: null,
-      rootMargin: "0px 0px -8% 0px",
-      threshold: 0.12
+      rootMargin: "0px 0px -12% 0px",
+      threshold: 0.08
     }
   );
 }

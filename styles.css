@@ -1956,8 +1956,10 @@ h1 {
 }
 
 .menu-row {
-  --row-reveal-y: -24px;
-  --row-reveal-scale: 0.975;
+  --row-reveal-y: 26px;
+  --row-reveal-scale: 0.9;
+  --row-reveal-tilt: 7deg;
+  --row-reveal-blur: 7px;
   position: relative;
   min-height: 96px;
   padding: 12px;
@@ -1967,21 +1969,27 @@ h1 {
   box-shadow: 0 8px 22px rgba(25, 33, 29, 0.06);
   overflow: hidden;
   opacity: 0;
-  transform: translateX(calc(var(--swipe-offset, 0px) * 0.18)) translateY(var(--row-reveal-y)) scale(var(--row-reveal-scale));
+  filter: blur(var(--row-reveal-blur));
+  transform: translateX(calc(var(--swipe-offset, 0px) * 0.18)) translateY(var(--row-reveal-y)) scale(var(--row-reveal-scale)) rotateX(var(--row-reveal-tilt));
+  transform-origin: center bottom;
   transition:
-    opacity 320ms ease,
-    transform 420ms cubic-bezier(0.2, 0.78, 0.22, 1),
+    opacity 420ms ease,
+    filter 420ms ease,
+    transform 640ms cubic-bezier(0.16, 1, 0.3, 1),
     background 180ms ease,
     box-shadow 180ms ease,
     border-color 180ms ease;
   transition-delay: var(--row-reveal-delay, 0ms);
   touch-action: pan-y;
-  will-change: opacity, transform;
+  backface-visibility: hidden;
+  will-change: opacity, filter, transform;
 }
 
 .menu-row.is-visible {
   --row-reveal-y: 0px;
   --row-reveal-scale: 1;
+  --row-reveal-tilt: 0deg;
+  --row-reveal-blur: 0px;
   opacity: 1;
 }
 
@@ -2034,6 +2042,8 @@ h1 {
 .menu-row.swipe-commit-delete {
   --swipe-offset: 0px;
   --row-reveal-scale: 0.985;
+  --row-reveal-tilt: 0deg;
+  --row-reveal-blur: 0px;
 }
 
 .menu-row.swipe-commit-edit::before,
@@ -3048,6 +3058,8 @@ h1 {
   .menu-row {
     --row-reveal-y: 0px;
     --row-reveal-scale: 1;
+    --row-reveal-tilt: 0deg;
+    --row-reveal-blur: 0px;
     opacity: 1;
     transition: background 180ms ease;
   }
