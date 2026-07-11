@@ -4715,7 +4715,7 @@ function prepareMenuRevealObserver() {
   menuRevealObserver = null;
   menuRevealSequence = 0;
 
-  if (prefersReducedMenuMotion() || !("IntersectionObserver" in window)) return;
+  if (!("IntersectionObserver" in window)) return;
 
   menuRevealObserver = new IntersectionObserver(
     (entries) => {
@@ -4723,20 +4723,25 @@ function prepareMenuRevealObserver() {
         .filter((entry) => entry.isIntersecting)
         .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
         .forEach((entry) => {
-          const delay = Math.min(260, (menuRevealSequence % 6) * 52);
+          const row = entry.target;
+          const delay = Math.min(320, (menuRevealSequence % 6) * 64);
           menuRevealSequence += 1;
-          entry.target.style.setProperty("--row-reveal-delay", `${delay}ms`);
-          entry.target.classList.add("is-visible");
-          window.setTimeout(() => {
-            entry.target.style.setProperty("--row-reveal-delay", "0ms");
-          }, delay + 720);
-          menuRevealObserver?.unobserve(entry.target);
+          row.style.setProperty("--row-reveal-delay", `${delay}ms`);
+          window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+              row.classList.add("is-visible");
+              window.setTimeout(() => {
+                row.style.setProperty("--row-reveal-delay", "0ms");
+              }, delay + 920);
+            });
+          });
+          menuRevealObserver?.unobserve(row);
         });
     },
     {
       root: null,
-      rootMargin: "0px 0px -12% 0px",
-      threshold: 0.08
+      rootMargin: "0px 0px -18% 0px",
+      threshold: 0.16
     }
   );
 }
