@@ -21,6 +21,7 @@
   },
   "devDependencies": {
     "@capacitor/cli": "^8.3.4",
-    "firebase-tools": "^15.19.0"
+    "firebase-tools": "^15.19.0",
+    "playwright": "^1.61.1"
   }
 }
