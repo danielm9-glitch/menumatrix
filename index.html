@@ -6,7 +6,7 @@
     <title>Menu Matrix</title>
     <link rel="icon" type="image/svg+xml" href="assets/app-icon.svg" />
     <link rel="apple-touch-icon" href="assets/app-icon-launcher-preview.png" />
-    <link rel="stylesheet" href="styles.css?v=scroll-pop-fixed" />
+    <link rel="stylesheet" href="styles.css?v=demo-menu-guide" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -49,6 +49,7 @@
           <p id="setupMessage" class="login-message" role="status"></p>
         </form>
 
+        <button id="demoMenuButton" class="demo-menu-button" type="button">Try demo menu</button>
         <button id="registerLinkButton" class="link-button" type="button">Register</button>
         <button id="showCodeLoginButton" class="link-button" type="button">I have a code</button>
         <form id="codeLoginForm" class="auth-form code-login-form" hidden>
@@ -178,6 +179,31 @@
             <button id="renameMenuButton" class="small-icon-action" type="button" aria-label="Rename menu" hidden>
               <span aria-hidden="true">&#9998;</span>
             </button>
+          </div>
+        </section>
+
+        <section id="demoGuidePanel" class="demo-guide-panel" aria-label="Demo guide" hidden>
+          <div>
+            <p class="kicker">Demo guide</p>
+            <h3>Learn the menu in a few taps</h3>
+          </div>
+          <ol class="demo-tip-list">
+            <li>
+              <strong>Tap a dish</strong>
+              <span>Open details, photos, ingredients, allergens, portions, and service notes.</span>
+            </li>
+            <li>
+              <strong>Use filters</strong>
+              <span>Try Allergy check or Ingredient finder to narrow the menu fast.</span>
+            </li>
+            <li>
+              <strong>Practice</strong>
+              <span>Flash cards and Quiz help servers study items before service.</span>
+            </li>
+          </ol>
+          <div class="demo-guide-actions">
+            <button id="demoCreateAccountButton" class="quick-action-button is-active" type="button">Create account</button>
+            <button id="demoExitButton" class="quick-action-button" type="button">Exit demo</button>
           </div>
         </section>
 
@@ -1080,6 +1106,6 @@
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js?v=scroll-pop-fixed"></script>
+    <script src="app.js?v=demo-menu-guide"></script>
   </body>
 </html>

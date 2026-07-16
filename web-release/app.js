@@ -1950,6 +1950,7 @@ const state = {
   currentUser: loadCurrentUser(),
   sharedMenu: null,
   sharedCode: "",
+  demoMode: false,
   editing: false,
   localItemEditTimes: {},
   localDeletedItemTimes: {},
@@ -2075,6 +2076,7 @@ const registerUsername = document.querySelector("#registerUsername");
 const registerEmail = document.querySelector("#registerEmail");
 const registerPassword = document.querySelector("#registerPassword");
 const registerMessage = document.querySelector("#registerMessage");
+const demoMenuButton = document.querySelector("#demoMenuButton");
 const registerLinkButton = document.querySelector("#registerLinkButton");
 const loginLinkButton = document.querySelector("#loginLinkButton");
 const showCodeLoginButton = document.querySelector("#showCodeLoginButton");
@@ -2255,6 +2257,9 @@ const editHeroButton = document.querySelector("#editHeroButton");
 const currentMenuTitle = document.querySelector("#currentMenuTitle");
 const topAddItemButton = document.querySelector("#topAddItemButton");
 const renameMenuButton = document.querySelector("#renameMenuButton");
+const demoGuidePanel = document.querySelector("#demoGuidePanel");
+const demoCreateAccountButton = document.querySelector("#demoCreateAccountButton");
+const demoExitButton = document.querySelector("#demoExitButton");
 const renameMenuDialog = document.querySelector("#renameMenuDialog");
 const renameMenuForm = document.querySelector("#renameMenuForm");
 const closeRenameMenuButton = document.querySelector("#closeRenameMenuButton");
@@ -2505,6 +2510,107 @@ function createDefaultRestaurantMenu() {
     items: clearDefaultStockImagesForMenuItems(loadMenuItems()),
     designSettings: loadDesignSettings()
   };
+}
+
+function createDemoSvgImage(title, background = "#19211d", accent = "#d99d2b", subtitle = "Menu training") {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360">
+      <rect width="640" height="360" fill="${background}"/>
+      <circle cx="512" cy="82" r="98" fill="${accent}" opacity="0.22"/>
+      <circle cx="108" cy="294" r="132" fill="#ffffff" opacity="0.08"/>
+      <rect x="62" y="72" width="516" height="216" rx="30" fill="#fffdfa" opacity="0.92"/>
+      <text x="320" y="166" text-anchor="middle" font-family="Georgia, serif" font-size="42" font-weight="700" fill="#19211d">${title}</text>
+      <text x="320" y="210" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="700" letter-spacing="4" fill="#66716b">${subtitle}</text>
+    </svg>
+  `;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+function createDemoRestaurantMenu() {
+  const demoItems = [
+    {
+      id: "demo-peking-duck",
+      name: "Signature Peking Duck",
+      description: "A training item with price, photo slides, allergens, accompaniments, and service notes.",
+      category: "bbq",
+      diet: "SIGN",
+      heat: 0,
+      allergens: ["Gluten", "Egg", "Peanut", "Sesame"],
+      ingredients: ["Duck", "Maltose", "Cucumber", "Scallion", "Sesame sauce", "Peanut sauce"],
+      details: "Tutorial: tap the item name to open this panel. Photos can be swiped, ingredients are separated from allergens, and prices stay visible in the matrix.",
+      images: [
+        createDemoSvgImage("Duck Plating", "#2f3b35", "#d99d2b", "Swipe photos"),
+        createDemoSvgImage("Sauce Setup", "#21343b", "#317c8e", "Details view")
+      ],
+      price: 128
+    },
+    {
+      id: "demo-soup-dumplings",
+      name: "Hot & Sour Soup Dumplings",
+      description: "Use this item to test heat level, ingredient finder, and allergy filtering.",
+      category: "steamed-dim-sum",
+      diet: "DIM",
+      heat: 2,
+      allergens: ["Gluten", "Soy", "Pork", "Sesame"],
+      ingredients: ["Iberico pork", "Ginger", "Chili", "Vinegar", "Gelatine"],
+      details: "Tutorial: select Pork or Gluten in Allergy check to see how the menu hides items guests should avoid.",
+      images: [createDemoSvgImage("Soup Dumplings", "#53342f", "#d99d2b", "Allergy filter demo")],
+      price: 14
+    },
+    {
+      id: "demo-lobster-noodle",
+      name: "Lobster Longevity Noodles",
+      description: "A seafood example for search, category browsing, and quiz practice.",
+      category: "rice-noodles",
+      diet: "SEA",
+      heat: 1,
+      allergens: ["Shellfish", "Gluten", "Soy", "Garlic"],
+      ingredients: ["Lobster", "Noodle", "Garlic", "Scallion", "Soy sauce"],
+      details: "Tutorial: search for lobster, noodle, garlic, or soy to see how staff can find answers quickly during training.",
+      images: [createDemoSvgImage("Lobster Noodles", "#243845", "#317c8e", "Search demo")],
+      price: 58
+    },
+    {
+      id: "demo-vegetable-tofu",
+      name: "Crispy Tofu & Seasonal Vegetables",
+      description: "A vegetarian-style example that shows ingredient notes without major seafood or pork allergens.",
+      category: "vegetables",
+      diet: "VEG",
+      heat: 0,
+      allergens: ["Soy", "Gluten"],
+      ingredients: ["Tofu", "Broccoli", "Mushroom", "Ginger", "Soy sauce"],
+      details: "Tutorial: Ingredient finder helps trainees locate items that contain a specific ingredient, not just avoid allergens.",
+      images: [createDemoSvgImage("Tofu Vegetables", "#2f4a3d", "#89b86d", "Ingredient demo")],
+      price: 28
+    },
+    {
+      id: "demo-mango-dessert",
+      name: "Mango Almond Cloud",
+      description: "A dessert example for flash cards and single-answer quiz questions.",
+      category: "desserts",
+      diet: "SWT",
+      heat: 0,
+      allergens: ["Dairy", "Nut"],
+      ingredients: ["Mango", "Almond", "Cream", "Coconut"],
+      details: "Tutorial: open Flash cards or Quiz above to practice ingredients and allergy answers from this demo menu.",
+      images: [createDemoSvgImage("Mango Dessert", "#59412e", "#f2c766", "Quiz demo")],
+      price: 16
+    }
+  ];
+
+  return normalizeRestaurantMenu({
+    id: "demo-menu-matrix",
+    name: "Menu Matrix Demo",
+    restaurantName: "Demo Kitchen",
+    owner: "demo",
+    label: "Tutorial menu",
+    categories: ["bbq", "steamed-dim-sum", "rice-noodles", "vegetables", "desserts"],
+    items: demoItems,
+    designSettings: {
+      ...defaultDesign,
+      heroImage: createDemoSvgImage("Menu Matrix Demo", "#19211d", "#d99d2b", "Tap, filter, study")
+    }
+  });
 }
 
 function normalizeRestaurantMenu(menu, index = 0) {
@@ -3446,6 +3552,7 @@ function openSharedMenuSnapshot({ code, menu, categories: sharedCategories = [] 
 
   state.sharedMenu = sharedMenu;
   state.sharedCode = normalizedCode;
+  state.demoMode = false;
   state.currentUser = null;
   state.screen = "shared";
   state.editing = false;
@@ -3460,6 +3567,30 @@ function openSharedMenuSnapshot({ code, menu, categories: sharedCategories = [] 
   applyDesignSettings();
   renderAllergyChips();
   showScreen("shared");
+}
+
+function openDemoMenu() {
+  closeDrawer();
+  const demoMenu = createDemoRestaurantMenu();
+  state.sharedMenu = demoMenu;
+  state.sharedCode = "";
+  state.demoMode = true;
+  state.currentUser = null;
+  state.screen = "shared";
+  state.editing = false;
+  state.category = "all";
+  state.query = "";
+  state.openItems.clear();
+  state.allergies.clear();
+  state.ingredients.clear();
+  searchInput.value = "";
+  codeLoginForm.hidden = true;
+  codeLoginMessage.textContent = "";
+  syncActiveRestaurantMenuData();
+  applyDesignSettings();
+  renderAllergyChips();
+  showScreen("shared");
+  scrollToPageTop();
 }
 
 async function publishMenuShare(code) {
@@ -4380,9 +4511,11 @@ function renderActiveMenuHeader() {
   const canShareMenu = canShareActiveMenu();
   const canUseStudyTools = canStudyActiveMenu();
   const isSharedView = state.screen === "shared";
+  const isDemoView = isSharedView && state.demoMode;
   currentMenuTitle.textContent = activeMenu?.name || "No menu selected";
-  backToMenusButton.textContent = isSharedView ? "Exit" : "Menus";
+  backToMenusButton.textContent = isDemoView ? "Exit demo" : isSharedView ? "Exit" : "Menus";
   drawerOpenButton.hidden = isSharedView || !getActiveUser();
+  demoGuidePanel.hidden = !isDemoView;
   topAddItemButton.hidden = !canEditMenu;
   renameMenuButton.hidden = !state.editing || !canEditMenu;
   quickEditModeButton.textContent = state.editing ? "Done editing" : "Edit menu";
@@ -7223,6 +7356,7 @@ function renderAdminState() {
 
   adminLoginForm.hidden = Boolean(activeUser) || showingInviteSetup;
   passwordSetupForm.hidden = !showingInviteSetup;
+  demoMenuButton.hidden = showingInviteSetup;
   registerLinkButton.hidden = showingInviteSetup;
   showCodeLoginButton.hidden = showingInviteSetup;
   if (showingInviteSetup) codeLoginForm.hidden = true;
@@ -7479,6 +7613,11 @@ function openLoginPage() {
   adminUsername.focus();
 }
 
+function openRegisterFromDemo() {
+  exitSharedMenu();
+  openRegisterPage();
+}
+
 function toggleCodeLoginPanel() {
   codeLoginForm.hidden = !codeLoginForm.hidden;
   codeLoginMessage.textContent = "";
@@ -7571,6 +7710,7 @@ async function copyShareCode() {
 function exitSharedMenu() {
   state.sharedMenu = null;
   state.sharedCode = "";
+  state.demoMode = false;
   state.screen = getActiveUser() ? "menus" : "login";
   state.category = "all";
   state.query = "";
@@ -9487,6 +9627,9 @@ backToMenusButton.addEventListener("click", () => {
   setEditMode(false);
   showScreen("menus");
 });
+demoMenuButton.addEventListener("click", openDemoMenu);
+demoCreateAccountButton.addEventListener("click", openRegisterFromDemo);
+demoExitButton.addEventListener("click", exitSharedMenu);
 registerLinkButton.addEventListener("click", openRegisterPage);
 loginLinkButton.addEventListener("click", openLoginPage);
 showCodeLoginButton.addEventListener("click", toggleCodeLoginPanel);
