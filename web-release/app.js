@@ -1947,6 +1947,7 @@ const state = {
   allergies: new Set(),
   ingredients: new Set(),
   openItems: new Set(),
+  revealedMenuRows: new Set(),
   currentUser: loadCurrentUser(),
   sharedMenu: null,
   sharedCode: "",
@@ -4843,12 +4844,17 @@ function prefersReducedMenuMotion() {
   return Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches);
 }
 
+function getMenuRevealKey(itemId) {
+  const menuId = state.sharedMenu?.id || state.activeRestaurantMenu || "default-menu";
+  return `${menuId}:${itemId}`;
+}
+
 function prepareMenuRevealObserver() {
   menuRevealObserver?.disconnect();
   menuRevealObserver = null;
   menuRevealSequence = 0;
 
-  if (!("IntersectionObserver" in window)) return;
+  if (!("IntersectionObserver" in window) || prefersReducedMenuMotion()) return;
 
   menuRevealObserver = new IntersectionObserver(
     (entries) => {
@@ -4857,8 +4863,10 @@ function prepareMenuRevealObserver() {
         .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
         .forEach((entry) => {
           const row = entry.target;
+          const revealKey = row.dataset.revealKey || getMenuRevealKey(row.dataset.itemId);
           const delay = Math.min(320, (menuRevealSequence % 6) * 64);
           menuRevealSequence += 1;
+          state.revealedMenuRows.add(revealKey);
           row.style.setProperty("--row-reveal-delay", `${delay}ms`);
           window.requestAnimationFrame(() => {
             window.requestAnimationFrame(() => {
@@ -4882,7 +4890,9 @@ function prepareMenuRevealObserver() {
 function observeMenuRowReveal(row) {
   if (!row) return;
 
-  if (!menuRevealObserver) {
+  const revealKey = row.dataset.revealKey || getMenuRevealKey(row.dataset.itemId);
+  if (!menuRevealObserver || state.revealedMenuRows.has(revealKey)) {
+    state.revealedMenuRows.add(revealKey);
     row.classList.add("is-visible");
     row.style.setProperty("--row-reveal-delay", "0ms");
     return;
@@ -4973,6 +4983,7 @@ function renderMenu({ preserveScroll = false, anchorItemId = "", scrollSnapshot 
   items.forEach((item) => {
     const row = template.content.firstElementChild.cloneNode(true);
     row.dataset.itemId = item.id;
+    row.dataset.revealKey = getMenuRevealKey(item.id);
     row.classList.toggle("is-open", state.openItems.has(item.id));
     row.querySelector("h3").textContent = item.name;
     row.querySelector(".item-cell > p").textContent = item.description;
@@ -5124,8 +5135,24 @@ function getItemPhotoSlideIndex(itemId, imageCount) {
 
 function setItemPhotoSlide(itemId, imageCount, requestedIndex) {
   if (imageCount <= 1) return;
-  state.photoSlides[itemId] = (requestedIndex + imageCount) % imageCount;
-  renderMenu({ preserveScroll: true, anchorItemId: itemId });
+  const nextIndex = (requestedIndex + imageCount) % imageCount;
+  state.photoSlides[itemId] = nextIndex;
+
+  const row = getMenuRowById(itemId);
+  const gallery = row?.querySelector(".item-photo-gallery");
+  const track = gallery?.querySelector(".item-photo-track");
+  if (!gallery || !track) {
+    renderMenu({ preserveScroll: true, anchorItemId: itemId });
+    return;
+  }
+
+  track.style.transform = `translateX(-${nextIndex * 100}%)`;
+  gallery.querySelectorAll(".photo-slide-dot").forEach((dot, index) => {
+    dot.classList.toggle("is-active", index === nextIndex);
+  });
+
+  const counter = gallery.querySelector(".photo-slide-counter");
+  if (counter) counter.textContent = `${nextIndex + 1}/${imageCount}`;
 }
 
 function createPhotoDots(imageCount, activeIndex) {
