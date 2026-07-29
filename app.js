@@ -2115,6 +2115,7 @@ const adminStatus = document.querySelector("#adminStatus");
 const editModeButton = document.querySelector("#editModeButton");
 const quickMenuActions = document.querySelector("#quickMenuActions");
 const quickEditModeButton = document.querySelector("#quickEditModeButton");
+const quickCustomizationButton = document.querySelector("#quickCustomizationButton");
 const quickScanMenuButton = document.querySelector("#quickScanMenuButton");
 const quickImportPdfButton = document.querySelector("#quickImportPdfButton");
 const quickPdfBuilderButton = document.querySelector("#quickPdfBuilderButton");
@@ -4647,6 +4648,7 @@ function renderActiveMenuHeader() {
   const canManageMenuCategories = canManageCategories();
   const canShareMenu = canShareActiveMenu();
   const canUseStudyTools = canStudyActiveMenu();
+  const canCustomizeMenu = Boolean(activeMenu) && isAdmin();
   const isSharedView = state.screen === "shared";
   const isDemoView = isSharedView && state.demoMode;
   currentMenuTitle.textContent = activeMenu?.name || "No menu selected";
@@ -4658,6 +4660,7 @@ function renderActiveMenuHeader() {
   quickEditModeButton.textContent = state.editing ? "Done editing" : "Edit menu";
   quickEditModeButton.classList.toggle("is-active", state.editing);
   quickEditModeButton.hidden = !canEditMenu;
+  quickCustomizationButton.hidden = !canCustomizeMenu;
   quickScanMenuButton.hidden = !canEditMenu;
   quickImportPdfButton.hidden = !canEditMenu;
   quickPdfBuilderButton.hidden = !canUsePdf;
@@ -4667,6 +4670,7 @@ function renderActiveMenuHeader() {
   quickQuizButton.hidden = !canUseStudyTools;
   quickMenuActions.hidden =
     quickEditModeButton.hidden &&
+    quickCustomizationButton.hidden &&
     quickScanMenuButton.hidden &&
     quickImportPdfButton.hidden &&
     quickPdfBuilderButton.hidden &&
@@ -7566,7 +7570,7 @@ function renderAdminState() {
   categoryManagerButton.hidden = !canManageCategories();
   shareMenuButton.hidden = !canShareActiveMenu();
   manageUsersButton.hidden = !activeUser;
-  designButton.hidden = true;
+  designButton.hidden = !isAdmin();
   editHeroButton.hidden = !isAdmin();
   loginMessage.textContent = "";
   setupMessage.textContent = "";
@@ -9739,6 +9743,7 @@ editModeButton.addEventListener("click", () => {
 quickEditModeButton.addEventListener("click", () => {
   setEditMode(!state.editing);
 });
+quickCustomizationButton.addEventListener("click", openDesignDialog);
 
 addItemButton.addEventListener("click", () => {
   openItemDialog();

@@ -6,7 +6,7 @@
     <title>Menu Matrix</title>
     <link rel="icon" type="image/svg+xml" href="assets/app-icon.svg" />
     <link rel="apple-touch-icon" href="assets/app-icon-launcher-preview.png" />
-    <link rel="stylesheet" href="styles.css?v=animation-slider" />
+    <link rel="stylesheet" href="styles.css?v=animation-slider-visible" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -209,6 +209,7 @@
 
         <section id="quickMenuActions" class="quick-menu-actions" aria-label="Menu actions">
           <button id="quickEditModeButton" class="quick-action-button" type="button" hidden>Edit menu</button>
+          <button id="quickCustomizationButton" class="quick-action-button" type="button" hidden>Customization</button>
           <button id="quickScanMenuButton" class="quick-action-button" type="button" hidden>Scan menu photo</button>
           <button id="quickImportPdfButton" class="quick-action-button" type="button" hidden>Import PDF</button>
           <button id="quickPdfBuilderButton" class="quick-action-button" type="button" hidden>Create PDF</button>
@@ -836,6 +837,18 @@
           <button class="icon-button" type="button" aria-label="Close design editor" id="closeDesignButton">x</button>
         </div>
 
+        <section class="form-subsection">
+          <div>
+            <p class="kicker">Motion</p>
+            <strong>Menu animation</strong>
+          </div>
+          <label>
+            Animation intensity
+            <input id="menuAnimationIntensity" type="range" min="0" max="100" step="5" />
+            <span id="menuAnimationIntensityValue" class="range-value">30%</span>
+          </label>
+        </section>
+
         <div class="color-grid">
           <label>
             Main text
@@ -939,11 +952,6 @@
             Item photo size
             <input id="itemPhotoSize" type="range" min="72" max="180" step="4" />
             <span id="itemPhotoSizeValue" class="range-value">96px</span>
-          </label>
-          <label>
-            Menu animation intensity
-            <input id="menuAnimationIntensity" type="range" min="0" max="100" step="5" />
-            <span id="menuAnimationIntensityValue" class="range-value">30%</span>
           </label>
         </section>
 
@@ -1116,6 +1124,6 @@
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js?v=animation-slider"></script>
+    <script src="app.js?v=animation-slider-visible"></script>
   </body>
 </html>
