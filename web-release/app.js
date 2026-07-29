@@ -33,7 +33,8 @@ const defaultDesign = {
   frontMediaPhoneSize: 100,
   frontMediaWebSize: 100,
   frontMediaBlur: 6.5,
-  frontVideoLength: 0
+  frontVideoLength: 0,
+  menuAnimationIntensity: 30
 };
 const defaultCategories = ["bbq", "steamed-dim-sum", "baked-fried", "starters", "soups", "birds-nest", "abalone", "market-seafood", "fresh-seafood", "clay-pot", "meat", "vegetables", "rice-noodles", "desserts", "out-of-menu"];
 let categories = loadCategories();
@@ -2305,6 +2306,10 @@ const frontMediaBlur = document.querySelector("#frontMediaBlur");
 const frontMediaBlurValue = document.querySelector("#frontMediaBlurValue");
 const itemPhotoSize = document.querySelector("#itemPhotoSize");
 const itemPhotoSizeValue = document.querySelector("#itemPhotoSizeValue");
+const menuAnimationIntensity = document.querySelector("#menuAnimationIntensity");
+const menuAnimationIntensityValue = document.querySelector("#menuAnimationIntensityValue");
+const dashboardMenuAnimationIntensity = document.querySelector("#dashboardMenuAnimationIntensity");
+const dashboardMenuAnimationIntensityValue = document.querySelector("#dashboardMenuAnimationIntensityValue");
 const frontVideoLength = document.querySelector("#frontVideoLength");
 const frontMediaPreview = document.querySelector("#frontMediaPreview");
 const frontMediaPreviewFrame = document.querySelector("#frontMediaPreviewFrame");
@@ -2722,6 +2727,17 @@ function markLocalItemDelete(itemId) {
   delete state.localItemEditTimes[itemId];
 }
 
+function getMenuAnimationIntensity(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return defaultDesign.menuAnimationIntensity;
+  return Math.max(0, Math.min(100, Math.round(parsed)));
+}
+
+function formatMenuAnimationIntensity(value) {
+  const intensity = getMenuAnimationIntensity(value);
+  return intensity <= 0 ? "Off" : `${intensity}%`;
+}
+
 function normalizeDesignSettings(settings = {}) {
   const frontMediaType = settings.frontMediaType === "image" ? "image" : "video";
   const frontMediaUrl =
@@ -2744,6 +2760,7 @@ function normalizeDesignSettings(settings = {}) {
     ? Math.max(0, Math.min(18, parsedFrontMediaBlur))
     : defaultDesign.frontMediaBlur;
   const frontVideoLength = Math.max(0, Math.min(120, Number(settings.frontVideoLength) || 0));
+  const menuAnimationIntensity = getMenuAnimationIntensity(settings.menuAnimationIntensity);
 
   return {
     ...defaultDesign,
@@ -2755,7 +2772,8 @@ function normalizeDesignSettings(settings = {}) {
     frontMediaPhoneSize,
     frontMediaWebSize,
     frontMediaBlur,
-    frontVideoLength
+    frontVideoLength,
+    menuAnimationIntensity
   };
 }
 
@@ -2908,6 +2926,20 @@ function saveRestaurantMenus({ sync = true } = {}) {
   if (sync) scheduleCloudSave();
 }
 
+function applyMenuAnimationIntensity(value) {
+  const intensity = getMenuAnimationIntensity(value);
+  const factor = intensity / 100;
+  const revealY = Math.round(factor * 30);
+  const revealScale = (1 - factor * 0.03).toFixed(3);
+  const startOpacity = (1 - factor * 0.16).toFixed(2);
+  const duration = Math.round(340 + factor * 500);
+
+  document.documentElement.style.setProperty("--menu-row-reveal-y", `${revealY}px`);
+  document.documentElement.style.setProperty("--menu-row-reveal-scale", revealScale);
+  document.documentElement.style.setProperty("--menu-row-start-opacity", startOpacity);
+  document.documentElement.style.setProperty("--menu-row-reveal-duration", `${duration}ms`);
+}
+
 function applyDesignSettings() {
   designSettings = normalizeDesignSettings(designSettings);
   document.documentElement.style.setProperty("--ink", designSettings.ink);
@@ -2920,6 +2952,7 @@ function applyDesignSettings() {
   document.documentElement.style.setProperty("--front-media-phone-size", `${designSettings.frontMediaPhoneSize}%`);
   document.documentElement.style.setProperty("--front-media-web-size", `${designSettings.frontMediaWebSize}%`);
   document.documentElement.style.setProperty("--front-media-blur", `${designSettings.frontMediaBlur}px`);
+  applyMenuAnimationIntensity(designSettings.menuAnimationIntensity);
   const hasHeroImage = Boolean(designSettings.heroImage);
   heroImage.hidden = !hasHeroImage;
   heroImage.closest(".logo-hero")?.classList.toggle("is-empty", !hasHeroImage);
@@ -2995,6 +3028,8 @@ function syncDesignForm() {
   heroImageFile.value = "";
   itemPhotoSize.value = String(designSettings.itemPhotoSize);
   itemPhotoSizeValue.textContent = `${designSettings.itemPhotoSize}px`;
+  menuAnimationIntensity.value = String(designSettings.menuAnimationIntensity);
+  menuAnimationIntensityValue.textContent = formatMenuAnimationIntensity(designSettings.menuAnimationIntensity);
   frontMediaType.value = designSettings.frontMediaType;
   frontMediaUrl.value = designSettings.frontMediaUrl;
   frontMediaFile.value = "";
@@ -4370,7 +4405,8 @@ function sanitizeDesignSettings(settings) {
     frontMediaPhoneSize: normalized.frontMediaPhoneSize,
     frontMediaWebSize: normalized.frontMediaWebSize,
     frontMediaBlur: normalized.frontMediaBlur,
-    frontVideoLength: normalized.frontVideoLength
+    frontVideoLength: normalized.frontVideoLength,
+    menuAnimationIntensity: normalized.menuAnimationIntensity
   };
 }
 
@@ -4946,6 +4982,7 @@ function prefersReducedMenuMotion() {
 
 function shouldUseMenuRevealObserver() {
   if (prefersReducedMenuMotion()) return false;
+  if (getMenuAnimationIntensity(designSettings.menuAnimationIntensity) <= 0) return false;
   if (window.matchMedia?.("(hover: none), (pointer: coarse)")?.matches) return false;
   if (window.Capacitor?.isNativePlatform?.()) return false;
   return true;
@@ -4971,7 +5008,9 @@ function prepareMenuRevealObserver() {
         .forEach((entry) => {
           const row = entry.target;
           const revealKey = row.dataset.revealKey || getMenuRevealKey(row.dataset.itemId);
-          const delay = Math.min(320, (menuRevealSequence % 6) * 64);
+          const intensityFactor = getMenuAnimationIntensity(designSettings.menuAnimationIntensity) / 100;
+          const delayStep = Math.round(48 * intensityFactor);
+          const delay = Math.min(240, (menuRevealSequence % 6) * delayStep);
           menuRevealSequence += 1;
           state.revealedMenuRows.add(revealKey);
           row.style.setProperty("--row-reveal-delay", `${delay}ms`);
@@ -6186,12 +6225,15 @@ function renderDashboardCustomizationSummary() {
     createCustomizationSwatch("Edit", designSettings.aqua),
     createDashboardMetric("Header image", designSettings.heroImage ? "Set" : "Blank", "Current menu banner"),
     createDashboardMetric("Item photos", `${designSettings.itemPhotoSize}px`, "Expanded slideshow size"),
+    createDashboardMetric("Animation", formatMenuAnimationIntensity(designSettings.menuAnimationIntensity), "Menu row reveal intensity"),
     createDashboardMetric(
       "Front media",
       designSettings.frontMediaType === "image" ? "Image" : "Video",
       `Phone ${designSettings.frontMediaPhoneSize}%, web ${designSettings.frontMediaWebSize}%, ${designSettings.frontMediaBlur}px blur`
     )
   );
+
+  syncDashboardAnimationControl();
 }
 
 function createCustomizationSwatch(label, color) {
@@ -6463,11 +6505,13 @@ function saveDesign(event) {
     frontMediaPhoneSize: Number(frontMediaPhoneSize.value) || defaultDesign.frontMediaPhoneSize,
     frontMediaWebSize: Number(frontMediaWebSize.value) || defaultDesign.frontMediaWebSize,
     frontMediaBlur: Number(frontMediaBlur.value),
-    frontVideoLength: Number(frontVideoLength.value) || 0
+    frontVideoLength: Number(frontVideoLength.value) || 0,
+    menuAnimationIntensity: getMenuAnimationIntensity(menuAnimationIntensity.value)
   };
 
   saveDesignSettings();
   applyDesignSettings();
+  renderDashboardCustomizationSummary();
   closeDesignDialog();
 }
 
@@ -6477,6 +6521,7 @@ function resetDesign() {
   saveDesignSettings();
   applyDesignSettings();
   syncDesignForm();
+  renderDashboardCustomizationSummary();
 }
 
 function renderPdfItemList() {
@@ -9422,6 +9467,41 @@ function updateItemPhotoSizeLabel() {
   document.documentElement.style.setProperty("--item-photo-size", `${itemPhotoSize.value}px`);
 }
 
+function syncDashboardAnimationControl() {
+  if (!dashboardMenuAnimationIntensity || !dashboardMenuAnimationIntensityValue) return;
+  dashboardMenuAnimationIntensity.value = String(designSettings.menuAnimationIntensity);
+  dashboardMenuAnimationIntensityValue.textContent = formatMenuAnimationIntensity(designSettings.menuAnimationIntensity);
+}
+
+function updateMenuAnimationIntensityLabel(source = menuAnimationIntensity) {
+  const intensity = getMenuAnimationIntensity(source?.value);
+  if (menuAnimationIntensity && menuAnimationIntensity !== source) {
+    menuAnimationIntensity.value = String(intensity);
+  }
+  if (dashboardMenuAnimationIntensity && dashboardMenuAnimationIntensity !== source) {
+    dashboardMenuAnimationIntensity.value = String(intensity);
+  }
+  if (menuAnimationIntensityValue) {
+    menuAnimationIntensityValue.textContent = formatMenuAnimationIntensity(intensity);
+  }
+  if (dashboardMenuAnimationIntensityValue) {
+    dashboardMenuAnimationIntensityValue.textContent = formatMenuAnimationIntensity(intensity);
+  }
+  applyMenuAnimationIntensity(intensity);
+  return intensity;
+}
+
+function saveDashboardMenuAnimationIntensity() {
+  if (!isAdmin() || !dashboardMenuAnimationIntensity) return;
+  const intensity = updateMenuAnimationIntensityLabel(dashboardMenuAnimationIntensity);
+  designSettings = normalizeDesignSettings({
+    ...designSettings,
+    menuAnimationIntensity: intensity
+  });
+  saveDesignSettings();
+  renderDashboardCustomizationSummary();
+}
+
 function updateFrontMediaBlurLabel() {
   const blur = Number(frontMediaBlur.value) || 0;
   frontMediaBlurValue.textContent = `${blur}px`;
@@ -9800,9 +9880,12 @@ frontMediaUrl.addEventListener("input", () => {
 });
 frontMediaFile.addEventListener("change", updateFrontMediaFromFile);
 itemPhotoSize.addEventListener("input", updateItemPhotoSizeLabel);
+menuAnimationIntensity.addEventListener("input", () => updateMenuAnimationIntensityLabel(menuAnimationIntensity));
 frontMediaPhoneSize.addEventListener("input", updateFrontMediaPhoneSizeLabel);
 frontMediaWebSize.addEventListener("input", updateFrontMediaWebSizeLabel);
 frontMediaBlur.addEventListener("input", updateFrontMediaBlurLabel);
+dashboardMenuAnimationIntensity.addEventListener("input", () => updateMenuAnimationIntensityLabel(dashboardMenuAnimationIntensity));
+dashboardMenuAnimationIntensity.addEventListener("change", saveDashboardMenuAnimationIntensity);
 authBackgroundVideo.addEventListener("timeupdate", handleFrontVideoTimeUpdate);
 registerBackgroundVideo.addEventListener("timeupdate", handleFrontVideoTimeUpdate);
 designForm.addEventListener("submit", saveDesign);

@@ -6,7 +6,7 @@
     <title>Menu Matrix</title>
     <link rel="icon" type="image/svg+xml" href="assets/app-icon.svg" />
     <link rel="apple-touch-icon" href="assets/app-icon-launcher-preview.png" />
-    <link rel="stylesheet" href="styles.css?v=calm-menu-rows" />
+    <link rel="stylesheet" href="styles.css?v=animation-slider" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -573,6 +573,11 @@
             <p class="kicker">Theme editor</p>
             <h2>Colors and header image</h2>
           </div>
+          <label class="dashboard-range-control">
+            <span>Menu animation</span>
+            <input id="dashboardMenuAnimationIntensity" type="range" min="0" max="100" step="5" />
+            <strong id="dashboardMenuAnimationIntensityValue" class="range-value">30%</strong>
+          </label>
           <button id="dashboardCustomizationButton" class="save-button" type="button">Open customization</button>
         </section>
       </section>
@@ -935,6 +940,11 @@
             <input id="itemPhotoSize" type="range" min="72" max="180" step="4" />
             <span id="itemPhotoSizeValue" class="range-value">96px</span>
           </label>
+          <label>
+            Menu animation intensity
+            <input id="menuAnimationIntensity" type="range" min="0" max="100" step="5" />
+            <span id="menuAnimationIntensityValue" class="range-value">30%</span>
+          </label>
         </section>
 
         <div class="form-actions">
@@ -1106,6 +1116,6 @@
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js?v=calm-menu-rows"></script>
+    <script src="app.js?v=animation-slider"></script>
   </body>
 </html>

@@ -958,6 +958,26 @@ h1 {
   font-size: 1.12rem;
 }
 
+.dashboard-range-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 210px) auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid rgba(25, 33, 29, 0.09);
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(255, 253, 250, 0.72);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.dashboard-range-control input {
+  width: 100%;
+  accent-color: var(--leaf);
+}
+
 .theme-swatch-card {
   position: relative;
   overflow: hidden;
@@ -2022,8 +2042,8 @@ h1 {
 }
 
 .menu-row {
-  --row-reveal-y: 18px;
-  --row-reveal-scale: 0.985;
+  --row-reveal-y: var(--menu-row-reveal-y, 9px);
+  --row-reveal-scale: var(--menu-row-reveal-scale, 0.991);
   position: relative;
   min-height: 96px;
   padding: 12px;
@@ -2032,12 +2052,12 @@ h1 {
   background: rgba(255, 255, 255, 0.94);
   box-shadow: 0 8px 22px rgba(25, 33, 29, 0.06);
   overflow: hidden;
-  opacity: 0.86;
+  opacity: var(--menu-row-start-opacity, 0.95);
   transform: translateX(calc(var(--swipe-offset, 0px) * 0.12)) translateY(var(--row-reveal-y)) scale(var(--row-reveal-scale));
   transform-origin: center bottom;
   transition:
-    opacity 420ms ease,
-    transform 620ms cubic-bezier(0.2, 0.72, 0.22, 1),
+    opacity var(--menu-row-reveal-duration, 490ms) ease,
+    transform var(--menu-row-reveal-duration, 490ms) cubic-bezier(0.2, 0.72, 0.22, 1),
     background 180ms ease,
     box-shadow 180ms ease,
     border-color 180ms ease;
@@ -3107,7 +3127,7 @@ h1 {
   }
 
   .customization-card {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 360px) auto;
   }
 
   .dashboard-list {
