@@ -5173,7 +5173,7 @@ function renderItemPhotoGallery(gallery, images, itemName, itemId) {
 
   const slideIndex = getItemPhotoSlideIndex(itemId, images.length);
   gallery.dataset.itemId = itemId;
-  gallery.classList.toggle("is-draggable", images.length > 1);
+  gallery.classList.toggle("has-controls", images.length > 1);
   gallery.setAttribute("role", "group");
   gallery.setAttribute("aria-label", `${itemName} photos`);
 
@@ -5201,12 +5201,14 @@ function renderItemPhotoGallery(gallery, images, itemName, itemId) {
   attachPhotoSwipeHandlers(gallery, itemId, images, itemName);
 
   if (images.length > 1) {
+    const previousButton = createPhotoNavButton("previous", itemId, images.length, itemName);
+    const nextButton = createPhotoNavButton("next", itemId, images.length, itemName);
     const dots = createPhotoDots(images.length, slideIndex);
     const counter = document.createElement("span");
     counter.className = "photo-slide-counter";
     counter.textContent = `${slideIndex + 1}/${images.length}`;
 
-    gallery.append(dots, counter);
+    gallery.append(previousButton, nextButton, dots, counter);
   }
 }
 
@@ -5270,6 +5272,26 @@ function createPhotoDots(imageCount, activeIndex) {
   return dots;
 }
 
+function createPhotoNavButton(direction, itemId, imageCount, itemName) {
+  const button = document.createElement("button");
+  const isNext = direction === "next";
+  button.className = `photo-nav-button ${isNext ? "next" : "previous"}`;
+  button.type = "button";
+  button.textContent = isNext ? ">" : "<";
+  button.setAttribute("aria-label", `${isNext ? "Next" : "Previous"} ${itemName} photo`);
+  button.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  });
+  button.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const activeIndex = getItemPhotoSlideIndex(itemId, imageCount);
+    setItemPhotoSlide(itemId, imageCount, activeIndex + (isNext ? 1 : -1));
+  });
+  return button;
+}
+
 function openPhotoLightbox(imageUrl, caption) {
   if (!photoLightboxDialog || !photoLightboxImage || !photoLightboxCaption || !imageUrl) return;
 
@@ -5325,8 +5347,6 @@ function attachPhotoSwipeHandlers(gallery, itemId, images, itemName) {
       openPhotoLightbox(images[activeIndex], `${itemName} photo ${activeIndex + 1}`);
       return;
     }
-    if (Math.abs(deltaX) < 26 || Math.abs(deltaX) < Math.abs(deltaY)) return;
-    setItemPhotoSlide(itemId, imageCount, activeIndex + (deltaX < 0 ? 1 : -1));
   });
   gallery.addEventListener("pointercancel", () => {
     isSwiping = false;

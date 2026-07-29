@@ -2337,14 +2337,6 @@ h1 {
   user-select: none;
 }
 
-.item-photo-gallery.is-draggable {
-  cursor: grab;
-}
-
-.item-photo-gallery.is-dragging {
-  cursor: grabbing;
-}
-
 .item-photo-gallery[hidden] {
   display: none;
 }
@@ -2398,6 +2390,40 @@ h1 {
 
 .photo-slide-dot.is-active {
   background: var(--white);
+}
+
+.photo-nav-button {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.48);
+  border-radius: 999px;
+  padding: 0;
+  background: rgba(25, 33, 29, 0.72);
+  color: var(--white);
+  font-size: 1rem;
+  font-weight: 950;
+  line-height: 1;
+  transform: translateY(-50%);
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+}
+
+.photo-nav-button.previous {
+  left: 6px;
+}
+
+.photo-nav-button.next {
+  right: 6px;
+}
+
+.photo-nav-button:hover,
+.photo-nav-button:focus-visible {
+  background: rgba(25, 33, 29, 0.88);
 }
 
 .photo-slide-counter {
