@@ -18,7 +18,7 @@ const legacyMott32HeroImage = "https://www.nicepng.com/png/detail/809-8099031_mo
 const defaultHeroImage = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 260'%3E%3Crect width='640' height='260' fill='%23f7f1e6'/%3E%3Ctext x='320' y='116' text-anchor='middle' font-family='Georgia%2C serif' font-size='84' font-weight='700' fill='%2319211d'%3EMOTT 32%3C/text%3E%3Ctext x='320' y='168' text-anchor='middle' font-family='Arial%2C sans-serif' font-size='22' letter-spacing='8' fill='%2366716b'%3ELAS VEGAS%3C/text%3E%3C/svg%3E";
 const defaultFrontMediaUrl = "assets/login-background.mp4";
 const maxInlineVideoUploadSize = 850000;
-const itemPhotoCloudUploadsEnabled = window.MENU_MATRIX_ENABLE_STORAGE_UPLOADS === true;
+const itemPhotoCloudUploadsEnabled = window.MENU_MATRIX_ENABLE_STORAGE_UPLOADS !== false;
 const defaultDesign = {
   ink: "#19211d",
   leaf: "#2f7d56",
@@ -3139,6 +3139,10 @@ function canUploadItemPhotosToCloud() {
   return Boolean(itemPhotoCloudUploadsEnabled && storage?.ref && getActiveUser());
 }
 
+function isInlineItemPhotoUrl(imageUrl) {
+  return /^data:image\//i.test(String(imageUrl || "").trim());
+}
+
 function getSafeStorageSegment(value, fallback = "file") {
   const segment = String(value || fallback)
     .toLowerCase()
@@ -3171,12 +3175,12 @@ function dataUrlToBlob(dataUrl) {
   return new Blob([bytes], { type: contentType });
 }
 
-async function uploadItemPhotoToCloud(dataUrl, { itemId, file, index, total, onProgress }) {
+async function uploadItemPhotoToCloud(dataUrl, { itemId, file, index, total, onProgress, menuId = "" }) {
   const storage = getCloudStorageClient();
   if (!storage?.ref) throw new Error("Firebase Storage is not ready.");
 
   const blob = dataUrlToBlob(dataUrl);
-  const activeMenuId = state.activeRestaurantMenu || getActiveRestaurantMenu()?.id || defaultRestaurantMenuId;
+  const activeMenuId = menuId || state.activeRestaurantMenu || getActiveRestaurantMenu()?.id || defaultRestaurantMenuId;
   const workspaceId = getWorkspaceDocumentId();
   const uploadId =
     window.crypto?.randomUUID?.() ||
@@ -3218,6 +3222,79 @@ async function uploadItemPhotoToCloud(dataUrl, { itemId, file, index, total, onP
       }
     );
   });
+}
+
+async function migrateInlineItemPhotosToCloud() {
+  if (!canUploadItemPhotosToCloud()) return 0;
+
+  let migratedCount = 0;
+  let changed = false;
+
+  for (const menu of restaurantMenus) {
+    if (!Array.isArray(menu.items)) continue;
+
+    const migratedItems = [];
+    for (const item of menu.items) {
+      const itemImages = getItemImages(item);
+      if (!itemImages.some(isInlineItemPhotoUrl)) {
+        migratedItems.push(item);
+        continue;
+      }
+
+      const nextImages = [];
+      let itemChanged = false;
+
+      for (const [index, imageUrl] of itemImages.entries()) {
+        if (!isInlineItemPhotoUrl(imageUrl)) {
+          nextImages.push(imageUrl);
+          continue;
+        }
+
+        try {
+          const cloudUrl = await withTimeout(
+            uploadItemPhotoToCloud(imageUrl, {
+              itemId: item.id || `item-${Date.now()}`,
+              file: { name: `migrated-photo-${index + 1}.jpg` },
+              index,
+              total: itemImages.length,
+              menuId: menu.id
+            }),
+              60000,
+              "Photo migration took too long."
+          );
+          nextImages.push(cloudUrl);
+          migratedCount += 1;
+          itemChanged = true;
+        } catch (error) {
+          console.warn("Could not migrate item photo to Firebase Storage.", error);
+          nextImages.push(imageUrl);
+        }
+      }
+
+      if (!itemChanged) {
+        migratedItems.push(item);
+        continue;
+      }
+
+      changed = true;
+      const normalizedImages = normalizeItemImageList(nextImages);
+      migratedItems.push({
+        ...item,
+        image: normalizedImages[0] || "",
+        images: normalizedImages,
+        updatedAt: new Date().toISOString()
+      });
+    }
+
+    menu.items = migratedItems;
+  }
+
+  if (changed) {
+    syncActiveRestaurantMenuData();
+    localStorage.setItem(getRestaurantMenusStorageKey(), JSON.stringify(restaurantMenus.map(sanitizeRestaurantMenuForStorage)));
+  }
+
+  return migratedCount;
 }
 
 function loadUsers() {
@@ -3635,7 +3712,7 @@ async function syncSharedMenuSnapshots() {
           menuName: menu.name,
           categories,
           quizResults: normalizeQuizResults(menu.quizResults),
-          menu: sanitizeRestaurantMenuForStorage(menu),
+          menu: sanitizeRestaurantMenuForStorage(menu, { allowInlineImages: false }),
           updatedAt: new Date().toISOString()
         },
         { merge: true }
@@ -4200,10 +4277,15 @@ async function uploadCloudSnapshot(reason) {
   if (!cloudSync.ref || cloudSync.applying) return;
 
   try {
+    const migratedPhotoCount = await migrateInlineItemPhotosToCloud();
+    if (migratedPhotoCount) {
+      setSyncStatus(`Uploaded ${migratedPhotoCount} photo${migratedPhotoCount === 1 ? "" : "s"} to Firebase...`);
+    }
+
     await cloudSync.ref.set(
       {
         categories,
-        menus: restaurantMenus.map(sanitizeRestaurantMenuForStorage),
+        menus: restaurantMenus.map((menu) => sanitizeRestaurantMenuForStorage(menu, { allowInlineImages: false })),
         source: reason,
         updatedAt: new Date().toISOString()
       },
@@ -4216,9 +4298,9 @@ async function uploadCloudSnapshot(reason) {
   }
 }
 
-function sanitizeMenuItemForCloud(item) {
+function sanitizeMenuItemForCloud(item, { allowInlineImages = true } = {}) {
   const category = normalizeCategoryValue(item.category);
-  const images = getItemImages(item);
+  const images = getItemImages(item).filter((image) => allowInlineImages || !isInlineItemPhotoUrl(image));
   return {
     id: item.id || `item-${Date.now()}`,
     name: item.name || "",
@@ -4238,7 +4320,7 @@ function sanitizeMenuItemForCloud(item) {
   };
 }
 
-function sanitizeRestaurantMenuForStorage(menu) {
+function sanitizeRestaurantMenuForStorage(menu, options = {}) {
   return {
     id: menu.id || `menu-${Date.now()}`,
     name: menu.name || "Untitled Menu",
@@ -4247,7 +4329,7 @@ function sanitizeRestaurantMenuForStorage(menu) {
     label: menu.label || "Menu training",
     shareCode: typeof menu.shareCode === "string" ? menu.shareCode : "",
     categories: getUniqueCategories(menu.categories || categories),
-    items: Array.isArray(menu.items) ? menu.items.map(sanitizeMenuItemForCloud) : [],
+    items: Array.isArray(menu.items) ? menu.items.map((item) => sanitizeMenuItemForCloud(item, options)) : [],
     stats: normalizeMenuStats(menu.stats),
     quizResults: normalizeQuizResults(menu.quizResults),
     designSettings: sanitizeDesignSettings(menu.designSettings || defaultDesign)
@@ -9217,7 +9299,7 @@ async function updateItemImageFromFile(event) {
                 });
               }
             }),
-            12000,
+            60000,
             "Photo upload took too long."
           );
           uploadedImages.push(cloudUrl);
@@ -9241,8 +9323,8 @@ async function updateItemImageFromFile(event) {
 
     const nextImages = normalizeItemImageList([...getItemImageFieldValues(), ...uploadedImages]);
     const storageNote = usedLocalFallback
-      ? "Photo ready to save."
-      : "Uploaded and ready to save.";
+      ? "Firebase Storage was unavailable; this local copy may not sync to other devices."
+      : "Uploaded to Firebase and ready to save.";
     setItemImageField(
       nextImages,
       `${storageNote} Added ${uploadedImages.length} photo${uploadedImages.length === 1 ? "" : "s"}. ${nextImages.length} total.`
