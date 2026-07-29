@@ -4944,6 +4944,13 @@ function prefersReducedMenuMotion() {
   return Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches);
 }
 
+function shouldUseMenuRevealObserver() {
+  if (prefersReducedMenuMotion()) return false;
+  if (window.matchMedia?.("(hover: none), (pointer: coarse)")?.matches) return false;
+  if (window.Capacitor?.isNativePlatform?.()) return false;
+  return true;
+}
+
 function getMenuRevealKey(itemId) {
   const menuId = state.sharedMenu?.id || state.activeRestaurantMenu || "default-menu";
   return `${menuId}:${itemId}`;
@@ -4954,7 +4961,7 @@ function prepareMenuRevealObserver() {
   menuRevealObserver = null;
   menuRevealSequence = 0;
 
-  if (!("IntersectionObserver" in window) || prefersReducedMenuMotion()) return;
+  if (!("IntersectionObserver" in window) || !shouldUseMenuRevealObserver()) return;
 
   menuRevealObserver = new IntersectionObserver(
     (entries) => {
