@@ -3143,6 +3143,10 @@ function isInlineItemPhotoUrl(imageUrl) {
   return /^data:image\//i.test(String(imageUrl || "").trim());
 }
 
+function getInlineItemPhotoUrls(item) {
+  return getItemImages(item).filter(isInlineItemPhotoUrl);
+}
+
 function getSafeStorageSegment(value, fallback = "file") {
   const segment = String(value || fallback)
     .toLowerCase()
@@ -4137,6 +4141,20 @@ function mergeCloudItemsWithLocal(cloudItems = [], localItems = []) {
       if (localDeletedAt > cloudUpdatedAt) {
         hasLocalPreserves = true;
         return [];
+      }
+
+      const localInlineImages = localItem ? getInlineItemPhotoUrls(localItem) : [];
+      if (localInlineImages.length) {
+        const images = normalizeItemImageList([...getItemImages(cloudItem), ...getItemImages(localItem)]);
+        hasLocalPreserves = true;
+        return [
+          {
+            ...cloudItem,
+            image: images[0] || "",
+            images,
+            updatedAt: localItem.updatedAt || cloudItem.updatedAt || new Date().toISOString()
+          }
+        ];
       }
 
       if (localItem && localUpdatedAt > cloudUpdatedAt) {
