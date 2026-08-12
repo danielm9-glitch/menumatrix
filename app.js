@@ -1,6 +1,6 @@
 const storageKey = "restaurant-menu-matrix-items";
 const menuSeedKey = "restaurant-menu-matrix-seed";
-const currentMenuSeed = "mott32-dinner-menu-matrix-history-v1";
+const currentMenuSeed = "mott32-dinner-menu-matrix-history-v2";
 const usersStorageKey = "restaurant-menu-matrix-users";
 const currentUserKey = "restaurant-menu-matrix-current-user";
 const designStorageKey = "restaurant-menu-matrix-design";
@@ -2782,6 +2782,307 @@ function normalizeText(value = "") {
   return String(value || "").replace(/\s+/g, " ").trim();
 }
 
+function joinReadableList(values = []) {
+  const list = values.filter(Boolean);
+  if (list.length <= 1) return list[0] || "";
+  if (list.length === 2) return `${list[0]} and ${list[1]}`;
+  return `${list.slice(0, -1).join(", ")}, and ${list[list.length - 1]}`;
+}
+
+function findDishKeyword(source, entries) {
+  return entries.find((entry) => entry.test.test(source));
+}
+
+function getDishIngredientSignals(item = {}) {
+  const source = normalizeText(`${item.name || ""} ${getItemIngredientText(item)} ${(item.ingredients || []).join(" ")}`).toLowerCase();
+  const entries = [
+    { test: /peking duck|duck rack|shredded duck|duck/, label: "duck" },
+    { test: /iberico|pork belly|pork|char siu|bbq pork/, label: "Iberico pork" },
+    { test: /lobster|maine lobster|australian lobster/, label: "lobster" },
+    { test: /king crab|dungeness crab|crab/, label: "crab" },
+    { test: /abalone/, label: "abalone" },
+    { test: /sea cucumber/, label: "sea cucumber" },
+    { test: /fish maw/, label: "fish maw" },
+    { test: /bird.?s nest/, label: "bird's nest" },
+    { test: /black cod|cod/, label: "black cod" },
+    { test: /mandarin fish|garoupa|grouper|marble goby|sea bass|fish/, label: "fish" },
+    { test: /prawn|shrimp|wonton/, label: "shrimp" },
+    { test: /scallop/, label: "scallop" },
+    { test: /wagyu|angus beef|beef/, label: "beef" },
+    { test: /lamb/, label: "lamb" },
+    { test: /silky fowl|free range chicken|chicken/, label: "chicken" },
+    { test: /jellyfish/, label: "jellyfish" },
+    { test: /matsutake|morel|truffle|mushroom|fungus/, label: "mushroom" },
+    { test: /tofu|bean curd/, label: "tofu" },
+    { test: /eggplant|aubergine/, label: "eggplant" },
+    { test: /asparagus/, label: "asparagus" },
+    { test: /cucumber/, label: "cucumber" },
+    { test: /rice/, label: "rice" },
+    { test: /noodle|rice noodle/, label: "noodles" },
+    { test: /mango/, label: "mango" },
+    { test: /sago/, label: "sago" },
+    { test: /sesame/, label: "sesame" },
+    { test: /almond/, label: "almond" },
+    { test: /coconut/, label: "coconut" },
+    { test: /quail egg|egg/, label: "egg" },
+    { test: /caviar/, label: "caviar" }
+  ];
+
+  const matches = entries.filter((entry) => entry.test.test(source)).map((entry) => entry.label);
+  return uniqueValues(matches).slice(0, 4);
+}
+
+function getDishTechniqueSignal(item = {}) {
+  const source = normalizeText(`${item.name || ""} ${item.description || ""} ${item.details || ""}`).toLowerCase();
+  const entries = [
+    {
+      test: /apple wood|smoked/,
+      label: "smoked",
+      fact: "Smoke is a memory cue: it adds aroma before the guest even focuses on the sauce."
+    },
+    {
+      test: /roasted|roast|barbecue|bbq/,
+      label: "roasted",
+      fact: "Roasting turns surface glaze into color, aroma, and texture, so shine matters as much as seasoning."
+    },
+    {
+      test: /double boil|double boiled/,
+      label: "double-boiled",
+      fact: "Double-boiling is gentle on luxury ingredients because the soup stays protected while flavor extracts slowly."
+    },
+    {
+      test: /braised/,
+      label: "braised",
+      fact: "Braising is a texture technique: time and sauce turn firm luxury ingredients tender without losing structure."
+    },
+    {
+      test: /wok fried|wok-fried|stir fried|stir-fried|fried rice|fried noodle/,
+      label: "wok-fried",
+      fact: "The training cue is wok hei, the smoky aroma created by high heat, oil, motion, and timing."
+    },
+    {
+      test: /steamed|steam/,
+      label: "steamed",
+      fact: "Steaming puts freshness on display because there is very little to hide behind if timing is off."
+    },
+    {
+      test: /deep fried|deep-fried|crispy|fried/,
+      label: "fried",
+      fact: "Crisp dishes are about contrast: the outside should be lively while the inside still tastes like the main ingredient."
+    },
+    {
+      test: /poached/,
+      label: "poached",
+      fact: "Poaching is a quiet technique; the liquid seasons gently while keeping the protein delicate."
+    },
+    {
+      test: /grilled/,
+      label: "grilled",
+      fact: "Grilling gives a dish a direct-heat aroma, which can make a simple sauce feel more layered."
+    },
+    {
+      test: /marinated|cold|salad/,
+      label: "chilled or marinated",
+      fact: "Cold starters rely on seasoning balance and texture because they do not have steam or heat to carry aroma."
+    },
+    {
+      test: /baked|bun|pastry/,
+      label: "baked",
+      fact: "Baked dim sum adds fragrance and texture to a tea-house spread that might otherwise be mostly steamed."
+    },
+    {
+      test: /clay pot|claypot|casserole/,
+      label: "clay-pot cooked",
+      fact: "Clay pots hold heat after leaving the stove, so the dish keeps cooking and perfuming the table."
+    }
+  ];
+  return findDishKeyword(source, entries);
+}
+
+function getDishSpecialHook(item = {}) {
+  const name = normalizeText(item.name);
+  const source = normalizeText(`${item.name || ""} ${item.description || ""}`).toLowerCase();
+  const abaloneSize = name.match(/\(([^)]*g dried[^)]*)\)/i)?.[1];
+
+  if (/42 days/.test(source)) {
+    return {
+      feature: "the 42-day duck and apple-wood roast cue",
+      history: `${name} makes the age and roast style part of the story, turning a Beijing banquet classic into a signature training item.`,
+      fact: "The number is useful for staff: 42 days gives guests a concrete detail to remember before the duck is carved or served."
+    };
+  }
+  if (/duck rack/.test(source)) {
+    return {
+      feature: "the second-life duck rack course",
+      history: `${name} continues the Peking duck ritual by using the carved rack instead of treating it as an afterthought.`,
+      fact: "A duck rack course teaches whole-animal service: the prized roast becomes more than one dish."
+    };
+  }
+  if (/yellow mountain|huangshan/.test(source)) {
+    return {
+      feature: "Yellow Mountain honey over Iberico pork",
+      history: `${name} blends Cantonese barbecue thinking with a Chinese honey cue and Spanish Iberico pork richness.`,
+      fact: "Honey is not only sweetness here; it helps build the glossy lacquer that guests expect from polished Cantonese roast meats."
+    };
+  }
+  if (/quail egg/.test(source)) {
+    return {
+      feature: "the soft quail egg center",
+      history: `${name} personalizes siu mai by hiding a small luxury detail inside a familiar open-topped dumpling.`,
+      fact: "The quail egg makes the bite feel staged: first the wrapper and filling, then a richer center."
+    };
+  }
+  if (/black truffle|truffle/.test(source)) {
+    return {
+      feature: "black truffle aroma",
+      history: `${name} shows the modern Mott32 style: classic Chinese structure with a luxury aromatic ingredient layered on top.`,
+      fact: "Truffle works best as aroma, so it is a server cue before it is a flavor cue."
+    };
+  }
+  if (/caviar/.test(source)) {
+    return {
+      feature: "caviar as a modern banquet garnish",
+      history: `${name} pushes seafood dumpling service into fine-dining territory by adding a caviar finish to a dim sum format.`,
+      fact: "Caviar gives a quick pop of salinity, which makes scallop and prawn taste sweeter by contrast."
+    };
+  }
+  if (/fish maw/.test(source)) {
+    return {
+      feature: "fish maw texture",
+      history: `${name} belongs to the Chinese luxury-soup world, where dried seafood is valued for texture as much as flavor.`,
+      fact: "Fish maw is the dried swim bladder of fish; its prized quality is a soft, gelatinous texture that absorbs broth."
+    };
+  }
+  if (/bird.?s nest/.test(source)) {
+    return {
+      feature: "bird's nest delicacy",
+      history: `${name} focuses on one of Chinese banquet cuisine's most famous luxury soup ingredients.`,
+      fact: "Bird's nest is valued for delicate texture, so aggressive seasoning would miss the point."
+    };
+  }
+  if (abaloneSize) {
+    return {
+      feature: `${abaloneSize} abalone sizing`,
+      history: `${name} makes the abalone size part of the service story, which matters because dried abalone is graded and discussed like a luxury product.`,
+      fact: `${abaloneSize} is not decoration in the name; it is a buying and service cue for portion, rarity, and perceived value.`
+    };
+  }
+  if (/sea cucumber/.test(source)) {
+    return {
+      feature: "sea cucumber texture",
+      history: `${name} follows Chinese banquet logic where texture-rich seafoods are paired with glossy sauces and careful braising.`,
+      fact: "Sea cucumber is subtle in flavor, so the sauce and texture carry the guest experience."
+    };
+  }
+  if (/mapo|ma po/.test(source)) {
+    return {
+      feature: "lobster with mapo tofu",
+      history: `${name} turns a Chengdu tofu classic into a luxury seafood dish by pairing mala sauce with lobster.`,
+      fact: "Mapo's lesson is mala: numbing Sichuan pepper plus chili heat. Lobster makes that familiar profile feel celebratory."
+    };
+  }
+  if (/golden garlic|garlic.*chili|chili.*garlic/.test(source)) {
+    return {
+      feature: "golden garlic and chili",
+      history: `${name} uses a Cantonese seafood approach where aromatics become the headline alongside the shellfish.`,
+      fact: "Golden garlic is a texture cue as much as a flavor cue: it should smell toasted, not burnt."
+    };
+  }
+  if (/ginger.*scallion|scallion.*ginger/.test(source)) {
+    return {
+      feature: "ginger and scallion",
+      history: `${name} leans on one of Cantonese seafood cooking's cleanest pairings: ginger for lift and scallion for freshness.`,
+      fact: "Ginger-scallion is popular because it flatters seafood without covering up sweetness."
+    };
+  }
+  if (/jellyfish/.test(source)) {
+    return {
+      feature: "jellyfish crunch",
+      history: `${name} fits the Chinese cold-appetizer tradition, where texture wakes up the palate before hot courses arrive.`,
+      fact: "Jellyfish is valued less for strong flavor and more for its crisp, snappy bite."
+    };
+  }
+  if (/black vinegar/.test(source)) {
+    return {
+      feature: "black vinegar sharpness",
+      history: `${name} uses black vinegar as a Chinese souring note, giving the dish depth beyond simple acidity.`,
+      fact: "Black vinegar tastes darker and rounder than plain vinegar, with a malty aroma that helps rich ingredients feel lighter."
+    };
+  }
+  if (/szechuan|sichuan|peppercorn/.test(source)) {
+    return {
+      feature: "Sichuan peppercorn numbness",
+      history: `${name} brings a Sichuan-style mala cue into the Mott32 menu, using peppercorn aroma as the memorable hook.`,
+      fact: "Sichuan peppercorn is not chili heat; it creates a tingling sensation that changes how the next bite tastes."
+    };
+  }
+  if (/matsutake/.test(source)) {
+    return {
+      feature: "matsutake mushroom aroma",
+      history: `${name} treats mushroom as a luxury aromatic ingredient rather than just a garnish.`,
+      fact: "Matsutake is prized for fragrance, so gentle soup service helps protect its aroma."
+    };
+  }
+  if (/mango|pomelo|sago/.test(source)) {
+    return {
+      feature: "mango, pomelo, and sago texture",
+      history: `${name} belongs to the modern Hong Kong dessert style that favors fruit, chill, and texture after a rich meal.`,
+      fact: "The fun is in the contrast: mango is creamy, pomelo pops, and sago gives tiny pearls of chew."
+    };
+  }
+  if (/vegan|plant based|tofu/.test(source)) {
+    return {
+      feature: "plant-based texture",
+      history: `${name} uses Chinese vegetarian logic: sauce, filling, and texture make a meatless item feel complete.`,
+      fact: "A good vegan version works when the texture has a clear job, not when it simply imitates meat."
+    };
+  }
+
+  return null;
+}
+
+function personalizeOriginTeaser(teaser, itemName) {
+  const name = itemName || "This item";
+  return normalizeText(teaser)
+    .replace(/^Origin note: This item/i, `Origin note: ${name}`)
+    .replace(/^Origin note: This dish/i, `Origin note: ${name}`)
+    .replace(/^Origin note: This dessert/i, `Origin note: ${name}`)
+    .replace(/^Origin note: Chinese egg tarts/i, `Origin note: ${name}`)
+    .replace(/^Origin note: Mango sago/i, `Origin note: ${name}`)
+    .replace(/^Origin note: Abalone/i, `Origin note: ${name}`)
+    .replace(/^Origin note: Sweet-and-sour cooking/i, `Origin note: ${name}`)
+    .replace(/^Origin note: Clay-pot dishes/i, `Origin note: ${name}`)
+    .replace(/^Origin note: Spring rolls/i, `Origin note: ${name}`);
+}
+
+function buildPersonalizedDishCopy(item, profile) {
+  const name = normalizeText(item.name) || "This item";
+  const categoryLabel = getCategoryLabel(normalizeCategoryValue(item.category)).toLowerCase();
+  const ingredients = getDishIngredientSignals(item);
+  const ingredientPhrase = joinReadableList(ingredients.slice(0, 3));
+  const technique = getDishTechniqueSignal(item);
+  const hook = getDishSpecialHook(item);
+  const featurePhrase =
+    hook?.feature ||
+    [technique?.label, ingredientPhrase ? `with ${ingredientPhrase}` : "", `in the ${categoryLabel} section`]
+      .filter(Boolean)
+      .join(" ");
+  const itemHistory =
+    hook?.history ||
+    `${name} personalizes that tradition through ${featurePhrase}, so the server story can connect origin, technique, and the guest-facing name.`;
+  const itemFact =
+    hook?.fact ||
+    technique?.fact ||
+    (ingredientPhrase
+      ? `The quick memory hook is ${ingredientPhrase}: it tells the guest what to focus on before the sauce or garnish.`
+      : profile.fact);
+
+  return {
+    description: `${personalizeOriginTeaser(profile.teaser, name)} Mott 32's version highlights ${featurePhrase}.`,
+    details: `Dish history: ${profile.history} ${itemHistory} Fun fact: ${itemFact}`
+  };
+}
+
 function getDishHistoryProfile(item = {}) {
   const name = normalizeText(item.name);
   const lowerName = name.toLowerCase();
@@ -2827,7 +3128,7 @@ function getDishHistoryProfile(item = {}) {
       fact: "Char siu literally refers to fork-roasting: strips of seasoned meat were traditionally skewered before roasting."
     },
     {
-      test: /dim sum|dumpling|bao|bun|turnip cake|taro|sesame prawn|shrimp toast|steamed|baked|fried/,
+      test: /dim sum|dumpling|bao|bun|turnip cake|taro|sesame prawn|shrimp toast|steamed|baked/,
       teaser: "Origin note: This dish fits Cantonese dim sum culture, where small plates grew around yum cha tea-house gatherings.",
       history: "Dim sum developed through tea-house culture, especially in southern China, where small bites were served with tea and conversation.",
       fact: "Yum cha means drinking tea; the food became part of a social rhythm as much as a meal."
@@ -2851,7 +3152,13 @@ function getDishHistoryProfile(item = {}) {
       fact: "The Cantonese name for abalone sounds close to ideas of assurance and abundance, which helps explain its festive popularity."
     },
     {
-      test: /lobster|crab|grouper|fish|scallop|prawn|shrimp|clam|seafood|cod/,
+      test: /mapo|ma po/,
+      teaser: "Origin note: Mapo tofu comes from Sichuan cooking, famous for the numbing-hot balance of chili bean paste and Sichuan peppercorn.",
+      history: "Mapo tofu is tied to Chengdu in the late Qing dynasty and to the story of Chen Mapo, whose tofu dish became a Sichuan icon.",
+      fact: "The classic flavor is mala: ma for numbing Sichuan peppercorn and la for chili heat."
+    },
+    {
+      test: /lobster|crab|grouper|\bfish\b|garoupa|goby|bass|scallop|prawn|shrimp|clam|seafood|cod/,
       teaser: "Origin note: This item reflects Cantonese live-seafood cooking, where freshness, precise heat, and light sauces are used to protect natural sweetness.",
       history: "Coastal Guangdong and Hong Kong cooking built a strong live-seafood culture around steaming, wok-frying, and sauces that respect the main ingredient.",
       fact: "For seafood, Cantonese chefs often treat texture as the proof of skill: overcooking can erase the sweetness the dish is meant to showcase."
@@ -2879,6 +3186,12 @@ function getDishHistoryProfile(item = {}) {
       teaser: "Origin note: Kung pao flavors are linked to Qing-dynasty Sichuan cooking and the official Ding Baozhen, whose title was Gong Bao.",
       history: "Kung pao dishes are associated with Ding Baozhen, a Qing official whose honorary title, Gong Bao, gave the dish its name.",
       fact: "The recognizable profile balances dried chili, nutty richness, sweetness, vinegar, and a light numbing edge."
+    },
+    {
+      test: /cucumber|jellyfish|salad|cold/,
+      teaser: "Origin note: This dish fits the Chinese cold-appetizer tradition, where refreshing texture and sharp seasoning wake up the palate before richer courses.",
+      history: "Cold dishes, often called liangcai, are common openers in Chinese meals because they balance temperature, crunch, vinegar, spice, or aromatics.",
+      fact: "A good cold starter is not just a salad; it sets the rhythm before steamed, roasted, and wok-fried dishes arrive."
     },
     {
       test: /sweet.*sour|black vinegar|vinegar/,
@@ -2953,10 +3266,7 @@ function getDishHistoryProfile(item = {}) {
     fact: "A useful training angle is to connect the item to its cooking method, main ingredient, and service style."
   };
 
-  return {
-    description: profile.teaser,
-    details: `Dish history: ${profile.history} Fun fact: ${profile.fact}`
-  };
+  return buildPersonalizedDishCopy(item, profile);
 }
 
 function isGeneratedDishHistoryCopy(value = "") {
@@ -2967,7 +3277,7 @@ function isGeneratedDishHistoryCopy(value = "") {
 function shouldReplaceMott32Description(item, defaultMatch) {
   const description = normalizeText(item.description);
   if (!description) return true;
-  if (isGeneratedDishHistoryCopy(description)) return false;
+  if (isGeneratedDishHistoryCopy(description)) return true;
   if (defaultMatch && description === normalizeText(defaultMatch.description)) return true;
   return /^(review menu matrix|deep fried|wok fried|steamed|steam|double boil|double boiled|braised|poached|marinated|crispy|light breaded|fried rice|fish soup|stir fried|sauteed|diced|mixed greens|sweetened|panna cotta|,)/i.test(description);
 }
@@ -2975,7 +3285,7 @@ function shouldReplaceMott32Description(item, defaultMatch) {
 function shouldReplaceMott32Details(item, defaultMatch) {
   const details = normalizeText(item.details);
   if (!details) return true;
-  if (isGeneratedDishHistoryCopy(details)) return false;
+  if (isGeneratedDishHistoryCopy(details)) return true;
   if (defaultMatch && details === normalizeText(defaultMatch.details)) return true;
   return /^section:/i.test(details) || /review menu matrix/i.test(details) || /ingredients:/i.test(details);
 }
