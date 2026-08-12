@@ -1,6 +1,6 @@
 const storageKey = "restaurant-menu-matrix-items";
 const menuSeedKey = "restaurant-menu-matrix-seed";
-const currentMenuSeed = "mott32-dinner-menu-matrix-history-v2";
+const currentMenuSeed = "mott32-dinner-menu-matrix-details-history-v1";
 const usersStorageKey = "restaurant-menu-matrix-users";
 const currentUserKey = "restaurant-menu-matrix-current-user";
 const designStorageKey = "restaurant-menu-matrix-design";
@@ -3274,12 +3274,12 @@ function isGeneratedDishHistoryCopy(value = "") {
   return text.startsWith("origin note:") || text.startsWith("dish history:");
 }
 
-function shouldReplaceMott32Description(item, defaultMatch) {
+function shouldRestoreMott32Description(item, defaultMatch) {
+  if (!defaultMatch) return false;
   const description = normalizeText(item.description);
   if (!description) return true;
   if (isGeneratedDishHistoryCopy(description)) return true;
-  if (defaultMatch && description === normalizeText(defaultMatch.description)) return true;
-  return /^(review menu matrix|deep fried|wok fried|steamed|steam|double boil|double boiled|braised|poached|marinated|crispy|light breaded|fried rice|fish soup|stir fried|sauteed|diced|mixed greens|sweetened|panna cotta|,)/i.test(description);
+  return false;
 }
 
 function shouldReplaceMott32Details(item, defaultMatch) {
@@ -3293,13 +3293,14 @@ function shouldReplaceMott32Details(item, defaultMatch) {
 function applyMott32HistoryFacts(item = {}) {
   const normalizedItem = normalizeMenuItem(item);
   const defaultMatch = defaultMenuItems.find((defaultItem) => defaultItem.id === normalizedItem.id);
-  const historyFacts = getDishHistoryProfile(normalizedItem);
+  const description = shouldRestoreMott32Description(normalizedItem, defaultMatch)
+    ? defaultMatch.description
+    : normalizedItem.description;
+  const historyFacts = getDishHistoryProfile({ ...normalizedItem, description });
 
   return {
     ...normalizedItem,
-    description: shouldReplaceMott32Description(normalizedItem, defaultMatch)
-      ? historyFacts.description
-      : normalizedItem.description,
+    description,
     details: shouldReplaceMott32Details(normalizedItem, defaultMatch)
       ? historyFacts.details
       : normalizedItem.details
