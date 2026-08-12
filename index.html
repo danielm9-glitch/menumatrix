@@ -6,7 +6,7 @@
     <title>Menu Matrix</title>
     <link rel="icon" type="image/svg+xml" href="assets/app-icon.svg" />
     <link rel="apple-touch-icon" href="assets/app-icon-launcher-preview.png" />
-    <link rel="stylesheet" href="styles.css?v=animation-slider-visible" />
+    <link rel="stylesheet" href="styles.css?v=history-facts" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -637,12 +637,12 @@
           <input id="itemName" required />
         </label>
         <label>
-          Description
+          Short history teaser
           <textarea id="itemDescription" rows="3" required></textarea>
         </label>
         <label>
-          Learning notes
-          <textarea id="itemDetails" rows="4" placeholder="Flavor profile, ingredients, prep, pairings..."></textarea>
+          Dish history and facts
+          <textarea id="itemDetails" rows="4" placeholder="Origin story, cultural background, and useful fun facts..."></textarea>
         </label>
         <label>
           Photo URLs
@@ -1108,8 +1108,8 @@
         <button class="price-button" type="button"></button>
         <div class="item-details" hidden>
           <div class="item-photo-gallery" aria-label="Item photos"></div>
-          <div>
-            <p class="kicker">Menu notes</p>
+          <div class="history-facts-panel">
+            <p class="kicker">Dish history and facts</p>
             <p class="detail-copy"></p>
           </div>
         </div>
@@ -1124,6 +1124,6 @@
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js?v=animation-slider-visible"></script>
+    <script src="app.js?v=history-facts"></script>
   </body>
 </html>

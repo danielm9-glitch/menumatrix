@@ -1,6 +1,6 @@
 const storageKey = "restaurant-menu-matrix-items";
 const menuSeedKey = "restaurant-menu-matrix-seed";
-const currentMenuSeed = "mott32-dinner-menu-matrix-v4";
+const currentMenuSeed = "mott32-dinner-menu-matrix-history-v1";
 const usersStorageKey = "restaurant-menu-matrix-users";
 const currentUserKey = "restaurant-menu-matrix-current-user";
 const designStorageKey = "restaurant-menu-matrix-design";
@@ -2514,7 +2514,7 @@ function createDefaultRestaurantMenu() {
     owner: primaryAdminUsername,
     label: "Chinese menu training",
     categories: [...categories],
-    items: clearDefaultStockImagesForMenuItems(loadMenuItems()),
+    items: clearDefaultStockImagesForMenuItems(applyMott32HistoryFactsToItems(loadMenuItems())),
     designSettings: loadDesignSettings()
   };
 }
@@ -2628,7 +2628,7 @@ function normalizeRestaurantMenu(menu, index = 0) {
   const design = menu.designSettings || (isDefaultMenu ? loadDesignSettings() : { ...defaultDesign, heroImage: "" });
   const items = Array.isArray(menu.items) ? menu.items : isDefaultMenu ? loadMenuItems() : [];
   const normalizedItems = menuIsMott32
-    ? clearDefaultStockImagesForMenuItems(items.map(normalizeMenuItem))
+    ? clearDefaultStockImagesForMenuItems(applyMott32HistoryFactsToItems(items))
     : items.map(normalizeMenuItem);
   const normalizedDesign = normalizeDesignSettings(design);
 
@@ -2778,6 +2778,228 @@ function normalizeDesignSettings(settings = {}) {
   };
 }
 
+function normalizeText(value = "") {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function getDishHistoryProfile(item = {}) {
+  const name = normalizeText(item.name);
+  const lowerName = name.toLowerCase();
+  const category = normalizeCategoryValue(item.category);
+  const categoryLabel = getCategoryLabel(category).toLowerCase();
+  const haystack = `${lowerName} ${category} ${categoryLabel}`;
+
+  const profiles = [
+    {
+      test: /peking duck|roast duck|duck/,
+      teaser: "Origin note: This dish connects to Beijing imperial roast-duck traditions, where crisp skin, table carving, pancakes, and condiments became part of the ceremony.",
+      history: "Peking duck grew from Chinese court roasting traditions and became closely associated with Beijing banquet dining during the Ming and Qing eras.",
+      fact: "The classic presentation is not only flavor-driven; the carving, pancakes, cucumber, scallion, and sauce turn the dish into a tableside ritual."
+    },
+    {
+      test: /soup dumpling|xiao long|shanghainese/,
+      teaser: "Origin note: This item follows the Shanghai-area soup dumpling tradition, famous for thin wrappers that hold broth made from melted aspic.",
+      history: "Xiao long bao is strongly tied to Nanxiang near Shanghai, where smaller, delicate steamed buns with jellied stock became a local specialty.",
+      fact: "The soup is sealed inside as gelatin-rich stock; steaming melts it into broth, which is why the dumpling must be handled gently."
+    },
+    {
+      test: /siu mai|shumai|sui mai/,
+      teaser: "Origin note: Siu mai traveled from northern Chinese dumpling traditions into Cantonese dim sum, where it became a tea-house classic.",
+      history: "Siu mai has roots in northern Chinese open-topped dumplings and later became one of the signature items of Cantonese dim sum service.",
+      fact: "In Cantonese dim sum culture, siu mai is often grouped with har gow, char siu bao, and egg tarts as classic tea-house staples."
+    },
+    {
+      test: /har gow|shrimp dumpling|prawn dumpling|crystal/,
+      teaser: "Origin note: Crystal shrimp dumplings come from Cantonese yum cha culture, especially the Pearl River Delta love of fresh seafood.",
+      history: "Har gow is associated with Guangzhou tea houses in the early twentieth century, where translucent wrappers showed off fresh shrimp.",
+      fact: "The wrapper is part of the skill: it should be thin and clear enough to show the filling but strong enough to hold the steam."
+    },
+    {
+      test: /spring roll/,
+      teaser: "Origin note: Spring rolls trace back to springtime Chinese festival foods, when thin wrappers carried seasonal vegetables.",
+      history: "Spring rolls developed from older spring pancakes and seasonal wrapped foods connected to the arrival of spring.",
+      fact: "The name points to the season; crisp rolls became especially symbolic around Lunar New Year because they resemble gold bars."
+    },
+    {
+      test: /char siu|barbecue|bbq|iberico pork|pluma|pork belly|roasted pork/,
+      teaser: "Origin note: This item draws from Cantonese siu mei barbecue culture, the roasted-meat tradition often displayed in Hong Kong and Guangdong shops.",
+      history: "Char siu and related Cantonese roast meats belong to siu mei, a family of glazed, roasted meats from Guangdong cooking.",
+      fact: "Char siu literally refers to fork-roasting: strips of seasoned meat were traditionally skewered before roasting."
+    },
+    {
+      test: /dim sum|dumpling|bao|bun|turnip cake|taro|sesame prawn|shrimp toast|steamed|baked|fried/,
+      teaser: "Origin note: This dish fits Cantonese dim sum culture, where small plates grew around yum cha tea-house gatherings.",
+      history: "Dim sum developed through tea-house culture, especially in southern China, where small bites were served with tea and conversation.",
+      fact: "Yum cha means drinking tea; the food became part of a social rhythm as much as a meal."
+    },
+    {
+      test: /bird.?s nest|hasma/,
+      teaser: "Origin note: This dish sits in the Chinese luxury-soup tradition, where rare ingredients are treated gently to preserve texture and aroma.",
+      history: "Bird's nest soup has long been prized in Chinese banquet and tonic traditions, especially from the Ming-era luxury-food imagination onward.",
+      fact: "Double steaming is used for rare ingredients because the covered vessel protects the liquid and captures the ingredient's delicate essence."
+    },
+    {
+      test: /double boil|double boiled|fish maw|hot sour|hot & sour|soup|broth/,
+      teaser: "Origin note: This dish belongs to the Cantonese slow-soup tradition, where gentle cooking highlights clarity, texture, and nourishment.",
+      history: "Cantonese kitchens are known for slow soups and double-boiling techniques that use time, not aggressive heat, to draw out flavor.",
+      fact: "In double boiling, the soup vessel sits inside steam or water, keeping the liquid from reducing while expensive ingredients cook gently."
+    },
+    {
+      test: /abalone/,
+      teaser: "Origin note: Abalone has a long place in Chinese banquet dining as a luxury seafood linked with prosperity and status.",
+      history: "In Chinese fine dining, abalone became a prized banquet ingredient because of its rarity, texture, and association with wealth.",
+      fact: "The Cantonese name for abalone sounds close to ideas of assurance and abundance, which helps explain its festive popularity."
+    },
+    {
+      test: /lobster|crab|grouper|fish|scallop|prawn|shrimp|clam|seafood|cod/,
+      teaser: "Origin note: This item reflects Cantonese live-seafood cooking, where freshness, precise heat, and light sauces are used to protect natural sweetness.",
+      history: "Coastal Guangdong and Hong Kong cooking built a strong live-seafood culture around steaming, wok-frying, and sauces that respect the main ingredient.",
+      fact: "For seafood, Cantonese chefs often treat texture as the proof of skill: overcooking can erase the sweetness the dish is meant to showcase."
+    },
+    {
+      test: /clay pot|claypot|casserole/,
+      teaser: "Origin note: Clay-pot dishes come from southern Chinese comfort cooking, where the vessel traps heat and builds a savory crust or concentrated sauce.",
+      history: "Clay-pot cooking is common in Guangdong and Hong Kong, where rice, meats, and sauces are finished in heat-retaining earthenware.",
+      fact: "The best-known clay-pot rice develops a crisp bottom layer, similar in spirit to tahdig or paella socarrat."
+    },
+    {
+      test: /wok|fried rice|noodle|rice noodle|lo mein|flat rice|hor fun/,
+      teaser: "Origin note: This item is rooted in wok cooking, where speed, high heat, and timing create the prized Cantonese aroma called wok hei.",
+      history: "Wok-fried rice and noodles grew from practical Chinese cooking: cooked grains or noodles are refreshed quickly with sauces, aromatics, and heat.",
+      fact: "Wok hei means the breath of the wok, a smoky aroma created by intense heat, motion, oil, and precise timing."
+    },
+    {
+      test: /mapo|ma po/,
+      teaser: "Origin note: Mapo tofu comes from Sichuan cooking, famous for the numbing-hot balance of chili bean paste and Sichuan peppercorn.",
+      history: "Mapo tofu is tied to Chengdu in the late Qing dynasty and to the story of Chen Mapo, whose tofu dish became a Sichuan icon.",
+      fact: "The classic flavor is mala: ma for numbing Sichuan peppercorn and la for chili heat."
+    },
+    {
+      test: /kung pao|gong bao/,
+      teaser: "Origin note: Kung pao flavors are linked to Qing-dynasty Sichuan cooking and the official Ding Baozhen, whose title was Gong Bao.",
+      history: "Kung pao dishes are associated with Ding Baozhen, a Qing official whose honorary title, Gong Bao, gave the dish its name.",
+      fact: "The recognizable profile balances dried chili, nutty richness, sweetness, vinegar, and a light numbing edge."
+    },
+    {
+      test: /sweet.*sour|black vinegar|vinegar/,
+      teaser: "Origin note: Sweet-and-sour cooking shows the Chinese banquet love of contrast: bright vinegar, sweetness, crisp texture, and glossy sauce.",
+      history: "Sweet-and-sour flavors appear across Chinese regional cooking, with Cantonese and Hong Kong styles helping popularize glossy banquet versions abroad.",
+      fact: "Black vinegar adds depth beyond sharpness; it brings malt-like aroma and a darker, rounder finish."
+    },
+    {
+      test: /egg tart|custard tart/,
+      teaser: "Origin note: Chinese egg tarts show Hong Kong and Guangdong adapting European custard pastry into dim sum and bakery culture.",
+      history: "Custard tarts entered southern Chinese foodways through contact with British and Portuguese pastry traditions, then became a Hong Kong tea-house favorite.",
+      fact: "Hong Kong-style tarts tend to be smooth and glossy, while Macau-style tarts are usually more caramelized on top."
+    },
+    {
+      test: /mango|sago|pomelo/,
+      teaser: "Origin note: Mango sago is a modern Hong Kong dessert, created for a tropical, refreshing finish rather than an ancient banquet ritual.",
+      history: "Mango pomelo sago is widely credited to Hong Kong restaurant innovation in the 1980s and spread through Cantonese dessert shops.",
+      fact: "Its appeal is texture: mango cream, pomelo pop, coconut richness, and tiny sago pearls all hit differently in one spoon."
+    },
+    {
+      test: /almond|sesame|red bean|green bean|tong sui|coconut|snow swallow|sweet soup/,
+      teaser: "Origin note: This dessert belongs to the Cantonese tong sui tradition, where sweet soups are served warm or chilled after a meal.",
+      history: "Tong sui, literally sugar water, is a Cantonese dessert category built around sweet broths, beans, nuts, seeds, and seasonal textures.",
+      fact: "Many tong sui desserts are valued as much for mouthfeel and soothing warmth as for sweetness."
+    },
+    {
+      test: /tofu|bean curd|vegan|vegetarian|mushroom|eggplant|vegetable|greens|asparagus|gai lan|pea shoot/,
+      teaser: "Origin note: This dish connects to Chinese vegetable and Buddhist-influenced vegetarian traditions, where texture and sauce make simple ingredients feel complete.",
+      history: "Chinese vegetable cooking often treats greens, tofu, mushrooms, and aromatics as central dishes rather than side notes.",
+      fact: "Texture is the hidden lesson: crisp greens, silky tofu, and springy mushrooms each need a different heat strategy."
+    },
+    {
+      test: /cucumber|jellyfish|salad|starter|cold/,
+      teaser: "Origin note: This dish fits the Chinese cold-appetizer tradition, where refreshing texture and sharp seasoning wake up the palate before richer courses.",
+      history: "Cold dishes, often called liangcai, are common openers in Chinese meals because they balance temperature, crunch, vinegar, spice, or aromatics.",
+      fact: "A good cold starter is not just a salad; it sets the rhythm before steamed, roasted, and wok-fried dishes arrive."
+    },
+    {
+      test: /beef|wagyu|lamb|pork|chicken|meat/,
+      teaser: "Origin note: This dish reflects modern Chinese banquet cooking, where regional sauces and wok techniques are applied to premium proteins.",
+      history: "Chinese banquet meat dishes often blend older regional sauces with newer luxury ingredients, especially in modern fine-dining restaurants.",
+      fact: "For wok-fried meats, the sauce should cling without drowning the protein; gloss and aroma are part of the craft."
+    }
+  ];
+
+  const categoryProfiles = {
+    "steamed-dim-sum": {
+      teaser: "Origin note: This item comes from the Cantonese dim sum world, where tea, steam baskets, and shared small plates define the experience.",
+      history: "Steamed dim sum grew around yum cha service, turning small bites into a social way to study texture, filling, and technique.",
+      fact: "The bamboo steamer is part cooking tool, part serving vessel, keeping dumplings warm while they are shared."
+    },
+    "baked-fried": {
+      teaser: "Origin note: This item reflects the crisp side of dim sum, where pastry, frying, and fillings add contrast to steamed baskets.",
+      history: "Baked and fried dim sum expanded tea-house menus with textures that could contrast soft steamed dumplings.",
+      fact: "The best examples stay crisp without feeling heavy, which is why timing matters so much."
+    },
+    soups: {
+      teaser: "Origin note: This item belongs to the Cantonese soup tradition, where slow extraction and delicate texture matter more than heavy seasoning.",
+      history: "Cantonese soup culture prizes clarity, nourishment, and long simmering or double-boiling.",
+      fact: "Soup often works as a quiet luxury course: simple-looking, but time-intensive."
+    },
+    desserts: {
+      teaser: "Origin note: This dessert follows Cantonese sweet-course thinking, where texture, temperature, and refreshment are as important as sugar.",
+      history: "Cantonese dessert culture ranges from old tong sui sweet soups to modern Hong Kong chilled creations.",
+      fact: "Many Chinese desserts aim for a gentle finish instead of the heavy sweetness common in Western plated desserts."
+    }
+  };
+
+  const profile = profiles.find((entry) => entry.test.test(haystack)) || categoryProfiles[category] || {
+    teaser: `Origin note: ${name || "This dish"} reflects modern Chinese fine dining, where regional techniques are adapted for a polished menu-training experience.`,
+    history: "This dish is best understood through its technique and category rather than a single fixed origin story.",
+    fact: "A useful training angle is to connect the item to its cooking method, main ingredient, and service style."
+  };
+
+  return {
+    description: profile.teaser,
+    details: `Dish history: ${profile.history} Fun fact: ${profile.fact}`
+  };
+}
+
+function isGeneratedDishHistoryCopy(value = "") {
+  const text = normalizeText(value).toLowerCase();
+  return text.startsWith("origin note:") || text.startsWith("dish history:");
+}
+
+function shouldReplaceMott32Description(item, defaultMatch) {
+  const description = normalizeText(item.description);
+  if (!description) return true;
+  if (isGeneratedDishHistoryCopy(description)) return false;
+  if (defaultMatch && description === normalizeText(defaultMatch.description)) return true;
+  return /^(review menu matrix|deep fried|wok fried|steamed|steam|double boil|double boiled|braised|poached|marinated|crispy|light breaded|fried rice|fish soup|stir fried|sauteed|diced|mixed greens|sweetened|panna cotta|,)/i.test(description);
+}
+
+function shouldReplaceMott32Details(item, defaultMatch) {
+  const details = normalizeText(item.details);
+  if (!details) return true;
+  if (isGeneratedDishHistoryCopy(details)) return false;
+  if (defaultMatch && details === normalizeText(defaultMatch.details)) return true;
+  return /^section:/i.test(details) || /review menu matrix/i.test(details) || /ingredients:/i.test(details);
+}
+
+function applyMott32HistoryFacts(item = {}) {
+  const normalizedItem = normalizeMenuItem(item);
+  const defaultMatch = defaultMenuItems.find((defaultItem) => defaultItem.id === normalizedItem.id);
+  const historyFacts = getDishHistoryProfile(normalizedItem);
+
+  return {
+    ...normalizedItem,
+    description: shouldReplaceMott32Description(normalizedItem, defaultMatch)
+      ? historyFacts.description
+      : normalizedItem.description,
+    details: shouldReplaceMott32Details(normalizedItem, defaultMatch)
+      ? historyFacts.details
+      : normalizedItem.details
+  };
+}
+
+function applyMott32HistoryFactsToItems(items = []) {
+  return items.map(applyMott32HistoryFacts);
+}
+
 function normalizeMenuItem(item) {
   const defaultMatch = defaultMenuItems.find((defaultItem) => defaultItem.id === item.id);
   const category = normalizeCategoryValue(item.category);
@@ -2786,7 +3008,7 @@ function normalizeMenuItem(item) {
   return {
     ...item,
     category: categories.includes(category) ? category : categories[0] || "starters",
-    details: item.details || defaultMatch?.details || "Key ingredients, flavor notes, and service talking points can go here.",
+    details: item.details || defaultMatch?.details || "Dish history, origin notes, and fun facts can go here.",
     ingredients: normalizeIngredientList(item.ingredients || defaultMatch?.ingredients || []),
     image: images[0] || "",
     images,

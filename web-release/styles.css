@@ -2338,6 +2338,13 @@ h1 {
   grid-template-columns: minmax(0, 1fr);
 }
 
+.history-facts-panel {
+  border: 1px solid rgba(25, 33, 29, 0.08);
+  border-radius: 8px;
+  padding: 10px 11px;
+  background: rgba(255, 253, 250, 0.72);
+}
+
 .item-photo-gallery {
   position: relative;
   width: var(--item-photo-size, 96px);
@@ -2512,7 +2519,7 @@ h1 {
   margin-bottom: 0;
   color: var(--ink);
   font-size: 0.82rem;
-  line-height: 1.35;
+  line-height: 1.5;
 }
 
 .empty-state {
