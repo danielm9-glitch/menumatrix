@@ -1957,6 +1957,12 @@ const state = {
   localItemEditTimes: {},
   localDeletedItemTimes: {},
   photoSlides: {},
+  photoLightbox: {
+    itemId: "",
+    itemName: "",
+    images: [],
+    index: 0
+  },
   screen: loadCurrentUser() ? "menus" : "login",
   activeRestaurantMenu: initialRestaurantMenu?.id || defaultRestaurantMenuId,
   dashboardTab: "users",
@@ -2105,6 +2111,8 @@ const syncStatus = document.querySelector("#syncStatus");
 const backToTopButton = document.querySelector("#backToTopButton");
 const photoLightboxDialog = document.querySelector("#photoLightboxDialog");
 const closePhotoLightboxButton = document.querySelector("#closePhotoLightboxButton");
+const photoLightboxPreviousButton = document.querySelector("#photoLightboxPreviousButton");
+const photoLightboxNextButton = document.querySelector("#photoLightboxNextButton");
 const photoLightboxImage = document.querySelector("#photoLightboxImage");
 const photoLightboxCaption = document.querySelector("#photoLightboxCaption");
 const setupPassword = document.querySelector("#setupPassword");
@@ -5875,20 +5883,79 @@ function createPhotoNavButton(direction, itemId, imageCount, itemName) {
   return button;
 }
 
-function openPhotoLightbox(imageUrl, caption) {
-  if (!photoLightboxDialog || !photoLightboxImage || !photoLightboxCaption || !imageUrl) return;
+function openPhotoLightbox(images, itemName, itemId, requestedIndex = 0) {
+  if (!photoLightboxDialog || !photoLightboxImage || !photoLightboxCaption) return;
 
+  const imageList = Array.isArray(images) ? normalizeItemImageList(images) : normalizeItemImageList([images]);
+  if (!imageList.length) return;
+
+  state.photoLightbox = {
+    itemId: itemId || "",
+    itemName: normalizeText(itemName) || "Item",
+    images: imageList,
+    index: Math.max(0, Math.min(imageList.length - 1, Number(requestedIndex) || 0))
+  };
+  renderPhotoLightbox();
+  if (!photoLightboxDialog.open) photoLightboxDialog.showModal();
+}
+
+function renderPhotoLightbox() {
+  const { itemId, itemName, images, index } = state.photoLightbox;
+  const imageUrl = images[index];
+  if (!photoLightboxImage || !photoLightboxCaption || !imageUrl) return;
+
+  const caption = `${itemName} photo ${index + 1} of ${images.length}`;
   photoLightboxImage.src = imageUrl;
   photoLightboxImage.alt = caption;
   photoLightboxCaption.textContent = caption;
-  if (!photoLightboxDialog.open) photoLightboxDialog.showModal();
+  if (photoLightboxPreviousButton) {
+    photoLightboxPreviousButton.hidden = images.length <= 1;
+    photoLightboxPreviousButton.disabled = images.length <= 1;
+  }
+  if (photoLightboxNextButton) {
+    photoLightboxNextButton.hidden = images.length <= 1;
+    photoLightboxNextButton.disabled = images.length <= 1;
+  }
+  if (itemId) setItemPhotoSlide(itemId, images.length, index);
+}
+
+function movePhotoLightbox(direction) {
+  const { images, index } = state.photoLightbox;
+  if (!images.length || images.length <= 1) return;
+
+  state.photoLightbox.index = (index + direction + images.length) % images.length;
+  renderPhotoLightbox();
+}
+
+function resetPhotoLightboxState() {
+  photoLightboxImage?.removeAttribute("src");
+  if (photoLightboxCaption) photoLightboxCaption.textContent = "";
+  state.photoLightbox = {
+    itemId: "",
+    itemName: "",
+    images: [],
+    index: 0
+  };
 }
 
 function closePhotoLightbox() {
   if (!photoLightboxDialog) return;
-  photoLightboxDialog.close();
-  photoLightboxImage?.removeAttribute("src");
-  if (photoLightboxCaption) photoLightboxCaption.textContent = "";
+  if (photoLightboxDialog.open) photoLightboxDialog.close();
+  resetPhotoLightboxState();
+}
+
+function handlePhotoLightboxKeydown(event) {
+  if (!photoLightboxDialog?.open) return;
+
+  if (event.key === "ArrowLeft") {
+    event.preventDefault();
+    movePhotoLightbox(-1);
+  } else if (event.key === "ArrowRight") {
+    event.preventDefault();
+    movePhotoLightbox(1);
+  } else if (event.key === "Escape") {
+    closePhotoLightbox();
+  }
 }
 
 function attachPhotoSwipeHandlers(gallery, itemId, images, itemName) {
@@ -5927,7 +5994,7 @@ function attachPhotoSwipeHandlers(gallery, itemId, images, itemName) {
     isSwiping = false;
     const activeIndex = getItemPhotoSlideIndex(itemId, imageCount);
     if (!hasDragged || (Math.abs(deltaX) < 8 && Math.abs(deltaY) < 8)) {
-      openPhotoLightbox(images[activeIndex], `${itemName} photo ${activeIndex + 1}`);
+      openPhotoLightbox(images, itemName, itemId, activeIndex);
       return;
     }
   });
@@ -10433,9 +10500,23 @@ closeDialogButton.addEventListener("click", closeItemDialog);
 deleteItemButton.addEventListener("click", deleteItem);
 itemForm.addEventListener("submit", saveItem);
 closePhotoLightboxButton?.addEventListener("click", closePhotoLightbox);
+photoLightboxPreviousButton?.addEventListener("click", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  movePhotoLightbox(-1);
+});
+photoLightboxNextButton?.addEventListener("click", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  movePhotoLightbox(1);
+});
+photoLightboxPreviousButton?.addEventListener("pointerdown", (event) => event.stopPropagation());
+photoLightboxNextButton?.addEventListener("pointerdown", (event) => event.stopPropagation());
 photoLightboxDialog?.addEventListener("click", (event) => {
   if (event.target === photoLightboxDialog) closePhotoLightbox();
 });
+photoLightboxDialog?.addEventListener("close", resetPhotoLightboxState);
+window.addEventListener("keydown", handlePhotoLightboxKeydown);
 backToTopButton.addEventListener("click", scrollToPageTop);
 window.addEventListener("scroll", updateBackToTopButton, { passive: true });
 window.addEventListener("resize", updateBackToTopButton);
