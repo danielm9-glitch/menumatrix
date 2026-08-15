@@ -1989,6 +1989,7 @@ const cloudSync = {
   ref: null,
   saveTimer: null,
   sharedCode: "",
+  sharedSaveTimer: null,
   sharedUnsubscribe: null,
   unsubscribe: null,
   usersRef: null,
@@ -3520,7 +3521,10 @@ function persistActiveRestaurantMenuData() {
 
 function saveRestaurantMenus({ sync = true } = {}) {
   localStorage.setItem(getRestaurantMenusStorageKey(), JSON.stringify(restaurantMenus.map(sanitizeRestaurantMenuForStorage)));
-  if (sync) scheduleCloudSave();
+  if (sync) {
+    scheduleCloudSave();
+    scheduleSharedMenuSnapshotsSave();
+  }
 }
 
 function applyMenuAnimationIntensity(value) {
@@ -4266,6 +4270,62 @@ function renderSavedShareCodes() {
   });
 }
 
+async function refreshSavedShareCodesFromFirebase() {
+  const codes = uniqueValues([
+    ...loadSavedShareCodes().map((entry) => normalizeShareCode(entry.code)),
+    normalizeShareCode(shareCodeInput?.value || "")
+  ]).filter(Boolean);
+  if (!codes.length) return 0;
+
+  const shouldShowMessage = Boolean(codeLoginForm && !codeLoginForm.hidden);
+  if (shouldShowMessage) {
+    codeLoginMessage.textContent = "Refreshing saved menus...";
+  }
+
+  try {
+    await ensureSharedFirebaseAccess();
+  } catch {
+    if (shouldShowMessage) {
+      codeLoginMessage.textContent = "Could not refresh from Firebase. Showing saved copies.";
+    }
+    return 0;
+  }
+
+  let refreshedCount = 0;
+  await Promise.all(
+    codes.map(async (code) => {
+      const snapshot = await getShareDocumentServerSnapshot(code, {
+        timeoutMs: 9000,
+        timeoutMessage: "Saved menu refresh timed out."
+      }).catch(() => null);
+      if (!snapshot?.exists) return;
+
+      const payload = createSharedMenuSnapshotPayload(code, snapshot.data() || {});
+      if (!payload.menu?.id) return;
+
+      saveSharedCodeLocally(code, payload.menu.name, payload.menu, {
+        categories: payload.categories,
+        updatedAt: payload.updatedAt,
+        owner: payload.owner,
+        menuId: payload.menuId
+      });
+      if (state.sharedCode === code) {
+        openSharedMenuSnapshot(payload, { preserveView: true });
+      }
+      flushPendingSharedQuizResults(code).catch(() => {});
+      refreshedCount += 1;
+    })
+  );
+
+  if (shouldShowMessage) {
+    codeLoginMessage.textContent = refreshedCount
+      ? "Saved menus refreshed."
+      : "No saved menu updates found.";
+  }
+
+  return refreshedCount;
+}
+
 function normalizeShareCode(code) {
   return String(code || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
@@ -4301,6 +4361,19 @@ function getShareDocument(code) {
   const collection = getShareCollection();
   const normalizedCode = normalizeShareCode(code);
   return collection && normalizedCode ? collection.doc(normalizedCode) : null;
+}
+
+async function getShareDocumentServerSnapshot(code, { timeoutMs = 12000, timeoutMessage = "Shared menu lookup timed out." } = {}) {
+  const doc = getShareDocument(code);
+  if (!doc) return null;
+
+  return withTimeout(doc.get({ source: "server" }), timeoutMs, timeoutMessage);
+}
+
+function isOlderSharedMenuSnapshot(updatedAt = "") {
+  const incomingTimestamp = getTimestampMs(updatedAt);
+  const currentTimestamp = getTimestampMs(state.sharedMenuUpdatedAt);
+  return Boolean(incomingTimestamp && currentTimestamp && incomingTimestamp <= currentTimestamp);
 }
 
 function createSharedMenuSnapshotPayload(code, data = {}) {
@@ -4379,6 +4452,7 @@ function subscribeToSharedMenuUpdates(code) {
       const data = snapshot.data() || {};
       const incomingUpdatedAt = data.updatedAt || "";
       if (incomingUpdatedAt && state.sharedMenuUpdatedAt === incomingUpdatedAt) return;
+      if (isOlderSharedMenuSnapshot(incomingUpdatedAt)) return;
 
       openSharedMenuSnapshot(createSharedMenuSnapshotPayload(normalizedCode, data), {
         preserveView: true,
@@ -4408,12 +4482,13 @@ async function ensureSharedFirebaseAccess() {
 async function validateShareCodeAvailability(code) {
   const activeMenu = getActiveRestaurantMenu();
   const activeUser = getActiveUser();
+  const normalizedCode = normalizeShareCode(code);
   const doc = getShareDocument(normalizedCode);
   if (!activeMenu || !activeUser || !doc) {
     throw new Error("Firebase share storage is not ready.");
   }
 
-  const snapshot = await doc.get();
+  const snapshot = await getShareDocumentServerSnapshot(normalizedCode, { timeoutMessage: "Share code check timed out." });
   if (!snapshot.exists) return;
 
   const data = snapshot.data();
@@ -4532,7 +4607,7 @@ async function publishMenuShare(code) {
   }
 
   const normalizedCode = normalizeShareCode(code);
-  const existingSnapshot = await doc.get().catch(() => null);
+  const existingSnapshot = await getShareDocumentServerSnapshot(normalizedCode).catch(() => null);
   const existingData = existingSnapshot?.exists ? existingSnapshot.data() || {} : {};
   const quizResults = mergeQuizResults(getShareQuizResults(existingData), activeMenu.quizResults || []);
   activeMenu.quizResults = quizResults;
@@ -4563,7 +4638,7 @@ async function syncSharedMenuSnapshots() {
   await Promise.all(
     sharedMenus.map(async (menu) => {
       const doc = getShareDocument(menu.shareCode);
-      const existingSnapshot = await doc.get().catch(() => null);
+      const existingSnapshot = await getShareDocumentServerSnapshot(menu.shareCode).catch(() => null);
       const existingData = existingSnapshot?.exists ? existingSnapshot.data() || {} : {};
       const quizResults = mergeQuizResults(getShareQuizResults(existingData), menu.quizResults || []);
 
@@ -4618,8 +4693,7 @@ async function loadSharedMenuFromCode(code) {
     return;
   }
 
-  const doc = getShareDocument(normalizedCode);
-  if (!doc) {
+  if (!getShareDocument(normalizedCode)) {
     const savedEntry = getSavedShareCodeEntry(normalizedCode);
     if (savedEntry?.menu) {
       openSharedMenuSnapshot(savedEntry, { subscribe: false });
@@ -4632,7 +4706,10 @@ async function loadSharedMenuFromCode(code) {
   }
 
   try {
-    const snapshot = await withTimeout(doc.get(), 12000, "Shared menu lookup timed out.");
+    const snapshot = await getShareDocumentServerSnapshot(normalizedCode, {
+      timeoutMs: 12000,
+      timeoutMessage: "Shared menu lookup timed out."
+    });
     if (!snapshot.exists) {
       const savedEntry = getSavedShareCodeEntry(normalizedCode);
       if (savedEntry?.menu) {
@@ -5198,6 +5275,18 @@ function scheduleCloudSave() {
   window.clearTimeout(cloudSync.saveTimer);
   setSyncStatus("Saving to Firebase...");
   cloudSync.saveTimer = window.setTimeout(() => uploadCloudSnapshot("update"), 600);
+}
+
+function scheduleSharedMenuSnapshotsSave() {
+  if (cloudSync.applying || !getActiveUser()) return;
+  if (!restaurantMenus.some((menu) => normalizeShareCode(menu.shareCode))) return;
+
+  window.clearTimeout(cloudSync.sharedSaveTimer);
+  cloudSync.sharedSaveTimer = window.setTimeout(() => {
+    syncSharedMenuSnapshots().catch(() => {
+      setSyncStatus("Shared code update failed - check Firebase", "error");
+    });
+  }, 900);
 }
 
 async function uploadCloudSnapshot(reason) {
@@ -9078,11 +9167,13 @@ function openRegisterFromDemo() {
 }
 
 function toggleCodeLoginPanel() {
+  const willOpen = codeLoginForm.hidden;
   codeLoginForm.hidden = !codeLoginForm.hidden;
   codeLoginMessage.textContent = "";
   renderSavedShareCodes();
-  if (!codeLoginForm.hidden) {
+  if (willOpen) {
     shareCodeInput.focus();
+    refreshSavedShareCodesFromFirebase();
   }
 }
 
