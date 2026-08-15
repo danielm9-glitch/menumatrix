@@ -1954,6 +1954,7 @@ const state = {
   currentUser: loadCurrentUser(),
   sharedMenu: null,
   sharedCode: "",
+  sharedMenuUpdatedAt: "",
   demoMode: false,
   editing: false,
   localItemEditTimes: {},
@@ -1986,6 +1987,8 @@ const cloudSync = {
   docId: "",
   ref: null,
   saveTimer: null,
+  sharedCode: "",
+  sharedUnsubscribe: null,
   unsubscribe: null,
   usersRef: null,
   usersSaveTimer: null,
@@ -4137,17 +4140,23 @@ function getSavedShareCodeEntry(code) {
   return loadSavedShareCodes().find((entry) => normalizeShareCode(entry.code) === normalizedCode) || null;
 }
 
-function saveSharedCodeLocally(code, menuName = "Shared menu", menuSnapshot = null) {
+function saveSharedCodeLocally(code, menuName = "Shared menu", menuSnapshot = null, metadata = {}) {
   const normalizedCode = normalizeShareCode(code);
   if (!normalizedCode) return;
 
   const currentCodes = loadSavedShareCodes().filter((entry) => normalizeShareCode(entry.code) !== normalizedCode);
+  const metadataCategories = Array.isArray(metadata.categories) && metadata.categories.length ? metadata.categories : null;
+  const sharedCategories = getUniqueCategories(metadataCategories || menuSnapshot?.categories || categories);
+  const sanitizedMenu = menuSnapshot ? sanitizeRestaurantMenuForStorage(menuSnapshot) : null;
   const nextCodes = [
     {
       code: normalizedCode,
-      menuName,
-      categories,
-      menu: menuSnapshot ? sanitizeRestaurantMenuForStorage(menuSnapshot) : null,
+      menuName: menuName || sanitizedMenu?.name || "Shared menu",
+      menuId: metadata.menuId || sanitizedMenu?.id || "",
+      owner: metadata.owner || sanitizedMenu?.owner || "",
+      categories: sharedCategories,
+      menu: sanitizedMenu,
+      updatedAt: metadata.updatedAt || "",
       savedAt: new Date().toISOString()
     },
     ...currentCodes
@@ -4213,6 +4222,68 @@ function getShareDocument(code) {
   return collection && normalizedCode ? collection.doc(normalizedCode) : null;
 }
 
+function createSharedMenuSnapshotPayload(code, data = {}) {
+  const normalizedCode = normalizeShareCode(code || data.code);
+  const sharedMenuData = data.menu && typeof data.menu === "object" ? data.menu : {};
+  const sharedCategories = Array.isArray(data.categories) && data.categories.length
+    ? data.categories
+    : Array.isArray(sharedMenuData.categories)
+      ? sharedMenuData.categories
+      : [];
+
+  return {
+    code: normalizedCode,
+    updatedAt: data.updatedAt || "",
+    owner: data.owner || sharedMenuData.owner || "",
+    menuId: data.menuId || sharedMenuData.id || "",
+    categories: sharedCategories,
+    menu: {
+      ...sharedMenuData,
+      id: data.menuId || sharedMenuData.id || `shared-${normalizedCode}`,
+      name: data.menuName || sharedMenuData.name || "Shared menu",
+      shareCode: normalizedCode,
+      quizResults: mergeQuizResults(sharedMenuData.quizResults || [], data.quizResults || [])
+    }
+  };
+}
+
+function clearSharedMenuSubscription() {
+  if (cloudSync.sharedUnsubscribe) {
+    cloudSync.sharedUnsubscribe();
+    cloudSync.sharedUnsubscribe = null;
+  }
+  cloudSync.sharedCode = "";
+}
+
+function subscribeToSharedMenuUpdates(code) {
+  const normalizedCode = normalizeShareCode(code);
+  if (!normalizedCode || state.demoMode) return;
+  if (cloudSync.sharedCode === normalizedCode && cloudSync.sharedUnsubscribe) return;
+
+  const doc = getShareDocument(normalizedCode);
+  if (!doc?.onSnapshot) return;
+
+  clearSharedMenuSubscription();
+  cloudSync.sharedCode = normalizedCode;
+  cloudSync.sharedUnsubscribe = doc.onSnapshot(
+    (snapshot) => {
+      if (!snapshot.exists || state.sharedCode !== normalizedCode) return;
+
+      const data = snapshot.data() || {};
+      const incomingUpdatedAt = data.updatedAt || "";
+      if (incomingUpdatedAt && state.sharedMenuUpdatedAt === incomingUpdatedAt) return;
+
+      openSharedMenuSnapshot(createSharedMenuSnapshotPayload(normalizedCode, data), {
+        preserveView: true,
+        subscribe: false
+      });
+    },
+    () => {
+      clearSharedMenuSubscription();
+    }
+  );
+}
+
 async function ensureSharedFirebaseAccess() {
   const client = await waitForFirebaseClient();
   if (!client?.enabled || !client.db) return null;
@@ -4247,10 +4318,27 @@ async function validateShareCodeAvailability(code) {
   }
 }
 
-function openSharedMenuSnapshot({ code, menu, categories: sharedCategories = [] }) {
+function openSharedMenuSnapshot(
+  { code, menu, categories: sharedCategories = [], updatedAt = "", owner = "", menuId = "" },
+  { preserveView = false, subscribe = true } = {}
+) {
   const normalizedCode = normalizeShareCode(code);
-  if (Array.isArray(sharedCategories)) {
-    mergeCategories(sharedCategories, { sync: false });
+  const previousScreen = state.screen;
+  const previousCategory = state.category;
+  const previousQuery = state.query;
+  const previousOpenItems = new Set(state.openItems);
+  const previousAllergies = new Set(state.allergies);
+  const previousIngredients = new Set(state.ingredients);
+  const previousScrollY = window.scrollY;
+  const incomingCategories =
+    Array.isArray(sharedCategories) && sharedCategories.length
+      ? sharedCategories
+      : Array.isArray(menu?.categories) && menu.categories.length
+        ? menu.categories
+        : categories;
+
+  if (incomingCategories.length) {
+    mergeCategories(incomingCategories, { sync: false });
   }
 
   const sharedMenu = normalizeRestaurantMenu({
@@ -4262,28 +4350,53 @@ function openSharedMenuSnapshot({ code, menu, categories: sharedCategories = [] 
 
   state.sharedMenu = sharedMenu;
   state.sharedCode = normalizedCode;
+  state.sharedMenuUpdatedAt = updatedAt || "";
   state.demoMode = false;
   state.currentUser = null;
-  state.screen = "shared";
   state.editing = false;
-  state.category = "all";
-  state.query = "";
-  state.openItems.clear();
-  state.allergies.clear();
-  state.ingredients.clear();
-  searchInput.value = "";
-  saveSharedCodeLocally(normalizedCode, sharedMenu.name, sharedMenu);
+
+  if (preserveView) {
+    const availableItemIds = new Set(sharedMenu.items.map((item) => item.id));
+    state.screen = ["shared", "flashcards", "quiz"].includes(previousScreen) ? previousScreen : "shared";
+    state.category = previousCategory === "all" || categories.includes(previousCategory) ? previousCategory : "all";
+    state.query = previousQuery;
+    state.openItems = new Set([...previousOpenItems].filter((itemId) => availableItemIds.has(itemId)));
+    state.allergies = previousAllergies;
+    state.ingredients = previousIngredients;
+    searchInput.value = previousQuery;
+  } else {
+    state.screen = "shared";
+    state.category = "all";
+    state.query = "";
+    state.openItems.clear();
+    state.allergies.clear();
+    state.ingredients.clear();
+    searchInput.value = "";
+  }
+
+  saveSharedCodeLocally(normalizedCode, sharedMenu.name, sharedMenu, {
+    categories: incomingCategories,
+    updatedAt,
+    owner,
+    menuId
+  });
   syncActiveRestaurantMenuData();
   applyDesignSettings();
   renderAllergyChips();
-  showScreen("shared");
+  showScreen(state.screen);
+  if (preserveView) {
+    window.requestAnimationFrame(() => window.scrollTo(0, previousScrollY));
+  }
+  if (subscribe) subscribeToSharedMenuUpdates(normalizedCode);
 }
 
 function openDemoMenu() {
   closeDrawer();
+  clearSharedMenuSubscription();
   const demoMenu = createDemoRestaurantMenu();
   state.sharedMenu = demoMenu;
   state.sharedCode = "";
+  state.sharedMenuUpdatedAt = "";
   state.demoMode = true;
   state.currentUser = null;
   state.screen = "shared";
@@ -4369,7 +4482,7 @@ async function loadSharedMenuFromCode(code) {
   } catch {
     const savedEntry = getSavedShareCodeEntry(normalizedCode);
     if (savedEntry?.menu) {
-      openSharedMenuSnapshot(savedEntry);
+      openSharedMenuSnapshot(savedEntry, { subscribe: false });
       if (submitButton) submitButton.disabled = false;
       return;
     }
@@ -4382,7 +4495,7 @@ async function loadSharedMenuFromCode(code) {
   if (!doc) {
     const savedEntry = getSavedShareCodeEntry(normalizedCode);
     if (savedEntry?.menu) {
-      openSharedMenuSnapshot(savedEntry);
+      openSharedMenuSnapshot(savedEntry, { subscribe: false });
       if (submitButton) submitButton.disabled = false;
       return;
     }
@@ -4396,7 +4509,7 @@ async function loadSharedMenuFromCode(code) {
     if (!snapshot.exists) {
       const savedEntry = getSavedShareCodeEntry(normalizedCode);
       if (savedEntry?.menu) {
-        openSharedMenuSnapshot(savedEntry);
+        openSharedMenuSnapshot(savedEntry, { subscribe: false });
         if (submitButton) submitButton.disabled = false;
         return;
       }
@@ -4404,26 +4517,11 @@ async function loadSharedMenuFromCode(code) {
       return;
     }
 
-    const data = snapshot.data();
-    if (Array.isArray(data.categories)) {
-      mergeCategories(data.categories, { sync: false });
-    }
-
-    openSharedMenuSnapshot({
-      code: normalizedCode,
-      menu: {
-        ...(data.menu || {}),
-        id: data.menuId || data.menu?.id || `shared-${normalizedCode}`,
-        name: data.menuName || data.menu?.name || "Shared menu",
-        shareCode: normalizedCode,
-        quizResults: mergeQuizResults(data.menu?.quizResults || [], data.quizResults || [])
-      },
-      categories: data.categories
-    });
+    openSharedMenuSnapshot(createSharedMenuSnapshotPayload(normalizedCode, snapshot.data() || {}));
   } catch (error) {
     const savedEntry = getSavedShareCodeEntry(normalizedCode);
     if (savedEntry?.menu) {
-      openSharedMenuSnapshot(savedEntry);
+      openSharedMenuSnapshot(savedEntry, { subscribe: false });
       return;
     }
     codeLoginMessage.textContent =
@@ -8866,8 +8964,10 @@ async function copyShareCode() {
 }
 
 function exitSharedMenu() {
+  clearSharedMenuSubscription();
   state.sharedMenu = null;
   state.sharedCode = "";
+  state.sharedMenuUpdatedAt = "";
   state.demoMode = false;
   state.screen = getActiveUser() ? "menus" : "login";
   state.category = "all";
@@ -9067,6 +9167,7 @@ function setupInvitedPassword(event) {
 }
 
 async function logoutAdmin() {
+  clearSharedMenuSubscription();
   state.currentUser = null;
   state.screen = "login";
   localStorage.removeItem(currentUserKey);
