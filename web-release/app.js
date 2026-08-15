@@ -14,6 +14,8 @@ const primaryAdminUsername = "admin";
 const cloudOcrEndpoint = window.MENU_MATRIX_OCR_ENDPOINT || "";
 const menuFullnessTarget = 12;
 const quizResultsLimit = 150;
+const menuStatsEventLimit = 80;
+const itemStatsEventLimit = 40;
 const legacyMott32HeroImage = "https://www.nicepng.com/png/detail/809-8099031_mott32-las-vegas-mott-32-logo.png";
 const defaultHeroImage = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 260'%3E%3Crect width='640' height='260' fill='%23f7f1e6'/%3E%3Ctext x='320' y='116' text-anchor='middle' font-family='Georgia%2C serif' font-size='84' font-weight='700' fill='%2319211d'%3EMOTT 32%3C/text%3E%3Ctext x='320' y='168' text-anchor='middle' font-family='Arial%2C sans-serif' font-size='22' letter-spacing='8' fill='%2366716b'%3ELAS VEGAS%3C/text%3E%3C/svg%3E";
 const defaultFrontMediaUrl = "assets/login-background.mp4";
@@ -2330,8 +2332,8 @@ const dashboardAuthSummary = document.querySelector("#dashboardAuthSummary");
 const dashboardPaymentsSummary = document.querySelector("#dashboardPaymentsSummary");
 const dashboardRestaurantList = document.querySelector("#dashboardRestaurantList");
 const dashboardMenuList = document.querySelector("#dashboardMenuList");
-const dashboardQuizSummary = document.querySelector("#dashboardQuizSummary");
-const dashboardQuizList = document.querySelector("#dashboardQuizList");
+const dashboardStatsSummary = document.querySelector("#dashboardStatsSummary");
+const dashboardStatsList = document.querySelector("#dashboardStatsList");
 const dashboardCustomizationSummary = document.querySelector("#dashboardCustomizationSummary");
 const dashboardCustomizationButton = document.querySelector("#dashboardCustomizationButton");
 const backFromFlashcardsButton = document.querySelector("#backFromFlashcardsButton");
@@ -2668,10 +2670,59 @@ function shouldUseBuiltInMott32Hero(menu, heroImageValue) {
   return isMott32Menu(menu) && (!heroImageValue || heroImageValue === legacyMott32HeroImage);
 }
 
+function normalizeStatsEvents(events = [], fallbackTimestamp = "", limit = menuStatsEventLimit) {
+  const eventList = Array.isArray(events) ? events : [];
+  const normalized = eventList
+    .map((event) => (typeof event === "string" ? event : event?.at || event?.timestamp || ""))
+    .filter((event) => !Number.isNaN(Date.parse(event)));
+
+  if (!normalized.length && typeof fallbackTimestamp === "string" && !Number.isNaN(Date.parse(fallbackTimestamp))) {
+    normalized.push(fallbackTimestamp);
+  }
+
+  return [...new Set(normalized)]
+    .sort((a, b) => Date.parse(b) - Date.parse(a))
+    .slice(0, limit);
+}
+
+function normalizeItemClickStats(itemClicks = {}) {
+  const source = itemClicks && typeof itemClicks === "object" ? itemClicks : {};
+  return Object.fromEntries(
+    Object.entries(source)
+      .map(([itemId, stat]) => {
+        const sourceStat = stat && typeof stat === "object" ? stat : {};
+        const clicks = Math.max(0, Number(sourceStat.clicks) || 0);
+        const lastOpenedAt = typeof sourceStat.lastOpenedAt === "string" ? sourceStat.lastOpenedAt : "";
+        const recentOpens = normalizeStatsEvents(
+          sourceStat.recentOpens || sourceStat.openEvents || sourceStat.timestamps,
+          lastOpenedAt,
+          itemStatsEventLimit
+        );
+        return [
+          String(itemId),
+          {
+            clicks,
+            lastOpenedAt: recentOpens[0] || lastOpenedAt,
+            recentOpens,
+            itemName: String(sourceStat.itemName || sourceStat.name || "")
+          }
+        ];
+      })
+      .filter(([itemId, stat]) => itemId && stat.clicks > 0)
+  );
+}
+
 function normalizeMenuStats(stats = {}) {
+  const source = stats && typeof stats === "object" ? stats : {};
+  const clicks = Math.max(0, Number(source.clicks) || 0);
+  const lastOpenedAt = typeof source.lastOpenedAt === "string" ? source.lastOpenedAt : "";
+  const recentOpens = normalizeStatsEvents(source.recentOpens || source.openEvents || source.timestamps, lastOpenedAt);
+
   return {
-    clicks: Math.max(0, Number(stats.clicks) || 0),
-    lastOpenedAt: typeof stats.lastOpenedAt === "string" ? stats.lastOpenedAt : ""
+    clicks,
+    lastOpenedAt: recentOpens[0] || lastOpenedAt,
+    recentOpens,
+    itemClicks: normalizeItemClickStats(source.itemClicks || source.itemStats || source.items)
   };
 }
 
@@ -4388,6 +4439,32 @@ function getMenuStats(menu) {
   return normalizeMenuStats(menu?.stats);
 }
 
+function getMenuItemClickRows(menu) {
+  const stats = getMenuStats(menu);
+  const items = Array.isArray(menu?.items) ? menu.items : [];
+  const itemById = new Map(items.map((item) => [item.id, item]));
+
+  return Object.entries(stats.itemClicks)
+    .map(([itemId, itemStat]) => {
+      const item = itemById.get(itemId);
+      const name = item?.name || itemStat.itemName || "Deleted item";
+      return {
+        itemId,
+        name,
+        category: item ? getCategoryLabel(item.category) : "No longer on menu",
+        clicks: Math.max(0, Number(itemStat.clicks) || 0),
+        lastOpenedAt: itemStat.lastOpenedAt || itemStat.recentOpens?.[0] || "",
+        recentOpens: normalizeStatsEvents(itemStat.recentOpens, itemStat.lastOpenedAt, itemStatsEventLimit)
+      };
+    })
+    .filter((row) => row.clicks > 0)
+    .sort((a, b) => {
+      const clickDifference = b.clicks - a.clicks;
+      if (clickDifference) return clickDifference;
+      return Date.parse(b.lastOpenedAt || "") - Date.parse(a.lastOpenedAt || "");
+    });
+}
+
 function getMenuFullnessScore(menu) {
   const items = Array.isArray(menu?.items) ? menu.items : [];
   const usedCategories = new Set(items.map((item) => item.category).filter(Boolean));
@@ -4420,9 +4497,38 @@ function recordMenuOpen(menuId) {
   const menu = restaurantMenus.find((candidate) => candidate.id === menuId);
   if (!menu) return;
 
+  const openedAt = new Date().toISOString();
   menu.stats = normalizeMenuStats(menu.stats);
   menu.stats.clicks += 1;
-  menu.stats.lastOpenedAt = new Date().toISOString();
+  menu.stats.lastOpenedAt = openedAt;
+  menu.stats.recentOpens = [openedAt, ...menu.stats.recentOpens].slice(0, menuStatsEventLimit);
+  saveRestaurantMenus();
+}
+
+function recordMenuItemOpen(itemId) {
+  if (state.sharedMenu || !itemId) return;
+
+  const menu = getActiveRestaurantMenu();
+  if (!menu) return;
+
+  const item = menuItems.find((candidate) => candidate.id === itemId) || menu.items?.find((candidate) => candidate.id === itemId);
+  const openedAt = new Date().toISOString();
+  menu.stats = normalizeMenuStats(menu.stats);
+  const current = normalizeItemClickStats(menu.stats.itemClicks)[itemId] || {
+    clicks: 0,
+    lastOpenedAt: "",
+    recentOpens: [],
+    itemName: item?.name || ""
+  };
+
+  menu.stats.itemClicks[itemId] = {
+    ...current,
+    clicks: current.clicks + 1,
+    lastOpenedAt: openedAt,
+    recentOpens: [openedAt, ...current.recentOpens].slice(0, itemStatsEventLimit),
+    itemName: item?.name || current.itemName || ""
+  };
+
   saveRestaurantMenus();
 }
 
@@ -6108,10 +6214,12 @@ function updateRowSwipeVisual(deltaX) {
 }
 
 function toggleItemDetails(id) {
-  if (state.openItems.has(id)) {
+  const willOpen = !state.openItems.has(id);
+  if (!willOpen) {
     state.openItems.delete(id);
   } else {
     state.openItems.add(id);
+    recordMenuItemOpen(id);
   }
 
   const isOpen = state.openItems.has(id);
@@ -6226,7 +6334,8 @@ function openUsersPage(tabName = "") {
   state.dashboardReturnScreen = state.screen === "menu" ? "menu" : "menus";
   showScreen("users");
   const adminTab = tabName || (state.dashboardTab && state.dashboardTab !== "account" ? state.dashboardTab : "users");
-  showDashboardTab(isAdmin() ? adminTab : "account");
+  const regularTab = tabName === "stats" || state.dashboardTab === "stats" ? "stats" : "account";
+  showDashboardTab(isAdmin() ? adminTab : regularTab);
   refreshAccountEmailStatus();
   renderDashboard();
   if (isAdmin()) renderUserList();
@@ -6733,14 +6842,16 @@ function handleDeleteAccountSliderKeydown(event) {
 }
 
 function showDashboardTab(tabName) {
-  if (!isAdmin() && tabName !== "account") {
+  if (tabName === "quiz-results") tabName = "stats";
+
+  if (!canAccessDashboardTab(tabName)) {
     tabName = "account";
   }
 
   state.dashboardTab = tabName;
 
   dashboardTabs.forEach((tab) => {
-    tab.hidden = !isAdmin() && tab.dataset.dashboardTab !== "account";
+    tab.hidden = !canAccessDashboardTab(tab.dataset.dashboardTab);
     const isActive = tab.dataset.dashboardTab === tabName;
     tab.classList.toggle("is-active", isActive);
     tab.setAttribute("aria-selected", String(isActive));
@@ -6753,6 +6864,10 @@ function showDashboardTab(tabName) {
   renderDashboard();
 }
 
+function canAccessDashboardTab(tabName) {
+  return isAdmin() || tabName === "account" || tabName === "stats";
+}
+
 function renderDashboard() {
   const activeUser = getActiveUser();
   if (!activeUser) return;
@@ -6760,17 +6875,17 @@ function renderDashboard() {
   dashboardKicker.textContent = isAdmin() ? "Admin" : "Account";
   dashboardTitle.textContent = "Dashboard";
   dashboardTabs.forEach((tab) => {
-    tab.hidden = !isAdmin() && tab.dataset.dashboardTab !== "account";
+    tab.hidden = !canAccessDashboardTab(tab.dataset.dashboardTab);
   });
 
   renderAccountDashboard();
+  renderDashboardStats();
   if (!isAdmin()) return;
   renderDashboardAuthSummary();
   renderDashboardPaymentsSummary();
   renderDashboardCustomizationSummary();
   renderDashboardRestaurants();
   renderDashboardMenus();
-  renderDashboardQuizResults();
 }
 
 function createDashboardMetric(label, value, note = "") {
@@ -6891,8 +7006,12 @@ function renderDashboardMenus() {
   });
 }
 
-function getAllQuizResults() {
-  return restaurantMenus
+function getDashboardStatMenus() {
+  return isAdmin() ? restaurantMenus : getVisibleRestaurantMenus();
+}
+
+function getAllQuizResults(menus = restaurantMenus) {
+  return menus
     .flatMap((menu) =>
       normalizeQuizResults(menu.quizResults).map((result) => ({
         ...result,
@@ -6906,42 +7025,222 @@ function getAllQuizResults() {
     .sort((a, b) => Date.parse(b.finishedAt || b.takenAt || "") - Date.parse(a.finishedAt || a.takenAt || ""));
 }
 
-function renderDashboardQuizResults() {
-  if (!dashboardQuizSummary || !dashboardQuizList) return;
+function getMenuQuizResults(menu) {
+  return normalizeQuizResults(menu?.quizResults).map((result) => ({
+    ...result,
+    menuId: result.menuId || menu.id,
+    menuName: result.menuName || menu.name,
+    restaurantName: result.restaurantName || menu.restaurantName,
+    owner: result.owner || getMenuOwner(menu),
+    shareCode: result.shareCode || normalizeShareCode(menu.shareCode)
+  }));
+}
 
-  pullSharedQuizResultsForDashboard();
-  const results = getAllQuizResults();
+function getQuizStats(results = []) {
   const average = results.length
     ? Math.round(results.reduce((sum, result) => sum + result.percent, 0) / results.length)
     : 0;
   const highest = results.reduce((best, result) => Math.max(best, result.percent), 0);
-  const latest = results[0];
+  return {
+    average,
+    highest,
+    latest: results[0] || null
+  };
+}
 
-  dashboardQuizSummary.replaceChildren(
-    createDashboardMetric("Attempts", String(results.length), "Completed quizzes"),
-    createDashboardMetric("Average", results.length ? `${average}%` : "0%", "Average score"),
-    createDashboardMetric("Highest", results.length ? `${highest}%` : "0%", "Best score"),
-    createDashboardMetric("Latest", latest ? latest.takerName : "None yet", latest ? formatQuizDate(latest.finishedAt || latest.takenAt) : "No quiz has been taken")
+function renderDashboardStats() {
+  if (!dashboardStatsSummary || !dashboardStatsList) return;
+
+  pullSharedQuizResultsForDashboard();
+  const statMenus = getDashboardStatMenus();
+  const results = getAllQuizResults(statMenus);
+  const statsByMenu = statMenus.map((menu) => ({
+    menu,
+    stats: getMenuStats(menu),
+    itemRows: getMenuItemClickRows(menu),
+    quizResults: getMenuQuizResults(menu)
+  }));
+  const totalMenuClicks = statsByMenu.reduce((sum, entry) => sum + entry.stats.clicks, 0);
+  const totalItemClicks = statsByMenu.reduce(
+    (sum, entry) => sum + entry.itemRows.reduce((itemSum, item) => itemSum + item.clicks, 0),
+    0
+  );
+  const allItemRows = statsByMenu.flatMap((entry) => entry.itemRows.map((item) => ({ ...item, menuName: entry.menu.name })));
+  const topItem = allItemRows.sort((a, b) => b.clicks - a.clicks)[0];
+  const quizStats = getQuizStats(results);
+
+  dashboardStatsSummary.replaceChildren(
+    createDashboardMetric("Menus", String(statMenus.length), isAdmin() ? "Tracked restaurant menus" : "Menus visible to you"),
+    createDashboardMetric("Menu opens", String(totalMenuClicks), "Every menu launch from now forward"),
+    createDashboardMetric("Item opens", String(totalItemClicks), "Dish expansions tracked from now forward"),
+    createDashboardMetric("Quiz attempts", String(results.length), results.length ? `${quizStats.average}% average score` : "No completed quizzes yet"),
+    createDashboardMetric("Top item", topItem ? topItem.name : "None yet", topItem ? `${topItem.clicks} opens - ${topItem.menuName}` : "Open dishes to build item stats"),
+    createDashboardMetric("Latest quiz", quizStats.latest ? quizStats.latest.takerName : "None yet", quizStats.latest ? formatQuizDate(quizStats.latest.finishedAt || quizStats.latest.takenAt) : "No quiz has been taken")
   );
 
-  dashboardQuizList.replaceChildren();
-  if (!results.length) {
-    dashboardQuizList.append(createDashboardEmpty("No quiz results have been saved yet."));
+  dashboardStatsList.replaceChildren();
+  if (!statMenus.length) {
+    dashboardStatsList.append(createDashboardEmpty("No menus have been created yet."));
     return;
   }
 
-  results.forEach((result) => {
-    dashboardQuizList.append(
-      createDashboardListRow({
-        title: `${result.takerName} - ${result.score}/${result.total} (${result.percent}%)`,
-        meta: `${result.menuName || "Menu"} - ${formatQuizDate(result.finishedAt || result.takenAt)}`,
-        badge: result.source === "shared-code" ? "Shared" : "Logged in",
-        onClick: () => {
-          if (result.menuId) openRestaurantMenu(result.menuId);
-        }
-      })
-    );
+  statsByMenu
+    .sort((a, b) => {
+      const clickDifference = b.stats.clicks - a.stats.clicks;
+      if (clickDifference) return clickDifference;
+      const quizDifference = b.quizResults.length - a.quizResults.length;
+      if (quizDifference) return quizDifference;
+      return b.menu.items.length - a.menu.items.length;
+    })
+    .forEach((entry, index) => {
+      dashboardStatsList.append(createMenuStatsCard(entry, index === 0));
+    });
+}
+
+function createMenuStatsCard({ menu, stats, itemRows, quizResults }, open = false) {
+  const details = document.createElement("details");
+  details.className = "stats-menu-card";
+  details.open = open;
+
+  const summary = document.createElement("summary");
+  summary.className = "stats-menu-summary";
+
+  const title = document.createElement("span");
+  title.className = "stats-menu-title";
+  const strong = document.createElement("strong");
+  strong.textContent = menu.name;
+  const small = document.createElement("small");
+  small.textContent = `${menu.restaurantName || "No restaurant linked"} - Owner: ${getMenuOwner(menu)} - ${menu.items.length} items`;
+  title.append(strong, small);
+
+  const meta = document.createElement("span");
+  meta.className = "stats-menu-meta";
+  [
+    `${stats.clicks} menu opens`,
+    `${itemRows.reduce((sum, item) => sum + item.clicks, 0)} item opens`,
+    `${quizResults.length} quizzes`
+  ].forEach((label) => {
+    const pill = document.createElement("span");
+    pill.textContent = label;
+    meta.append(pill);
   });
+
+  const marker = document.createElement("span");
+  marker.className = "stats-menu-marker";
+  marker.setAttribute("aria-hidden", "true");
+
+  summary.append(title, meta, marker);
+
+  const quizStats = getQuizStats(quizResults);
+  const topItem = itemRows[0];
+  const body = document.createElement("div");
+  body.className = "stats-menu-body";
+  body.append(
+    createStatsMetricStrip([
+      ["Last menu open", stats.lastOpenedAt ? formatQuizDate(stats.lastOpenedAt) : "No timestamp"],
+      ["Most opened item", topItem ? `${topItem.name} (${topItem.clicks})` : "No item opens"],
+      ["Quiz average", quizResults.length ? `${quizStats.average}%` : "No quizzes"],
+      ["Best quiz", quizResults.length ? `${quizStats.highest}%` : "No quizzes"]
+    ]),
+    createStatsTable(
+      "Recent menu opens",
+      ["#", "Timestamp"],
+      stats.recentOpens.slice(0, 10).map((timestamp, index) => [String(index + 1), formatQuizDate(timestamp)]),
+      stats.clicks
+        ? "Older menu opens were counted before timestamp history was added."
+        : "No menu opens have been tracked yet."
+    ),
+    createStatsTable(
+      "Most opened items",
+      ["Item", "Category", "Opens", "Last opened"],
+      itemRows.slice(0, 10).map((item) => [
+        item.name,
+        item.category,
+        String(item.clicks),
+        item.lastOpenedAt ? formatQuizDate(item.lastOpenedAt) : "No timestamp"
+      ]),
+      "No item opens yet. Expanding a dish will start tracking item stats."
+    ),
+    createStatsTable(
+      "Quiz results",
+      ["Name", "Score", "Questions", "Taken"],
+      quizResults.slice(0, 10).map((result) => [
+        result.takerName,
+        `${result.score}/${result.total} (${result.percent}%)`,
+        String(result.questionLimit || result.total),
+        `${formatQuizDate(result.finishedAt || result.takenAt)} - ${result.source === "shared-code" ? "Shared code" : "Logged in"}`
+      ]),
+      "No quiz results for this menu yet."
+    )
+  );
+
+  details.append(summary, body);
+  return details;
+}
+
+function createStatsMetricStrip(metrics = []) {
+  const strip = document.createElement("div");
+  strip.className = "stats-metric-strip";
+  metrics.forEach(([label, value]) => {
+    const card = document.createElement("span");
+    const labelElement = document.createElement("small");
+    const valueElement = document.createElement("strong");
+    labelElement.textContent = label;
+    valueElement.textContent = value;
+    card.append(labelElement, valueElement);
+    strip.append(card);
+  });
+  return strip;
+}
+
+function createStatsTable(title, columns, rows, emptyText) {
+  const section = document.createElement("section");
+  section.className = "stats-table-card";
+
+  const heading = document.createElement("div");
+  heading.className = "section-heading";
+  const kicker = document.createElement("p");
+  kicker.className = "kicker";
+  kicker.textContent = "Details";
+  const strong = document.createElement("strong");
+  strong.textContent = title;
+  heading.append(kicker, strong);
+
+  if (!rows.length) {
+    const empty = createDashboardEmpty(emptyText);
+    section.append(heading, empty);
+    return section;
+  }
+
+  const scroll = document.createElement("div");
+  scroll.className = "stats-table-scroll";
+  const table = document.createElement("table");
+  table.className = "stats-table";
+
+  const thead = document.createElement("thead");
+  const headerRow = document.createElement("tr");
+  columns.forEach((column) => {
+    const th = document.createElement("th");
+    th.textContent = column;
+    headerRow.append(th);
+  });
+  thead.append(headerRow);
+
+  const tbody = document.createElement("tbody");
+  rows.forEach((row) => {
+    const tr = document.createElement("tr");
+    row.forEach((cell) => {
+      const td = document.createElement("td");
+      td.textContent = cell;
+      tr.append(td);
+    });
+    tbody.append(tr);
+  });
+
+  table.append(thead, tbody);
+  scroll.append(table);
+  section.append(heading, scroll);
+  return section;
 }
 
 async function pullSharedQuizResultsForDashboard() {
@@ -6990,7 +7289,7 @@ async function pullSharedQuizResultsForDashboard() {
 
     if (changed) {
       saveRestaurantMenus();
-      renderDashboardQuizResults();
+      renderDashboardStats();
     }
   } catch {
     // Results already saved locally; Firebase sync status handles broader connection failures.

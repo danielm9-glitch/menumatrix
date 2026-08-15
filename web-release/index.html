@@ -6,7 +6,7 @@
     <title>Menu Matrix</title>
     <link rel="icon" type="image/svg+xml" href="assets/app-icon.svg" />
     <link rel="apple-touch-icon" href="assets/app-icon-launcher-preview.png" />
-    <link rel="stylesheet" href="styles.css?v=photo-lightbox-arrows" />
+    <link rel="stylesheet" href="styles.css?v=dashboard-stats" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -393,7 +393,7 @@
         <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="payments">Payments</button>
         <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="restaurants">Restaurants</button>
         <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="menus">Menus</button>
-        <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="quiz-results">Quizzes</button>
+        <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="stats">Stats</button>
         <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="customization">Customization</button>
       </nav>
 
@@ -554,13 +554,13 @@
         <div id="dashboardMenuList" class="dashboard-list"></div>
       </section>
 
-      <section class="dashboard-panel" data-dashboard-panel="quiz-results" hidden>
+      <section class="dashboard-panel" data-dashboard-panel="stats" hidden>
         <div class="section-heading">
-          <p class="kicker">Training results</p>
-          <strong>Quiz Results</strong>
+          <p class="kicker">Menu analytics</p>
+          <strong>Stats</strong>
         </div>
-        <div id="dashboardQuizSummary" class="dashboard-metric-grid"></div>
-        <div id="dashboardQuizList" class="dashboard-list"></div>
+        <div id="dashboardStatsSummary" class="dashboard-metric-grid"></div>
+        <div id="dashboardStatsList" class="dashboard-list stats-menu-list"></div>
       </section>
 
       <section class="dashboard-panel" data-dashboard-panel="customization" hidden>
@@ -1130,6 +1130,6 @@
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js?v=photo-lightbox-arrows"></script>
+    <script src="app.js?v=dashboard-stats"></script>
   </body>
 </html>
