@@ -4113,6 +4113,12 @@ function getWorkspaceDocumentId(user = getActiveUser()) {
   return `user-${owner.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "menu"}`;
 }
 
+function getWorkspaceDocumentIdForOwner(owner = primaryAdminUsername) {
+  const normalizedOwner = String(owner || primaryAdminUsername).trim() || primaryAdminUsername;
+  if (normalizedOwner === primaryAdminUsername) return firebaseMenuDocumentId;
+  return `user-${normalizedOwner.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "menu"}`;
+}
+
 function getRestaurantMenusStorageKey(user = getActiveUser()) {
   const docId = getWorkspaceDocumentId(user);
   return docId === firebaseMenuDocumentId ? menusStorageKey : `${menusStorageKey}-${docId}`;
@@ -4300,7 +4306,7 @@ async function refreshSavedShareCodesFromFirebase() {
       }).catch(() => null);
       if (!snapshot?.exists) return;
 
-      const payload = createSharedMenuSnapshotPayload(code, snapshot.data() || {});
+      const payload = await getLatestSharedMenuPayload(code, snapshot.data() || {});
       if (!payload.menu?.id) return;
 
       saveSharedCodeLocally(code, payload.menu.name, payload.menu, {
@@ -4310,7 +4316,7 @@ async function refreshSavedShareCodesFromFirebase() {
         menuId: payload.menuId
       });
       if (state.sharedCode === code) {
-        openSharedMenuSnapshot(payload, { preserveView: true });
+      openSharedMenuSnapshot(payload, { preserveView: true });
       }
       flushPendingSharedQuizResults(code).catch(() => {});
       refreshedCount += 1;
@@ -4355,6 +4361,11 @@ function getFirebaseDb() {
 
 function getShareCollection() {
   return getFirebaseDb()?.collection("menuShares") || null;
+}
+
+function getWorkspaceMenuDocument(docId) {
+  const normalizedDocId = String(docId || "").trim();
+  return normalizedDocId ? getFirebaseDb()?.collection("menus").doc(normalizedDocId) || null : null;
 }
 
 function getShareDocument(code) {
@@ -4402,6 +4413,110 @@ function createSharedMenuSnapshotPayload(code, data = {}) {
   };
 }
 
+function getShareWorkspaceDocumentId(data = {}) {
+  const sharedMenuData = data.menu && typeof data.menu === "object" ? data.menu : {};
+  const explicitDocId = data.workspaceDocId || data.workspaceId || sharedMenuData.workspaceDocId || "";
+  if (explicitDocId) return String(explicitDocId);
+  return getWorkspaceDocumentIdForOwner(data.owner || sharedMenuData.owner || primaryAdminUsername);
+}
+
+function findSharedSourceMenu(workspaceData = {}, shareData = {}, code = "") {
+  const normalizedCode = normalizeShareCode(code || shareData.code);
+  const sharedMenuData = shareData.menu && typeof shareData.menu === "object" ? shareData.menu : {};
+  const menuId = shareData.menuId || sharedMenuData.id || "";
+  const menus = Array.isArray(workspaceData.menus) ? workspaceData.menus : [];
+
+  return menus.find((menu) => menu.id === menuId) ||
+    menus.find((menu) => normalizeShareCode(menu.shareCode) === normalizedCode) ||
+    null;
+}
+
+function getLatestTimestampString(...values) {
+  return values
+    .filter((value) => typeof value === "string" && value)
+    .sort((a, b) => getTimestampMs(b) - getTimestampMs(a))[0] || "";
+}
+
+function createSharedPayloadFromLiveMenu(code, shareData = {}, workspaceData = {}, liveMenu = {}) {
+  const normalizedCode = normalizeShareCode(code || shareData.code || liveMenu.shareCode);
+  const fallbackPayload = createSharedMenuSnapshotPayload(normalizedCode, shareData);
+  const quizResults = mergeQuizResults(
+    getShareQuizResults(shareData),
+    liveMenu.quizResults || fallbackPayload.menu?.quizResults || []
+  );
+  const liveCategories = Array.isArray(liveMenu.categories) && liveMenu.categories.length
+    ? liveMenu.categories
+    : Array.isArray(workspaceData.categories) && workspaceData.categories.length
+      ? workspaceData.categories
+      : fallbackPayload.categories;
+  const owner = liveMenu.owner || shareData.owner || fallbackPayload.owner || primaryAdminUsername;
+  const workspaceDocId = getShareWorkspaceDocumentId({ ...shareData, owner });
+
+  return {
+    code: normalizedCode,
+    updatedAt: getLatestTimestampString(workspaceData.updatedAt, shareData.updatedAt, liveMenu.updatedAt),
+    workspaceDocId,
+    owner,
+    menuId: liveMenu.id || fallbackPayload.menuId,
+    categories: liveCategories,
+    menu: {
+      ...liveMenu,
+      id: liveMenu.id || fallbackPayload.menuId || `shared-${normalizedCode}`,
+      name: liveMenu.name || fallbackPayload.menu?.name || shareData.menuName || "Shared menu",
+      shareCode: normalizedCode,
+      quizResults
+    }
+  };
+}
+
+async function refreshShareDocumentFromLivePayload(payload) {
+  const code = normalizeShareCode(payload?.code);
+  const doc = getShareDocument(code);
+  if (!doc || !payload?.menu) return;
+
+  await doc.set(
+    {
+      code,
+      owner: payload.owner || payload.menu.owner || primaryAdminUsername,
+      workspaceDocId: payload.workspaceDocId || getWorkspaceDocumentIdForOwner(payload.owner || payload.menu.owner),
+      menuId: payload.menuId || payload.menu.id,
+      menuName: payload.menu.name || "Shared menu",
+      categories: payload.categories,
+      quizResults: normalizeQuizResults(payload.menu.quizResults),
+      menu: sanitizeRestaurantMenuForStorage({ ...payload.menu, shareCode: code }, { allowInlineImages: false }),
+      updatedAt: new Date().toISOString()
+    },
+    { merge: true }
+  );
+}
+
+async function getLatestSharedMenuPayload(code, shareData = {}) {
+  const normalizedCode = normalizeShareCode(code || shareData.code);
+  const fallbackPayload = createSharedMenuSnapshotPayload(normalizedCode, shareData);
+  const workspaceDocId = getShareWorkspaceDocumentId(shareData);
+  const workspaceDoc = getWorkspaceMenuDocument(workspaceDocId);
+  if (!workspaceDoc) return fallbackPayload;
+
+  try {
+    const snapshot = await withTimeout(
+      workspaceDoc.get({ source: "server" }),
+      12000,
+      "Live menu lookup timed out."
+    );
+    if (!snapshot.exists) return fallbackPayload;
+
+    const workspaceData = snapshot.data() || {};
+    const liveMenu = findSharedSourceMenu(workspaceData, shareData, normalizedCode);
+    if (!liveMenu) return fallbackPayload;
+
+    const payload = createSharedPayloadFromLiveMenu(normalizedCode, shareData, workspaceData, liveMenu);
+    refreshShareDocumentFromLivePayload(payload).catch(() => {});
+    return payload;
+  } catch {
+    return fallbackPayload;
+  }
+}
+
 function getShareQuizResults(data = {}) {
   const sharedMenuData = data.menu && typeof data.menu === "object" ? data.menu : {};
   return mergeQuizResults(data.quizResults || [], sharedMenuData.quizResults || []);
@@ -4446,7 +4561,7 @@ function subscribeToSharedMenuUpdates(code) {
   clearSharedMenuSubscription();
   cloudSync.sharedCode = normalizedCode;
   cloudSync.sharedUnsubscribe = doc.onSnapshot(
-    (snapshot) => {
+    async (snapshot) => {
       if (!snapshot.exists || state.sharedCode !== normalizedCode) return;
 
       const data = snapshot.data() || {};
@@ -4454,7 +4569,8 @@ function subscribeToSharedMenuUpdates(code) {
       if (incomingUpdatedAt && state.sharedMenuUpdatedAt === incomingUpdatedAt) return;
       if (isOlderSharedMenuSnapshot(incomingUpdatedAt)) return;
 
-      openSharedMenuSnapshot(createSharedMenuSnapshotPayload(normalizedCode, data), {
+      const payload = await getLatestSharedMenuPayload(normalizedCode, data);
+      openSharedMenuSnapshot(payload, {
         preserveView: true,
         subscribe: false
       });
@@ -4616,6 +4732,7 @@ async function publishMenuShare(code) {
     {
       code: normalizedCode,
       owner: activeUser.username,
+      workspaceDocId: getWorkspaceDocumentId(activeUser),
       menuId: activeMenu.id,
       menuName: activeMenu.name,
       categories,
@@ -4651,6 +4768,7 @@ async function syncSharedMenuSnapshots() {
         {
           code: normalizeShareCode(menu.shareCode),
           owner: getActiveUser().username,
+          workspaceDocId: getWorkspaceDocumentId(getActiveUser()),
           menuId: menu.id,
           menuName: menu.name,
           categories,
@@ -4721,7 +4839,8 @@ async function loadSharedMenuFromCode(code) {
       return;
     }
 
-    openSharedMenuSnapshot(createSharedMenuSnapshotPayload(normalizedCode, snapshot.data() || {}));
+    const payload = await getLatestSharedMenuPayload(normalizedCode, snapshot.data() || {});
+    openSharedMenuSnapshot(payload);
     flushPendingSharedQuizResults(normalizedCode).catch(() => {});
   } catch (error) {
     const savedEntry = getSavedShareCodeEntry(normalizedCode);
