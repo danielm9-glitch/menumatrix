@@ -7873,6 +7873,36 @@ function uniqueValues(values) {
   return unique;
 }
 
+function normalizeQuizQuestion(question) {
+  if (!question || !Array.isArray(question.options) || !Array.isArray(question.answers)) return null;
+
+  const seenOptions = new Set();
+  const options = question.options
+    .map((option) => ({
+      label: String(option?.label || option?.value || "").trim(),
+      value: String(option?.value || "").trim()
+    }))
+    .filter((option) => {
+      const key = option.value.toLowerCase();
+      if (!option.label || !option.value || seenOptions.has(key)) return false;
+      seenOptions.add(key);
+      return true;
+    });
+  const optionValues = new Set(options.map((option) => option.value));
+  const answers = uniqueValues(question.answers.map((answer) => String(answer || "").trim()))
+    .filter((answer) => optionValues.has(answer));
+
+  if (!options.length || !answers.length) return null;
+
+  return {
+    ...question,
+    options,
+    answers,
+    multiple: Boolean(question.multiple || answers.length > 1),
+    selected: Array.isArray(question.selected) ? question.selected.filter((value) => optionValues.has(value)) : []
+  };
+}
+
 function getItemAllergens(item) {
   return uniqueValues(Array.isArray(item?.allergens) ? item.allergens : []);
 }
@@ -8088,7 +8118,7 @@ function createQuizQuestion() {
   const shuffledBuilders = shuffleValues(availableBuilders);
 
   for (const builder of shuffledBuilders) {
-    const question = builder();
+    const question = normalizeQuizQuestion(builder());
     if (question) return question;
   }
 
@@ -8170,19 +8200,15 @@ function createItemByAllergenQuestion() {
   if (!allergen) return null;
 
   const correctItems = menuItems.filter((item) => getItemAllergens(item).includes(allergen));
-  const correctItem = randomItem(correctItems);
-  const distractors = shuffleValues(menuItems.filter((item) => item.id !== correctItem?.id)).slice(0, 3);
-  if (!correctItem || distractors.length < 2) return null;
-
-  const options = shuffleValues([correctItem, ...distractors]).map((item) => ({ label: item.name, value: item.id }));
-  return {
-    typeLabel: "Find the item",
-    prompt: `Which item lists ${allergen} as an allergy note?`,
-    multiple: false,
-    options,
-    answers: [correctItem.id],
-    explanation: `${correctItem.name} lists ${allergen}.`
-  };
+  return createItemMatchQuestion({
+    term: allergen,
+    correctItems,
+    distractorItems: menuItems.filter((item) => !getItemAllergens(item).includes(allergen)),
+    singularPrompt: (value) => `Which item lists ${value} as an allergy note?`,
+    multiplePrompt: (value) => `Select every item below that lists ${value} as an allergy note.`,
+    typeLabel: "Find allergy item",
+    explanationLabel: (value) => `list ${value}`
+  });
 }
 
 function createItemByIngredientQuestion() {
@@ -8191,18 +8217,46 @@ function createItemByIngredientQuestion() {
   if (!term) return null;
 
   const correctItems = menuItems.filter((item) => getItemIngredientTerms(item).includes(term));
-  const correctItem = randomItem(correctItems);
-  const distractors = shuffleValues(menuItems.filter((item) => item.id !== correctItem?.id)).slice(0, 3);
-  if (!correctItem || distractors.length < 2) return null;
+  return createItemMatchQuestion({
+    term,
+    correctItems,
+    distractorItems: menuItems.filter((item) => !getItemIngredientTerms(item).includes(term)),
+    singularPrompt: (value) => `Which item mentions ${value} in its menu notes?`,
+    multiplePrompt: (value) => `Select every item below that mentions ${value} in its menu notes.`,
+    typeLabel: "Find ingredient item",
+    explanationLabel: (value) => `mention ${value}`
+  });
+}
 
-  const options = shuffleValues([correctItem, ...distractors]).map((item) => ({ label: item.name, value: item.id }));
+function createItemMatchQuestion({ term, correctItems = [], distractorItems = [], singularPrompt, multiplePrompt, typeLabel, explanationLabel }) {
+  const correctPool = shuffleValues(correctItems).filter((item) => item?.id);
+  if (!correctPool.length) return null;
+
+  const maxCorrectOptions = Math.min(3, correctPool.length);
+  const correctCount = correctPool.length > 1
+    ? Math.max(2, Math.min(maxCorrectOptions, 2 + Math.floor(Math.random() * maxCorrectOptions)))
+    : 1;
+  const selectedCorrect = correctPool.slice(0, correctCount);
+  const correctIds = new Set(correctItems.map((item) => item.id));
+  const distractors = shuffleValues(distractorItems.filter((item) => item?.id && !correctIds.has(item.id)))
+    .slice(0, Math.max(2, 5 - selectedCorrect.length));
+  if (distractors.length < 2) return null;
+
+  const options = shuffleValues([...selectedCorrect, ...distractors]).map((item) => ({ label: item.name, value: item.id }));
+  const answers = selectedCorrect.map((item) => item.id);
+  const isMultiple = answers.length > 1;
+  const answerNames = selectedCorrect.map((item) => item.name).join(", ");
+  const explanationAction = typeof explanationLabel === "function" ? explanationLabel(term) : `match ${term}`;
+
   return {
-    typeLabel: "Find the item",
-    prompt: `Which item mentions ${term} in its menu notes?`,
-    multiple: false,
+    typeLabel: isMultiple ? "Select items" : typeLabel,
+    prompt: isMultiple ? multiplePrompt(term) : singularPrompt(term),
+    multiple: isMultiple,
     options,
-    answers: [correctItem.id],
-    explanation: `${correctItem.name} mentions ${term}.`
+    answers,
+    explanation: isMultiple
+      ? `Correct options in this question: ${answerNames}.`
+      : `${answerNames} ${explanationAction}.`
   };
 }
 
@@ -8263,7 +8317,9 @@ function renderQuiz() {
     ? state.quizSession.saveMessage || "Quiz complete."
     : state.quiz.answered
       ? state.quiz.message
-      : "";
+      : state.quiz.multiple
+        ? "Select all that apply."
+        : "";
   const inputType = state.quiz.multiple ? "checkbox" : "radio";
 
   state.quiz.options.forEach((option) => {
