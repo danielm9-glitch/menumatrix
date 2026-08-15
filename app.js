@@ -14,6 +14,7 @@ const primaryAdminUsername = "admin";
 const cloudOcrEndpoint = window.MENU_MATRIX_OCR_ENDPOINT || "";
 const menuFullnessTarget = 12;
 const quizResultsLimit = 150;
+const sharedQuizResultsPullInterval = 3000;
 const menuStatsEventLimit = 80;
 const itemStatsEventLimit = 40;
 const legacyMott32HeroImage = "https://www.nicepng.com/png/detail/809-8099031_mott32-las-vegas-mott-32-logo.png";
@@ -4129,7 +4130,15 @@ function loadSavedShareCodes() {
 
   try {
     const parsed = JSON.parse(savedCodes);
-    return Array.isArray(parsed) ? parsed.filter((entry) => entry?.code) : [];
+    return Array.isArray(parsed)
+      ? parsed
+          .filter((entry) => entry?.code)
+          .map((entry) => ({
+            ...entry,
+            code: normalizeShareCode(entry.code),
+            pendingQuizResults: normalizeQuizResults(entry.pendingQuizResults)
+          }))
+      : [];
   } catch {
     return [];
   }
@@ -4145,9 +4154,14 @@ function saveSharedCodeLocally(code, menuName = "Shared menu", menuSnapshot = nu
   if (!normalizedCode) return;
 
   const currentCodes = loadSavedShareCodes().filter((entry) => normalizeShareCode(entry.code) !== normalizedCode);
+  const previousEntry = getSavedShareCodeEntry(normalizedCode);
   const metadataCategories = Array.isArray(metadata.categories) && metadata.categories.length ? metadata.categories : null;
   const sharedCategories = getUniqueCategories(metadataCategories || menuSnapshot?.categories || categories);
   const sanitizedMenu = menuSnapshot ? sanitizeRestaurantMenuForStorage(menuSnapshot) : null;
+  const pendingQuizResults = normalizeQuizResults([
+    ...(previousEntry?.pendingQuizResults || []),
+    ...(metadata.pendingQuizResults || [])
+  ]);
   const nextCodes = [
     {
       code: normalizedCode,
@@ -4157,12 +4171,79 @@ function saveSharedCodeLocally(code, menuName = "Shared menu", menuSnapshot = nu
       categories: sharedCategories,
       menu: sanitizedMenu,
       updatedAt: metadata.updatedAt || "",
+      pendingQuizResults,
+      pendingSavedAt: pendingQuizResults.length ? previousEntry?.pendingSavedAt || metadata.pendingSavedAt || new Date().toISOString() : "",
       savedAt: new Date().toISOString()
     },
     ...currentCodes
   ].slice(0, 12);
-  localStorage.setItem(savedShareCodesStorageKey, JSON.stringify(nextCodes));
+  saveShareCodeEntries(nextCodes);
+}
+
+function saveShareCodeEntries(entries = []) {
+  localStorage.setItem(
+    savedShareCodesStorageKey,
+    JSON.stringify(entries.filter((entry) => normalizeShareCode(entry.code)).slice(0, 12))
+  );
   renderSavedShareCodes();
+}
+
+function savePendingSharedQuizResult(code, result) {
+  const normalizedCode = normalizeShareCode(code);
+  const normalizedResult = normalizeQuizResult(result);
+  if (!normalizedCode || !normalizedResult.id) return;
+
+  const currentCodes = loadSavedShareCodes();
+  const existingIndex = currentCodes.findIndex((entry) => normalizeShareCode(entry.code) === normalizedCode);
+  const existingEntry = existingIndex >= 0 ? currentCodes[existingIndex] : {};
+  const pendingQuizResults = mergeQuizResults(existingEntry.pendingQuizResults || [], [normalizedResult]);
+  const nextEntry = {
+    ...existingEntry,
+    code: normalizedCode,
+    menuName: existingEntry.menuName || state.sharedMenu?.name || normalizedResult.menuName || "Shared menu",
+    menuId: existingEntry.menuId || state.sharedMenu?.id || normalizedResult.menuId || "",
+    owner: existingEntry.owner || state.sharedMenu?.owner || normalizedResult.owner || "",
+    categories: existingEntry.categories || state.sharedMenu?.categories || categories,
+    menu: existingEntry.menu || (state.sharedMenu ? sanitizeRestaurantMenuForStorage(state.sharedMenu) : null),
+    pendingQuizResults,
+    pendingSavedAt: new Date().toISOString(),
+    savedAt: existingEntry.savedAt || new Date().toISOString()
+  };
+
+  const nextCodes = existingIndex >= 0
+    ? currentCodes.map((entry, index) => (index === existingIndex ? nextEntry : entry))
+    : [nextEntry, ...currentCodes];
+  saveShareCodeEntries(nextCodes);
+}
+
+function clearPendingSharedQuizResults(code, syncedResults = []) {
+  const normalizedCode = normalizeShareCode(code);
+  if (!normalizedCode) return;
+
+  const syncedIds = new Set(normalizeQuizResults(syncedResults).map((result) => result.id));
+  const nextCodes = loadSavedShareCodes().map((entry) => {
+    if (normalizeShareCode(entry.code) !== normalizedCode) return entry;
+    const pendingQuizResults = normalizeQuizResults(entry.pendingQuizResults).filter((result) => !syncedIds.has(result.id));
+    return {
+      ...entry,
+      pendingQuizResults,
+      pendingSavedAt: pendingQuizResults.length ? entry.pendingSavedAt || "" : ""
+    };
+  });
+  saveShareCodeEntries(nextCodes);
+}
+
+async function flushPendingSharedQuizResults(code) {
+  const normalizedCode = normalizeShareCode(code);
+  const pendingQuizResults = normalizeQuizResults(getSavedShareCodeEntry(normalizedCode)?.pendingQuizResults);
+  if (!normalizedCode || !pendingQuizResults.length) return 0;
+
+  const saved = await saveQuizResultsToShare(normalizedCode, pendingQuizResults);
+  if (saved) {
+    clearPendingSharedQuizResults(normalizedCode, pendingQuizResults);
+    return pendingQuizResults.length;
+  }
+  return 0;
 }
 
 function renderSavedShareCodes() {
@@ -4225,6 +4306,7 @@ function getShareDocument(code) {
 function createSharedMenuSnapshotPayload(code, data = {}) {
   const normalizedCode = normalizeShareCode(code || data.code);
   const sharedMenuData = data.menu && typeof data.menu === "object" ? data.menu : {};
+  const quizResults = getShareQuizResults(data);
   const sharedCategories = Array.isArray(data.categories) && data.categories.length
     ? data.categories
     : Array.isArray(sharedMenuData.categories)
@@ -4242,9 +4324,34 @@ function createSharedMenuSnapshotPayload(code, data = {}) {
       id: data.menuId || sharedMenuData.id || `shared-${normalizedCode}`,
       name: data.menuName || sharedMenuData.name || "Shared menu",
       shareCode: normalizedCode,
-      quizResults: mergeQuizResults(sharedMenuData.quizResults || [], data.quizResults || [])
+      quizResults
     }
   };
+}
+
+function getShareQuizResults(data = {}) {
+  const sharedMenuData = data.menu && typeof data.menu === "object" ? data.menu : {};
+  return mergeQuizResults(data.quizResults || [], sharedMenuData.quizResults || []);
+}
+
+function createShareQuizResultsPayload(data = {}, nextResults = []) {
+  const sharedMenuData = data.menu && typeof data.menu === "object" ? data.menu : null;
+  const payload = {
+    quizResults: nextResults,
+    latestQuizResult: nextResults[0] || null,
+    quizAttemptCount: nextResults.length,
+    quizResultsUpdatedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  if (sharedMenuData) {
+    payload.menu = {
+      ...sharedMenuData,
+      quizResults: nextResults
+    };
+  }
+
+  return payload;
 }
 
 function clearSharedMenuSubscription() {
@@ -4301,7 +4408,7 @@ async function ensureSharedFirebaseAccess() {
 async function validateShareCodeAvailability(code) {
   const activeMenu = getActiveRestaurantMenu();
   const activeUser = getActiveUser();
-  const doc = getShareDocument(code);
+  const doc = getShareDocument(normalizedCode);
   if (!activeMenu || !activeUser || !doc) {
     throw new Error("Firebase share storage is not ready.");
   }
@@ -4425,6 +4532,11 @@ async function publishMenuShare(code) {
   }
 
   const normalizedCode = normalizeShareCode(code);
+  const existingSnapshot = await doc.get().catch(() => null);
+  const existingData = existingSnapshot?.exists ? existingSnapshot.data() || {} : {};
+  const quizResults = mergeQuizResults(getShareQuizResults(existingData), activeMenu.quizResults || []);
+  activeMenu.quizResults = quizResults;
+
   await doc.set(
     {
       code: normalizedCode,
@@ -4432,8 +4544,8 @@ async function publishMenuShare(code) {
       menuId: activeMenu.id,
       menuName: activeMenu.name,
       categories,
-      quizResults: normalizeQuizResults(activeMenu.quizResults),
-      menu: sanitizeRestaurantMenuForStorage({ ...activeMenu, shareCode: normalizedCode }),
+      quizResults,
+      menu: sanitizeRestaurantMenuForStorage({ ...activeMenu, shareCode: normalizedCode, quizResults }),
       updatedAt: new Date().toISOString()
     },
     { merge: true }
@@ -4447,23 +4559,38 @@ async function syncSharedMenuSnapshots() {
   const sharedMenus = restaurantMenus.filter((menu) => normalizeShareCode(menu.shareCode));
   if (!sharedMenus.length || !getShareCollection() || !getActiveUser()) return;
 
+  let changed = false;
   await Promise.all(
-    sharedMenus.map((menu) =>
-      getShareDocument(menu.shareCode).set(
+    sharedMenus.map(async (menu) => {
+      const doc = getShareDocument(menu.shareCode);
+      const existingSnapshot = await doc.get().catch(() => null);
+      const existingData = existingSnapshot?.exists ? existingSnapshot.data() || {} : {};
+      const quizResults = mergeQuizResults(getShareQuizResults(existingData), menu.quizResults || []);
+
+      if (!areQuizResultListsEqual(menu.quizResults || [], quizResults)) {
+        menu.quizResults = quizResults;
+        changed = true;
+      }
+
+      await doc.set(
         {
           code: normalizeShareCode(menu.shareCode),
           owner: getActiveUser().username,
           menuId: menu.id,
           menuName: menu.name,
           categories,
-          quizResults: normalizeQuizResults(menu.quizResults),
-          menu: sanitizeRestaurantMenuForStorage(menu, { allowInlineImages: false }),
+          quizResults,
+          menu: sanitizeRestaurantMenuForStorage({ ...menu, quizResults }, { allowInlineImages: false }),
           updatedAt: new Date().toISOString()
         },
         { merge: true }
-      )
-    )
+      );
+    })
   );
+
+  if (changed) {
+    localStorage.setItem(getRestaurantMenusStorageKey(), JSON.stringify(restaurantMenus.map(sanitizeRestaurantMenuForStorage)));
+  }
 }
 
 async function loadSharedMenuFromCode(code) {
@@ -4518,6 +4645,7 @@ async function loadSharedMenuFromCode(code) {
     }
 
     openSharedMenuSnapshot(createSharedMenuSnapshotPayload(normalizedCode, snapshot.data() || {}));
+    flushPendingSharedQuizResults(normalizedCode).catch(() => {});
   } catch (error) {
     const savedEntry = getSavedShareCodeEntry(normalizedCode);
     if (savedEntry?.menu) {
@@ -7341,49 +7469,92 @@ function createStatsTable(title, columns, rows, emptyText) {
   return section;
 }
 
+async function getSharedQuizDocumentsForDashboard(statMenus = []) {
+  const collection = getShareCollection();
+  if (!collection) return [];
+
+  const documents = [];
+  const seenCodes = new Set();
+  const addDocument = (code, snapshot) => {
+    const normalizedCode = normalizeShareCode(code || snapshot?.id);
+    if (!normalizedCode || seenCodes.has(normalizedCode) || !snapshot?.exists) return;
+    seenCodes.add(normalizedCode);
+    documents.push({
+      code: normalizedCode,
+      data: snapshot.data() || {}
+    });
+  };
+
+  try {
+    const snapshot = await withTimeout(collection.get(), 10000, "Shared quiz lookup timed out.");
+    snapshot.forEach((documentSnapshot) => addDocument(documentSnapshot.id, documentSnapshot));
+    return documents;
+  } catch {
+    const directCodes = uniqueValues(statMenus.map((menu) => normalizeShareCode(menu.shareCode)).filter(Boolean));
+    await Promise.all(
+      directCodes.map(async (code) => {
+        const snapshot = await getShareDocument(code)?.get().catch(() => null);
+        addDocument(code, snapshot);
+      })
+    );
+    return documents;
+  }
+}
+
+function findMenuForSharedQuizData(data = {}, shareCode = "", statMenus = []) {
+  const normalizedCode = normalizeShareCode(shareCode || data.code);
+  const menuId = data.menuId || data.menu?.id || "";
+  return statMenus.find((menu) => {
+    return menu.id === menuId || normalizeShareCode(menu.shareCode) === normalizedCode;
+  }) || null;
+}
+
 async function pullSharedQuizResultsForDashboard() {
   const now = Date.now();
-  if (sharedQuizResultsPulling || now - sharedQuizResultsPulledAt < 15000) return;
+  if (sharedQuizResultsPulling || now - sharedQuizResultsPulledAt < sharedQuizResultsPullInterval) return;
   if (!getActiveUser() || !getShareCollection()) return;
 
-  const sharedMenus = restaurantMenus.filter((menu) => normalizeShareCode(menu.shareCode));
-  if (!sharedMenus.length) return;
+  const statMenus = getDashboardStatMenus();
+  if (!statMenus.length) return;
 
   sharedQuizResultsPulling = true;
   sharedQuizResultsPulledAt = now;
 
   try {
     let changed = false;
-    await Promise.all(
-      sharedMenus.map(async (menu) => {
-        const snapshot = await getShareDocument(menu.shareCode)?.get();
-        if (!snapshot?.exists) return;
+    const sharedDocuments = await getSharedQuizDocumentsForDashboard(statMenus);
+    sharedDocuments.forEach(({ code, data }) => {
+      const menu = findMenuForSharedQuizData(data, code, statMenus);
+      if (!menu) return;
 
-        const data = snapshot.data();
-        const sharedResults = mergeQuizResults(data.quizResults || [], data.menu?.quizResults || [])
-          .filter((result) => {
-            return (
-              !result.menuId ||
-              result.menuId === menu.id ||
-              normalizeShareCode(result.shareCode) === normalizeShareCode(menu.shareCode)
-            );
-          })
-          .map((result) => ({
-            ...result,
-            menuId: menu.id,
-            menuName: result.menuName || menu.name,
-            restaurantName: result.restaurantName || menu.restaurantName,
-            owner: result.owner || getMenuOwner(menu),
-            shareCode: normalizeShareCode(menu.shareCode)
-          }));
+      if (code && normalizeShareCode(menu.shareCode) !== code) {
+        menu.shareCode = code;
+        changed = true;
+      }
 
-        const merged = mergeQuizResults(menu.quizResults || [], sharedResults);
-        if (!areQuizResultListsEqual(menu.quizResults || [], merged)) {
-          menu.quizResults = merged;
-          changed = true;
-        }
-      })
-    );
+      const sharedResults = getShareQuizResults(data)
+        .filter((result) => {
+          return (
+            !result.menuId ||
+            result.menuId === menu.id ||
+            normalizeShareCode(result.shareCode) === code
+          );
+        })
+        .map((result) => ({
+          ...result,
+          menuId: menu.id,
+          menuName: result.menuName || menu.name,
+          restaurantName: result.restaurantName || menu.restaurantName,
+          owner: result.owner || getMenuOwner(menu),
+          shareCode: code || normalizeShareCode(menu.shareCode)
+        }));
+
+      const merged = mergeQuizResults(menu.quizResults || [], sharedResults);
+      if (!areQuizResultListsEqual(menu.quizResults || [], merged)) {
+        menu.quizResults = merged;
+        changed = true;
+      }
+    });
 
     if (changed) {
       saveRestaurantMenus();
@@ -8549,34 +8720,66 @@ async function saveQuizResult(result) {
 
   try {
     const savedToMenu = addQuizResultToMenu(result);
+    let savedToShare = false;
     if (result.shareCode) {
-      await saveQuizResultToShare(result.shareCode, result);
+      savedToShare = await saveQuizResultToShare(result.shareCode, result);
+      if (savedToShare) {
+        clearPendingSharedQuizResults(result.shareCode, [result]);
+        flushPendingSharedQuizResults(result.shareCode).catch(() => {});
+      }
+    }
+    if (result.shareCode && state.sharedMenu && !savedToShare) {
+      throw new Error("Shared quiz result did not sync.");
     }
     state.quizSession.saved = true;
-    state.quizSession.saveMessage = savedToMenu || result.shareCode
+    state.quizSession.saveMessage = savedToMenu || savedToShare
       ? "Quiz complete. Result saved."
       : "Quiz complete. Result saved on this device.";
   } catch {
-    state.quizSession.saveMessage = "Quiz complete. Result could not sync yet.";
+    if (result.shareCode) {
+      savePendingSharedQuizResult(result.shareCode, result);
+      state.quizSession.saveMessage = "Quiz complete. Saved on this device; it will sync when Firebase is reachable.";
+    } else {
+      state.quizSession.saveMessage = "Quiz complete. Result could not sync yet.";
+    }
   }
 
   renderQuiz();
 }
 
 async function saveQuizResultToShare(code, result) {
+  return saveQuizResultsToShare(code, [result]);
+}
+
+async function saveQuizResultsToShare(code, results = []) {
+  const normalizedCode = normalizeShareCode(code);
+  const incomingResults = normalizeQuizResults(results);
+  if (!normalizedCode || !incomingResults.length) return false;
+
+  await ensureSharedFirebaseAccess();
   const doc = getShareDocument(code);
-  if (!doc || !result) return;
+  if (!doc) throw new Error("Firebase share storage is not ready.");
+
+  const db = getFirebaseDb();
+  if (db?.runTransaction) {
+    await db.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(doc);
+      if (!snapshot.exists) throw new Error("Share code not found.");
+
+      const data = snapshot.data() || {};
+      const nextResults = mergeQuizResults(getShareQuizResults(data), incomingResults);
+      transaction.set(doc, createShareQuizResultsPayload(data, nextResults), { merge: true });
+    });
+    return true;
+  }
 
   const snapshot = await doc.get();
-  const data = snapshot.exists ? snapshot.data() : {};
-  const nextResults = mergeQuizResults(data.quizResults || data.menu?.quizResults || [], [result]);
-  const nextMenu = data.menu ? { ...data.menu, quizResults: nextResults } : undefined;
-  const payload = {
-    quizResults: nextResults,
-    updatedAt: new Date().toISOString()
-  };
-  if (nextMenu) payload.menu = nextMenu;
-  await doc.set(payload, { merge: true });
+  if (!snapshot.exists) throw new Error("Share code not found.");
+
+  const data = snapshot.data() || {};
+  const nextResults = mergeQuizResults(getShareQuizResults(data), incomingResults);
+  await doc.set(createShareQuizResultsPayload(data, nextResults), { merge: true });
+  return true;
 }
 
 function formatQuizDate(value) {
