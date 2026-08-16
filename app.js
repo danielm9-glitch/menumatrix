@@ -6811,12 +6811,13 @@ function handleRowSwipeStart(event, row, item) {
   rowSwipeState = {
     row,
     item,
+    pointerId: event.pointerId,
+    hasPointerCapture: false,
     startX: event.clientX,
     startY: event.clientY,
     currentX: event.clientX,
     active: false
   };
-  row.setPointerCapture?.(event.pointerId);
 }
 
 function handleRowSwipeMove(event) {
@@ -6824,14 +6825,18 @@ function handleRowSwipeMove(event) {
 
   const deltaX = event.clientX - rowSwipeState.startX;
   const deltaY = event.clientY - rowSwipeState.startY;
-  if (!rowSwipeState.active && Math.abs(deltaX) < 14) return;
-  if (!rowSwipeState.active && Math.abs(deltaY) > Math.abs(deltaX)) {
+  if (!rowSwipeState.active && Math.abs(deltaX) < 24) return;
+  if (!rowSwipeState.active && Math.abs(deltaX) < Math.abs(deltaY) * 1.35) {
     cancelRowSwipe();
     return;
   }
 
   event.preventDefault();
   rowSwipeState.active = true;
+  if (!rowSwipeState.hasPointerCapture) {
+    rowSwipeState.row.setPointerCapture?.(event.pointerId);
+    rowSwipeState.hasPointerCapture = true;
+  }
   rowSwipeState.currentX = event.clientX;
   updateRowSwipeVisual(deltaX);
 }
@@ -6841,7 +6846,7 @@ function handleRowSwipeEnd(event) {
 
   const deltaX = event.clientX - rowSwipeState.startX;
   const { row, item } = rowSwipeState;
-  const wasSwipeGesture = rowSwipeState.active || Math.abs(deltaX) > 12;
+  const wasSwipeGesture = rowSwipeState.active;
   cancelRowSwipe();
   if (wasSwipeGesture) suppressNextRowClick(row);
 
@@ -6868,6 +6873,13 @@ function suppressNextRowClick(row) {
 function cancelRowSwipe() {
   if (!rowSwipeState) return;
 
+  if (rowSwipeState.hasPointerCapture) {
+    try {
+      rowSwipeState.row.releasePointerCapture?.(rowSwipeState.pointerId);
+    } catch {
+      // The browser may release pointer capture before this cleanup runs.
+    }
+  }
   rowSwipeState.row.style.removeProperty("--swipe-offset");
   rowSwipeState.row.dataset.swipeAction = "";
   rowSwipeState.row.classList.remove("is-swiping", "swipe-edit-ready", "swipe-delete-ready");
