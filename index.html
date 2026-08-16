@@ -6,7 +6,7 @@
     <title>Menu Matrix</title>
     <link rel="icon" type="image/svg+xml" href="assets/app-icon.svg" />
     <link rel="apple-touch-icon" href="assets/app-icon-launcher-preview.png" />
-    <link rel="stylesheet" href="styles.css?v=live-source-share" />
+    <link rel="stylesheet" href="styles.css?v=menu-notifications" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -172,6 +172,10 @@
             <h2 id="currentMenuTitle">Mott 32 Las Vegas</h2>
           </div>
           <div class="menu-title-actions">
+            <button id="menuNotificationsButton" class="notification-bell-button" type="button" aria-label="Open menu notifications" hidden>
+              <span class="notification-bell-glyph" aria-hidden="true">&#128276;</span>
+              <span id="menuNotificationBadge" class="notification-bell-badge" hidden>0</span>
+            </button>
             <button id="topAddItemButton" class="top-add-item-button" type="button" hidden>
               <span aria-hidden="true">+</span>
               Add item
@@ -983,6 +987,25 @@
       </form>
     </dialog>
 
+    <dialog id="notificationDialog" class="item-dialog notification-dialog" aria-labelledby="notificationDialogTitle">
+      <form class="item-form" method="dialog">
+        <div class="dialog-head">
+          <div>
+            <p class="kicker">Menu updates</p>
+            <h2 id="notificationDialogTitle">Notifications</h2>
+          </div>
+          <button class="icon-button" type="button" aria-label="Close notifications" id="closeNotificationButton">x</button>
+        </div>
+
+        <p id="notificationMenuName" class="notification-menu-name">Recent changes for this menu.</p>
+        <div id="notificationList" class="notification-list"></div>
+
+        <div class="form-actions single-action">
+          <button id="markNotificationsReadButton" class="save-button" type="button">Mark all read</button>
+        </div>
+      </form>
+    </dialog>
+
     <dialog id="deleteMenuDialog" class="item-dialog danger-dialog" aria-labelledby="deleteMenuTitle">
       <form class="item-form" method="dialog">
         <div class="dialog-head">
@@ -1130,6 +1153,6 @@
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js?v=live-source-share"></script>
+    <script src="app.js?v=menu-notifications"></script>
   </body>
 </html>

@@ -409,7 +409,7 @@ textarea {
 
 .restaurant-card {
   display: grid;
-  grid-template-columns: 82px minmax(0, 1fr);
+  grid-template-columns: 82px minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
   width: 100%;
@@ -468,6 +468,27 @@ textarea {
   font-size: 0.78rem;
   font-weight: 800;
   line-height: 1.35;
+}
+
+.restaurant-card-notifications {
+  display: inline-grid !important;
+  min-width: 38px;
+  min-height: 34px;
+  place-items: center;
+  border: 1px solid rgba(47, 125, 86, 0.2);
+  border-radius: 999px;
+  padding: 0 9px;
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--muted) !important;
+  font-size: 0.76rem !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+}
+
+.restaurant-card-notifications.has-unread {
+  border-color: rgba(217, 157, 43, 0.42);
+  background: rgba(217, 157, 43, 0.16);
+  color: var(--ink) !important;
 }
 
 .app-footer {
@@ -1726,6 +1747,44 @@ h1 {
   font-weight: 950;
 }
 
+.notification-bell-button {
+  position: relative;
+  display: grid;
+  width: 38px;
+  min-height: 38px;
+  place-items: center;
+  border: 1px solid rgba(217, 157, 43, 0.42);
+  border-radius: 50%;
+  padding: 0;
+  background: rgba(217, 157, 43, 0.16);
+  color: var(--ink);
+  box-shadow: 0 10px 24px rgba(25, 33, 29, 0.08);
+}
+
+.notification-bell-glyph {
+  display: block;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.notification-bell-badge {
+  position: absolute;
+  top: -5px;
+  right: -6px;
+  display: grid;
+  min-width: 19px;
+  height: 19px;
+  place-items: center;
+  border: 2px solid var(--white);
+  border-radius: 999px;
+  padding: 0 5px;
+  background: var(--tomato);
+  color: white;
+  font-size: 0.62rem;
+  font-weight: 950;
+  line-height: 1;
+}
+
 .top-add-item-button {
   display: inline-grid;
   grid-template-columns: auto auto;
@@ -2774,6 +2833,77 @@ h1 {
   background: rgba(25, 33, 29, 0.42);
 }
 
+.notification-dialog .item-form {
+  gap: 14px;
+}
+
+.notification-menu-name {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.notification-list {
+  display: grid;
+  gap: 9px;
+}
+
+.notification-row {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: #fffdfa;
+}
+
+.notification-row.is-unread {
+  border-color: rgba(217, 157, 43, 0.46);
+  background: linear-gradient(135deg, rgba(217, 157, 43, 0.13), rgba(255, 253, 250, 0.96));
+}
+
+.notification-row-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+}
+
+.notification-row strong,
+.notification-row span,
+.notification-row small {
+  display: block;
+}
+
+.notification-row strong {
+  font-size: 0.88rem;
+  line-height: 1.2;
+}
+
+.notification-row p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 760;
+  line-height: 1.35;
+}
+
+.notification-time {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.notification-actor {
+  color: var(--aqua);
+  font-size: 0.68rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
 .item-form {
   display: grid;
   gap: 12px;
@@ -3114,7 +3244,7 @@ h1 {
 
   .restaurant-card {
     min-height: 130px;
-    grid-template-columns: 96px minmax(0, 1fr);
+    grid-template-columns: 96px minmax(0, 1fr) auto;
     padding: 12px;
   }
 

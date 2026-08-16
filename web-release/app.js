@@ -17,6 +17,7 @@ const quizResultsLimit = 150;
 const sharedQuizResultsPullInterval = 3000;
 const menuStatsEventLimit = 80;
 const itemStatsEventLimit = 40;
+const menuNotificationsLimit = 120;
 const legacyMott32HeroImage = "https://www.nicepng.com/png/detail/809-8099031_mott32-las-vegas-mott-32-logo.png";
 const defaultHeroImage = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 260'%3E%3Crect width='640' height='260' fill='%23f7f1e6'/%3E%3Ctext x='320' y='116' text-anchor='middle' font-family='Georgia%2C serif' font-size='84' font-weight='700' fill='%2319211d'%3EMOTT 32%3C/text%3E%3Ctext x='320' y='168' text-anchor='middle' font-family='Arial%2C sans-serif' font-size='22' letter-spacing='8' fill='%2366716b'%3ELAS VEGAS%3C/text%3E%3C/svg%3E";
 const defaultFrontMediaUrl = "assets/login-background.mp4";
@@ -1978,7 +1979,8 @@ const state = {
   quizScore: {
     correct: 0,
     total: 0
-  }
+  },
+  notificationMenuId: ""
 };
 
 const cloudSync = {
@@ -2273,6 +2275,8 @@ const shareMenuMessage = document.querySelector("#shareMenuMessage");
 const heroImage = document.querySelector("#heroImage");
 const editHeroButton = document.querySelector("#editHeroButton");
 const currentMenuTitle = document.querySelector("#currentMenuTitle");
+const menuNotificationsButton = document.querySelector("#menuNotificationsButton");
+const menuNotificationBadge = document.querySelector("#menuNotificationBadge");
 const topAddItemButton = document.querySelector("#topAddItemButton");
 const renameMenuButton = document.querySelector("#renameMenuButton");
 const demoGuidePanel = document.querySelector("#demoGuidePanel");
@@ -2282,6 +2286,11 @@ const renameMenuDialog = document.querySelector("#renameMenuDialog");
 const renameMenuForm = document.querySelector("#renameMenuForm");
 const closeRenameMenuButton = document.querySelector("#closeRenameMenuButton");
 const menuNameInput = document.querySelector("#menuNameInput");
+const notificationDialog = document.querySelector("#notificationDialog");
+const closeNotificationButton = document.querySelector("#closeNotificationButton");
+const notificationMenuName = document.querySelector("#notificationMenuName");
+const notificationList = document.querySelector("#notificationList");
+const markNotificationsReadButton = document.querySelector("#markNotificationsReadButton");
 const deleteMenuDialog = document.querySelector("#deleteMenuDialog");
 const closeDeleteMenuButton = document.querySelector("#closeDeleteMenuButton");
 const cancelDeleteMenuButton = document.querySelector("#cancelDeleteMenuButton");
@@ -2662,6 +2671,8 @@ function normalizeRestaurantMenu(menu, index = 0) {
     items: normalizedItems,
     stats: normalizeMenuStats(menu.stats),
     quizResults: normalizeQuizResults(menu.quizResults),
+    notifications: normalizeMenuNotifications(menu.notifications || menu.changeLog || menu.activity),
+    updatedAt: typeof menu.updatedAt === "string" ? menu.updatedAt : "",
     designSettings: normalizedDesign
   };
 }
@@ -2767,6 +2778,51 @@ function mergeQuizResults(currentResults = [], incomingResults = []) {
 
 function normalizeQuizResults(results = []) {
   return Array.isArray(results) ? mergeQuizResults([], results) : [];
+}
+
+function normalizeMenuNotification(notification = {}) {
+  const at = typeof notification.at === "string" && !Number.isNaN(Date.parse(notification.at))
+    ? notification.at
+    : typeof notification.createdAt === "string" && !Number.isNaN(Date.parse(notification.createdAt))
+      ? notification.createdAt
+      : new Date().toISOString();
+  const title = String(notification.title || notification.label || "Menu updated").trim() || "Menu updated";
+  const detail = String(notification.detail || notification.message || "").trim();
+  return {
+    id: String(notification.id || `note-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`),
+    type: String(notification.type || "menu").trim() || "menu",
+    title,
+    detail,
+    actor: String(notification.actor || notification.user || "System").trim() || "System",
+    at,
+    readBy: uniqueValues(Array.isArray(notification.readBy) ? notification.readBy.map(String) : [])
+  };
+}
+
+function mergeMenuNotifications(...notificationLists) {
+  const merged = new Map();
+  notificationLists.flat().forEach((notification) => {
+    if (!notification) return;
+    const normalized = normalizeMenuNotification(notification);
+    const existing = merged.get(normalized.id);
+    merged.set(
+      normalized.id,
+      existing
+        ? {
+            ...normalized,
+            readBy: uniqueValues([...(existing.readBy || []), ...(normalized.readBy || [])])
+          }
+        : normalized
+    );
+  });
+
+  return [...merged.values()]
+    .sort((a, b) => Date.parse(b.at || "") - Date.parse(a.at || ""))
+    .slice(0, menuNotificationsLimit);
+}
+
+function normalizeMenuNotifications(notifications = []) {
+  return Array.isArray(notifications) ? mergeMenuNotifications(notifications) : [];
 }
 
 function getTimestampMs(value) {
@@ -3525,6 +3581,153 @@ function saveRestaurantMenus({ sync = true } = {}) {
     scheduleCloudSave();
     scheduleSharedMenuSnapshotsSave();
   }
+}
+
+function getMenuById(menuId) {
+  if (state.sharedMenu && (!menuId || state.sharedMenu.id === menuId)) return state.sharedMenu;
+  return restaurantMenus.find((menu) => menu.id === menuId) || null;
+}
+
+function getNotificationReaderId() {
+  return getActiveUser()?.username || "";
+}
+
+function isNotificationUnread(notification, readerId = getNotificationReaderId()) {
+  if (!readerId) return false;
+  return !normalizeMenuNotification(notification).readBy.includes(readerId);
+}
+
+function getUnreadNotificationCount(menu, readerId = getNotificationReaderId()) {
+  if (!menu || !readerId) return 0;
+  return normalizeMenuNotifications(menu.notifications).filter((notification) => isNotificationUnread(notification, readerId)).length;
+}
+
+function formatNotificationCount(count) {
+  return count > 99 ? "99+" : String(count);
+}
+
+function addMenuNotification(menu, { title, detail = "", type = "menu" } = {}) {
+  if (!menu || state.sharedMenu) return null;
+
+  const timestamp = new Date().toISOString();
+  const activeUser = getActiveUser();
+  const notification = normalizeMenuNotification({
+    id: `note-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    type,
+    title: title || "Menu updated",
+    detail,
+    actor: activeUser?.username || "System",
+    at: timestamp,
+    readBy: []
+  });
+
+  menu.notifications = mergeMenuNotifications([notification], menu.notifications || []);
+  menu.updatedAt = timestamp;
+  return notification;
+}
+
+function addActiveMenuNotification(change) {
+  return addMenuNotification(getActiveRestaurantMenu(), change);
+}
+
+function addMenuNotificationsToMenus(menus, change) {
+  menus.forEach((menu) => addMenuNotification(menu, change));
+}
+
+function markMenuNotificationsRead(menuId = state.notificationMenuId) {
+  const readerId = getNotificationReaderId();
+  const menu = getMenuById(menuId);
+  if (!readerId || !menu) return;
+
+  menu.notifications = normalizeMenuNotifications(menu.notifications).map((notification) => ({
+    ...notification,
+    readBy: uniqueValues([...(notification.readBy || []), readerId])
+  }));
+
+  if (!state.sharedMenu) saveRestaurantMenus();
+  renderActiveMenuHeader();
+  renderRestaurantList();
+  renderNotificationDialog();
+}
+
+function renderActiveMenuNotificationButton(menu = getActiveRestaurantMenu()) {
+  if (!menuNotificationsButton || !menuNotificationBadge) return;
+
+  menuNotificationsButton.hidden = !menu;
+  if (!menu) return;
+
+  const unreadCount = getUnreadNotificationCount(menu);
+  const totalCount = normalizeMenuNotifications(menu.notifications).length;
+  menuNotificationBadge.hidden = unreadCount <= 0;
+  menuNotificationBadge.textContent = formatNotificationCount(unreadCount);
+  menuNotificationsButton.classList.toggle("has-unread", unreadCount > 0);
+  menuNotificationsButton.setAttribute(
+    "aria-label",
+    unreadCount
+      ? `Open ${menu.name} notifications, ${unreadCount} unread`
+      : `Open ${menu.name} notifications, ${totalCount} total`
+  );
+}
+
+function getNotificationDialogMenu() {
+  return getMenuById(state.notificationMenuId) || getActiveRestaurantMenu();
+}
+
+function renderNotificationDialog() {
+  if (!notificationList || !notificationMenuName || !markNotificationsReadButton) return;
+
+  const menu = getNotificationDialogMenu();
+  const notifications = normalizeMenuNotifications(menu?.notifications);
+  const readerId = getNotificationReaderId();
+  notificationMenuName.textContent = menu
+    ? `Recent changes for ${menu.name}.`
+    : "Recent changes for this menu.";
+  markNotificationsReadButton.hidden = !readerId || !notifications.length;
+  markNotificationsReadButton.disabled = !readerId || getUnreadNotificationCount(menu, readerId) <= 0;
+  notificationList.replaceChildren();
+
+  if (!notifications.length) {
+    notificationList.append(createDashboardEmpty("No changes have been logged for this menu yet."));
+    return;
+  }
+
+  notifications.forEach((notification) => {
+    const row = document.createElement("article");
+    row.className = "notification-row";
+    row.classList.toggle("is-unread", isNotificationUnread(notification, readerId));
+
+    const head = document.createElement("div");
+    head.className = "notification-row-head";
+    const title = document.createElement("strong");
+    title.textContent = notification.title;
+    const time = document.createElement("span");
+    time.className = "notification-time";
+    time.textContent = formatQuizDate(notification.at);
+    head.append(title, time);
+
+    const detail = document.createElement("p");
+    detail.textContent = notification.detail || "Menu settings were updated.";
+
+    const actor = document.createElement("span");
+    actor.className = "notification-actor";
+    actor.textContent = `By ${notification.actor}`;
+
+    row.append(head, detail, actor);
+    notificationList.append(row);
+  });
+}
+
+function openMenuNotifications(menuId = "") {
+  const menu = getMenuById(menuId) || getActiveRestaurantMenu();
+  if (!menu || !notificationDialog) return;
+
+  state.notificationMenuId = menu.id;
+  renderNotificationDialog();
+  notificationDialog.showModal();
+}
+
+function closeMenuNotifications() {
+  notificationDialog?.close();
 }
 
 function applyMenuAnimationIntensity(value) {
@@ -4744,6 +4947,11 @@ async function publishMenuShare(code) {
   );
 
   activeMenu.shareCode = normalizedCode;
+  addMenuNotification(activeMenu, {
+    title: "Share code saved",
+    detail: `Share code ${normalizedCode} was saved for viewers.`,
+    type: "share-code"
+  });
   saveRestaurantMenus();
 }
 
@@ -5317,7 +5525,9 @@ function mergeCloudMenusWithLocal(cloudMenus = [], workspaceOwner = primaryAdmin
 
     return {
       ...cloudMenu,
-      items: mergedItems.items
+      items: mergedItems.items,
+      notifications: mergeMenuNotifications(cloudMenu.notifications, localMenu.notifications),
+      updatedAt: getLatestTimestampString(cloudMenu.updatedAt, localMenu.updatedAt)
     };
   });
 
@@ -5467,6 +5677,8 @@ function sanitizeRestaurantMenuForStorage(menu, options = {}) {
     items: Array.isArray(menu.items) ? menu.items.map((item) => sanitizeMenuItemForCloud(item, options)) : [],
     stats: normalizeMenuStats(menu.stats),
     quizResults: normalizeQuizResults(menu.quizResults),
+    notifications: normalizeMenuNotifications(menu.notifications),
+    updatedAt: typeof menu.updatedAt === "string" ? menu.updatedAt : "",
     designSettings: sanitizeDesignSettings(menu.designSettings || defaultDesign)
   };
 }
@@ -5606,7 +5818,17 @@ function renderRestaurantList() {
       info.append(stats);
     }
 
-    button.append(image, info);
+    const notificationIndicator = document.createElement("span");
+    const unreadCount = getUnreadNotificationCount(menu);
+    notificationIndicator.className = "restaurant-card-notifications";
+    notificationIndicator.classList.toggle("has-unread", unreadCount > 0);
+    notificationIndicator.textContent = unreadCount ? formatNotificationCount(unreadCount) : "0";
+    notificationIndicator.setAttribute(
+      "aria-label",
+      unreadCount ? `${unreadCount} unread menu notifications` : "No unread menu notifications"
+    );
+
+    button.append(image, info, notificationIndicator);
     restaurantList.append(button);
   });
 }
@@ -5749,6 +5971,7 @@ function renderActiveMenuHeader() {
   quickShareMenuButton.hidden = !canShareMenu;
   quickFlashcardButton.hidden = !canUseStudyTools;
   quickQuizButton.hidden = !canUseStudyTools;
+  renderActiveMenuNotificationButton(activeMenu);
   quickMenuActions.hidden =
     quickEditModeButton.hidden &&
     quickCustomizationButton.hidden &&
@@ -5800,11 +6023,21 @@ function saveMenuName(event) {
   const activeMenu = getActiveRestaurantMenu();
   const name = menuNameInput.value.trim();
   if (!activeMenu || !name || !state.editing || !canEditAnyCategory()) return;
+  if (name === activeMenu.name) {
+    closeRenameMenuDialog();
+    return;
+  }
 
+  const previousName = activeMenu.name;
   activeMenu.name = name;
   if (activeMenu.label === "Blank menu") {
     activeMenu.label = "Menu training";
   }
+  addActiveMenuNotification({
+    title: "Menu renamed",
+    detail: `${previousName} was renamed to ${name}.`,
+    type: "menu-rename"
+  });
   saveRestaurantMenus();
   renderActiveMenuHeader();
   renderRestaurantList();
@@ -5978,6 +6211,11 @@ function createBlankRestaurantMenu() {
       heroImage: ""
     }
   }, restaurantMenus.length);
+  addMenuNotification(blankMenu, {
+    title: "Menu created",
+    detail: `${blankMenu.name} was created as a blank menu.`,
+    type: "menu-create"
+  });
 
   restaurantMenus = [blankMenu, ...restaurantMenus];
   state.activeRestaurantMenu = blankMenu.id;
@@ -7068,6 +7306,11 @@ function linkMenuToRestaurant(event) {
     menu.label = "Menu training";
   }
 
+  addMenuNotification(menu, {
+    title: "Restaurant linked",
+    detail: `${menu.name} was linked to ${restaurantName}.`,
+    type: "restaurant-link"
+  });
   saveRestaurantMenus();
   accountRestaurantMessage.textContent = `${menu.name} is linked to ${restaurantName}.`;
   renderAccountDashboard();
@@ -7867,6 +8110,7 @@ function saveDesign(event) {
   if (!isAdmin()) return;
 
   const activeMenu = getActiveRestaurantMenu();
+  const previousDesign = normalizeDesignSettings(designSettings);
   const requestedHeroImage = heroImageUrl.value.trim();
   const heroImageValue = shouldUseBuiltInMott32Hero(activeMenu, requestedHeroImage) ? defaultHeroImage : requestedHeroImage;
   const requestedFrontMedia = frontMediaUrl.value.trim() || defaultFrontMediaUrl;
@@ -7889,6 +8133,14 @@ function saveDesign(event) {
     menuAnimationIntensity: getMenuAnimationIntensity(menuAnimationIntensity.value)
   };
 
+  const changedAreas = getDesignChangeLabels(previousDesign, designSettings);
+  if (changedAreas.length) {
+    addActiveMenuNotification({
+      title: "Customization updated",
+      detail: `${changedAreas.join(", ")} ${changedAreas.length === 1 ? "was" : "were"} changed.`,
+      type: "customization"
+    });
+  }
   saveDesignSettings();
   applyDesignSettings();
   renderDashboardCustomizationSummary();
@@ -7898,6 +8150,11 @@ function saveDesign(event) {
 function resetDesign() {
   if (!isAdmin()) return;
   designSettings = normalizeDesignSettings(defaultDesign);
+  addActiveMenuNotification({
+    title: "Customization reset",
+    detail: "Menu colors, media, photo sizing, and animation settings were reset.",
+    type: "customization"
+  });
   saveDesignSettings();
   applyDesignSettings();
   syncDesignForm();
@@ -9069,6 +9326,7 @@ function renderAdminState() {
   renderSavedShareCodes();
   renderAccountDashboard();
   renderDashboard();
+  if (notificationDialog?.open) renderNotificationDialog();
   if (isAdmin()) {
     renderUserList();
     if (!createUserPanel.hidden) renderNewUserAccessControls();
@@ -10128,6 +10386,11 @@ function addCategory(event) {
     ...menu,
     categories: getUniqueCategories([...(menu.categories || []), category])
   }));
+  addMenuNotificationsToMenus(restaurantMenus, {
+    title: "Category added",
+    detail: `${getCategoryLabel(category)} was added to this menu's categories.`,
+    type: "category-add"
+  });
   users = users.map((user) => {
     if (user.role !== "admin" && user.role !== "owner") return user;
     return {
@@ -10183,6 +10446,11 @@ function renameCategory(category, value) {
       items
     };
   });
+  addMenuNotificationsToMenus(restaurantMenus, {
+    title: "Category renamed",
+    detail: `${getCategoryLabel(category)} was renamed to ${getCategoryLabel(nextCategory)}.`,
+    type: "category-rename"
+  });
   users = users.map((user) => ({
     ...user,
     permissions: Array.isArray(user.permissions)
@@ -10220,6 +10488,11 @@ function deleteCategory(category) {
     ...menu,
     categories: getUniqueCategories((menu.categories || []).filter((savedCategory) => savedCategory !== category))
   }));
+  addMenuNotificationsToMenus(restaurantMenus, {
+    title: "Category deleted",
+    detail: `${label} was removed from this menu's categories.`,
+    type: "category-delete"
+  });
   users = users.map((user) => ({
     ...user,
     permissions: Array.isArray(user.permissions) ? user.permissions.filter((permission) => permission !== category) : user.permissions
@@ -10695,6 +10968,11 @@ function importPdfItems() {
     menuItems = menuItems.filter((item) => !canEditCategory(item.category));
   }
 
+  addActiveMenuNotification({
+    title: "PDF import completed",
+    detail: `${pdfImportDraftItems.length} item${pdfImportDraftItems.length === 1 ? "" : "s"} ${pdfImportMode.value === "replace" ? "replaced editable sections" : "were added"} from a PDF.`,
+    type: "pdf-import"
+  });
   menuItems = [...menuItems, ...pdfImportDraftItems.map(normalizeMenuItem)];
   saveMenuItems();
   renderAllergyChips();
@@ -10966,11 +11244,19 @@ function updateMenuAnimationIntensityLabel(source = menuAnimationIntensity) {
 
 function saveDashboardMenuAnimationIntensity() {
   if (!isAdmin() || !dashboardMenuAnimationIntensity) return;
+  const previousIntensity = designSettings.menuAnimationIntensity;
   const intensity = updateMenuAnimationIntensityLabel(dashboardMenuAnimationIntensity);
   designSettings = normalizeDesignSettings({
     ...designSettings,
     menuAnimationIntensity: intensity
   });
+  if (previousIntensity !== intensity) {
+    addActiveMenuNotification({
+      title: "Animation updated",
+      detail: `Menu row animation intensity changed to ${formatMenuAnimationIntensity(intensity)}.`,
+      type: "customization"
+    });
+  }
   saveDesignSettings();
   renderDashboardCustomizationSummary();
 }
@@ -11057,6 +11343,54 @@ async function updateFrontMediaFromFile(event) {
   }
 }
 
+function normalizeChangeValue(value) {
+  return String(value ?? "").trim();
+}
+
+function normalizeChangeList(values = []) {
+  return uniqueValues(values).map((value) => value.toLowerCase()).sort().join("|");
+}
+
+function getItemChangeLabels(previousItem, item) {
+  if (!previousItem) return ["new item"];
+
+  const changes = [];
+  if (normalizeChangeValue(previousItem.name) !== normalizeChangeValue(item.name)) changes.push("name");
+  if (normalizeChangeValue(previousItem.description) !== normalizeChangeValue(item.description)) changes.push("description");
+  if (normalizeChangeValue(previousItem.details) !== normalizeChangeValue(item.details)) changes.push("dish history and facts");
+  if (normalizeCategoryValue(previousItem.category) !== normalizeCategoryValue(item.category)) changes.push("category");
+  if (Number(previousItem.price) !== Number(item.price)) changes.push("price");
+  if (normalizeChangeValue(previousItem.diet) !== normalizeChangeValue(item.diet)) changes.push("diet tag");
+  if (Number(previousItem.heat) !== Number(item.heat)) changes.push("heat");
+  if (normalizeChangeList(previousItem.allergens || []) !== normalizeChangeList(item.allergens || [])) changes.push("allergies");
+  if (normalizeChangeList(getItemIngredientTerms(previousItem)) !== normalizeChangeList(getItemIngredientTerms(item))) changes.push("ingredients");
+  if (normalizeChangeList(getItemImages(previousItem)) !== normalizeChangeList(getItemImages(item))) changes.push("photos");
+  return changes;
+}
+
+function getItemNotificationDetail(previousItem, item) {
+  const categoryLabel = getCategoryLabel(item.category);
+  if (!previousItem) return `${item.name || "New item"} was added to ${categoryLabel}.`;
+
+  const changes = getItemChangeLabels(previousItem, item);
+  if (!changes.length) return `${item.name || "Menu item"} was saved with no visible field changes.`;
+  return `${item.name || "Menu item"} updated: ${changes.join(", ")}.`;
+}
+
+function getDesignChangeLabels(previousDesign, nextDesign) {
+  const checks = [
+    ["theme colors", ["ink", "leaf", "gold", "aqua", "page", "panel"]],
+    ["header image", ["heroImage"]],
+    ["item photo size", ["itemPhotoSize"]],
+    ["front media", ["frontMediaType", "frontMediaUrl", "frontMediaPhoneSize", "frontMediaWebSize", "frontMediaBlur", "frontVideoLength"]],
+    ["animation", ["menuAnimationIntensity"]]
+  ];
+
+  return checks
+    .filter(([, keys]) => keys.some((key) => normalizeChangeValue(previousDesign?.[key]) !== normalizeChangeValue(nextDesign?.[key])))
+    .map(([label]) => label);
+}
+
 function getStyleForItem(category, heat) {
   if (category === "drinks") return "sea";
   if (heat > 1) return "fire";
@@ -11119,6 +11453,11 @@ function saveItem(event) {
     ];
   }
 
+  addActiveMenuNotification({
+    title: itemIndex >= 0 ? "Menu item updated" : "Menu item added",
+    detail: getItemNotificationDetail(previousItem, item),
+    type: itemIndex >= 0 ? "item-edit" : "item-add"
+  });
   markLocalItemEdit(item);
   saveMenuItems();
   closeItemDialog();
@@ -11178,6 +11517,11 @@ function deleteMenuItemById(id) {
   const menuScrollSnapshot = captureMenuScrollSnapshot(id);
 
   markLocalItemDelete(id);
+  addActiveMenuNotification({
+    title: "Menu item deleted",
+    detail: `${item.name || "Menu item"} was removed from ${getCategoryLabel(item.category)}.`,
+    type: "item-delete"
+  });
   menuItems = menuItems.filter((item) => item.id !== id);
   saveMenuItems();
   state.openItems.delete(id);
@@ -11310,6 +11654,9 @@ designButton.addEventListener("click", openDesignDialog);
 adminHomeDashboardButton.addEventListener("click", () => openUsersPage());
 dashboardCustomizationButton.addEventListener("click", openDesignDialog);
 editHeroButton.addEventListener("click", openDesignDialog);
+menuNotificationsButton.addEventListener("click", () => openMenuNotifications());
+closeNotificationButton.addEventListener("click", closeMenuNotifications);
+markNotificationsReadButton.addEventListener("click", () => markMenuNotificationsRead());
 renameMenuButton.addEventListener("click", openRenameMenuDialog);
 closeRenameMenuButton.addEventListener("click", closeRenameMenuDialog);
 renameMenuForm.addEventListener("submit", saveMenuName);
