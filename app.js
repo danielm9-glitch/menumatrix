@@ -7,6 +7,7 @@ const designStorageKey = "restaurant-menu-matrix-design";
 const menusStorageKey = "restaurant-menu-matrix-restaurant-menus";
 const categoriesStorageKey = "restaurant-menu-matrix-categories";
 const savedShareCodesStorageKey = "restaurant-menu-matrix-saved-share-codes";
+const remoteRequestsStorageKey = "restaurant-menu-matrix-remote-requests";
 const authFlowKey = "restaurant-menu-matrix-auth-flow";
 const currentAuthFlow = "login-first-menus";
 const firebaseMenuDocumentId = "main";
@@ -18,6 +19,7 @@ const sharedQuizResultsPullInterval = 3000;
 const menuStatsEventLimit = 80;
 const itemStatsEventLimit = 40;
 const menuNotificationsLimit = 120;
+const remoteRequestsLimit = 80;
 const legacyMott32HeroImage = "https://www.nicepng.com/png/detail/809-8099031_mott32-las-vegas-mott-32-logo.png";
 const defaultHeroImage = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 260'%3E%3Crect width='640' height='260' fill='%23f7f1e6'/%3E%3Ctext x='320' y='116' text-anchor='middle' font-family='Georgia%2C serif' font-size='84' font-weight='700' fill='%2319211d'%3EMOTT 32%3C/text%3E%3Ctext x='320' y='168' text-anchor='middle' font-family='Arial%2C sans-serif' font-size='22' letter-spacing='8' fill='%2366716b'%3ELAS VEGAS%3C/text%3E%3C/svg%3E";
 const defaultFrontMediaUrl = "assets/login-background.mp4";
@@ -2011,6 +2013,7 @@ let menuRevealObserver = null;
 let menuRevealSequence = 0;
 let sharedQuizResultsPulling = false;
 let sharedQuizResultsPulledAt = 0;
+let remoteRequests = loadRemoteRequests(getActiveUser());
 
 const formatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -2351,6 +2354,12 @@ const dashboardStatsSummary = document.querySelector("#dashboardStatsSummary");
 const dashboardStatsList = document.querySelector("#dashboardStatsList");
 const dashboardCustomizationSummary = document.querySelector("#dashboardCustomizationSummary");
 const dashboardCustomizationButton = document.querySelector("#dashboardCustomizationButton");
+const remoteRequestSummary = document.querySelector("#remoteRequestSummary");
+const remoteRequestForm = document.querySelector("#remoteRequestForm");
+const remoteRequestMenu = document.querySelector("#remoteRequestMenu");
+const remoteRequestPrompt = document.querySelector("#remoteRequestPrompt");
+const remoteRequestMessage = document.querySelector("#remoteRequestMessage");
+const remoteRequestList = document.querySelector("#remoteRequestList");
 const backFromFlashcardsButton = document.querySelector("#backFromFlashcardsButton");
 const flashcardShuffleButton = document.querySelector("#flashcardShuffleButton");
 const flashcardModeButton = document.querySelector("#flashcardModeButton");
@@ -4328,6 +4337,76 @@ function getRestaurantMenusStorageKey(user = getActiveUser()) {
   return docId === firebaseMenuDocumentId ? menusStorageKey : `${menusStorageKey}-${docId}`;
 }
 
+function getRemoteRequestsStorageKey(user = getActiveUser()) {
+  const docId = getWorkspaceDocumentId(user);
+  return docId === firebaseMenuDocumentId ? remoteRequestsStorageKey : `${remoteRequestsStorageKey}-${docId}`;
+}
+
+function getRemoteRequestTime(request = {}) {
+  const updatedAt = Date.parse(request.updatedAt || "");
+  const createdAt = Date.parse(request.createdAt || "");
+  if (!Number.isNaN(updatedAt)) return updatedAt;
+  if (!Number.isNaN(createdAt)) return createdAt;
+  return 0;
+}
+
+function normalizeRemoteRequest(request = {}) {
+  const createdAt = typeof request.createdAt === "string" ? request.createdAt : new Date().toISOString();
+  const updatedAt = typeof request.updatedAt === "string" ? request.updatedAt : createdAt;
+  const status = ["new", "in-progress", "done", "archived"].includes(request.status) ? request.status : "new";
+
+  return {
+    id: request.id || `request-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    prompt: String(request.prompt || "").trim(),
+    menuId: String(request.menuId || ""),
+    menuName: String(request.menuName || ""),
+    status,
+    createdBy: String(request.createdBy || ""),
+    createdAt,
+    updatedAt
+  };
+}
+
+function normalizeRemoteRequests(requests = []) {
+  return (Array.isArray(requests) ? requests : [])
+    .map(normalizeRemoteRequest)
+    .filter((request) => request.prompt)
+    .sort((first, second) => getRemoteRequestTime(second) - getRemoteRequestTime(first))
+    .slice(0, remoteRequestsLimit);
+}
+
+function sanitizeRemoteRequestForStorage(request) {
+  return normalizeRemoteRequest(request);
+}
+
+function loadRemoteRequests(user = getActiveUser()) {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(getRemoteRequestsStorageKey(user)) || "[]");
+    return normalizeRemoteRequests(parsed);
+  } catch {
+    return [];
+  }
+}
+
+function mergeRemoteRequests(...requestLists) {
+  const merged = new Map();
+  requestLists.flatMap((list) => normalizeRemoteRequests(list)).forEach((request) => {
+    const current = merged.get(request.id);
+    if (!current || getRemoteRequestTime(request) >= getRemoteRequestTime(current)) {
+      merged.set(request.id, request);
+    }
+  });
+
+  return normalizeRemoteRequests([...merged.values()]);
+}
+
+function saveRemoteRequests({ sync = true } = {}) {
+  remoteRequests = normalizeRemoteRequests(remoteRequests);
+  localStorage.setItem(getRemoteRequestsStorageKey(), JSON.stringify(remoteRequests.map(sanitizeRemoteRequestForStorage)));
+  if (sync) scheduleCloudSave();
+  renderDashboardRequests();
+}
+
 function isOwnerWorkspace(user = getActiveUser()) {
   return Boolean(user && user.role === "owner");
 }
@@ -5661,6 +5740,15 @@ function applyCloudSnapshot(data) {
       saveRestaurantMenus({ sync: false });
       syncActiveRestaurantMenuData();
     }
+    if (Array.isArray(data.remoteRequests)) {
+      const cloudRequests = normalizeRemoteRequests(data.remoteRequests);
+      const mergedRequests = mergeRemoteRequests(cloudRequests, remoteRequests);
+      shouldResaveLocalPreserves = shouldResaveLocalPreserves || JSON.stringify(mergedRequests) !== JSON.stringify(cloudRequests);
+      remoteRequests = mergedRequests;
+      saveRemoteRequests({ sync: false });
+    } else if (remoteRequests.length) {
+      shouldResaveLocalPreserves = true;
+    }
 
     setSyncStatus("Synced with Firebase", "connected");
     applyDesignSettings();
@@ -5706,6 +5794,7 @@ async function uploadCloudSnapshot(reason) {
       {
         categories,
         menus: restaurantMenus.map((menu) => sanitizeRestaurantMenuForStorage(menu, { allowInlineImages: false })),
+        remoteRequests: remoteRequests.map(sanitizeRemoteRequestForStorage),
         source: reason,
         updatedAt: new Date().toISOString()
       },
@@ -7661,6 +7750,7 @@ function renderDashboard() {
   renderDashboardCustomizationSummary();
   renderDashboardRestaurants();
   renderDashboardMenus();
+  renderDashboardRequests();
 }
 
 function createDashboardMetric(label, value, note = "") {
@@ -7779,6 +7869,162 @@ function renderDashboardMenus() {
       })
     );
   });
+}
+
+function renderDashboardRequests() {
+  if (!remoteRequestSummary || !remoteRequestMenu || !remoteRequestList) return;
+
+  const activeRequests = remoteRequests.filter((request) => !["done", "archived"].includes(request.status));
+  remoteRequestSummary.replaceChildren(
+    createDashboardMetric("Open", String(activeRequests.length), "Waiting for desktop follow-up"),
+    createDashboardMetric(
+      "In progress",
+      String(remoteRequests.filter((request) => request.status === "in-progress").length),
+      "Already being handled"
+    ),
+    createDashboardMetric("Done", String(remoteRequests.filter((request) => request.status === "done").length), "Completed requests")
+  );
+
+  const selectedMenuId = remoteRequestMenu.value;
+  remoteRequestMenu.replaceChildren();
+  remoteRequestMenu.append(new Option("General app request", ""));
+  restaurantMenus.forEach((menu) => {
+    remoteRequestMenu.append(new Option(menu.name, menu.id));
+  });
+  remoteRequestMenu.value = [...remoteRequestMenu.options].some((option) => option.value === selectedMenuId)
+    ? selectedMenuId
+    : "";
+
+  remoteRequestList.replaceChildren();
+  const visibleRequests = remoteRequests.filter((request) => request.status !== "archived");
+  if (!visibleRequests.length) {
+    remoteRequestList.append(createDashboardEmpty("No remote requests saved yet."));
+    return;
+  }
+
+  visibleRequests.forEach((request) => {
+    remoteRequestList.append(createRemoteRequestCard(request));
+  });
+}
+
+function createRemoteRequestCard(request) {
+  const card = document.createElement("article");
+  card.className = `remote-request-card status-${request.status}`;
+
+  const head = document.createElement("div");
+  head.className = "remote-request-head";
+
+  const title = document.createElement("div");
+  const kicker = document.createElement("p");
+  kicker.className = "kicker";
+  kicker.textContent = request.menuName || "General app";
+  const strong = document.createElement("strong");
+  strong.textContent = request.status === "done" ? "Completed request" : "Remote request";
+  title.append(kicker, strong);
+
+  const badge = document.createElement("span");
+  badge.className = "dashboard-badge";
+  badge.textContent = formatRemoteRequestStatus(request.status);
+  head.append(title, badge);
+
+  const prompt = document.createElement("p");
+  prompt.className = "remote-request-prompt";
+  prompt.textContent = request.prompt;
+
+  const meta = document.createElement("p");
+  meta.className = "dashboard-note";
+  meta.textContent = `${request.createdBy || "Admin"} - ${formatQuizDate(request.createdAt)}`;
+
+  const actions = document.createElement("div");
+  actions.className = "remote-request-actions";
+  if (request.status === "new") {
+    actions.append(createRemoteRequestActionButton("Start", () => updateRemoteRequestStatus(request.id, "in-progress")));
+  }
+  if (request.status !== "done") {
+    actions.append(createRemoteRequestActionButton("Mark done", () => updateRemoteRequestStatus(request.id, "done")));
+  } else {
+    actions.append(createRemoteRequestActionButton("Reopen", () => updateRemoteRequestStatus(request.id, "new")));
+  }
+  actions.append(createRemoteRequestActionButton("Copy", () => copyRemoteRequestPrompt(request)));
+  actions.append(createRemoteRequestActionButton("Archive", () => updateRemoteRequestStatus(request.id, "archived"), "danger-button"));
+
+  card.append(head, prompt, meta, actions);
+  return card;
+}
+
+function createRemoteRequestActionButton(label, onClick, className = "action-button") {
+  const button = document.createElement("button");
+  button.className = className;
+  button.type = "button";
+  button.textContent = label;
+  button.addEventListener("click", onClick);
+  return button;
+}
+
+function formatRemoteRequestStatus(status) {
+  return (
+    {
+      new: "New",
+      "in-progress": "In progress",
+      done: "Done",
+      archived: "Archived"
+    }[status] || "New"
+  );
+}
+
+function submitRemoteRequest(event) {
+  event.preventDefault();
+  if (!isAdmin()) return;
+
+  const prompt = remoteRequestPrompt.value.trim();
+  if (!prompt) {
+    remoteRequestMessage.textContent = "Write a request first.";
+    return;
+  }
+
+  const selectedMenu = getMenuById(remoteRequestMenu.value);
+  const createdAt = new Date().toISOString();
+  remoteRequests = mergeRemoteRequests(
+    [
+      {
+        id: `request-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        prompt,
+        menuId: selectedMenu?.id || "",
+        menuName: selectedMenu?.name || "",
+        status: "new",
+        createdBy: getActiveUser()?.username || getActiveUser()?.email || "admin",
+        createdAt,
+        updatedAt: createdAt
+      }
+    ],
+    remoteRequests
+  );
+  remoteRequestPrompt.value = "";
+  remoteRequestMessage.textContent = "Request saved.";
+  saveRemoteRequests();
+}
+
+function updateRemoteRequestStatus(requestId, status) {
+  remoteRequests = remoteRequests.map((request) =>
+    request.id === requestId
+      ? {
+          ...request,
+          status,
+          updatedAt: new Date().toISOString()
+        }
+      : request
+  );
+  saveRemoteRequests();
+  if (remoteRequestMessage) remoteRequestMessage.textContent = "Request updated.";
+}
+
+async function copyRemoteRequestPrompt(request) {
+  try {
+    await navigator.clipboard.writeText(request.prompt);
+    if (remoteRequestMessage) remoteRequestMessage.textContent = "Prompt copied.";
+  } catch {
+    if (remoteRequestMessage) remoteRequestMessage.textContent = "Copy was blocked by this browser.";
+  }
 }
 
 function getDashboardStatMenus() {
@@ -9756,6 +10002,7 @@ function exitSharedMenu() {
 
 function activateWorkspaceForCurrentUser() {
   restaurantMenus = loadRestaurantMenus(getActiveUser());
+  remoteRequests = loadRemoteRequests(getActiveUser());
   resetMenuViewForCurrentUser();
   connectCloudWorkspaceForCurrentUser();
 }
@@ -11730,6 +11977,7 @@ methodTabs.forEach((tab) => {
 dashboardTabs.forEach((tab) => {
   tab.addEventListener("click", () => showDashboardTab(tab.dataset.dashboardTab));
 });
+remoteRequestForm.addEventListener("submit", submitRemoteRequest);
 manageUsersButton.addEventListener("click", () => openUsersPage());
 accountEmailForm.addEventListener("submit", changeAccountEmail);
 accountVerifyEmailButton.addEventListener("click", verifyAccountEmail);

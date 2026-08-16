@@ -968,6 +968,62 @@ h1 {
   white-space: nowrap;
 }
 
+.remote-request-form textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.remote-request-list {
+  grid-template-columns: 1fr;
+}
+
+.remote-request-card {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--white);
+}
+
+.remote-request-card.status-done {
+  opacity: 0.78;
+}
+
+.remote-request-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.remote-request-head strong {
+  color: var(--ink);
+}
+
+.remote-request-prompt {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.84rem;
+  font-weight: 800;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.remote-request-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.remote-request-actions .action-button,
+.remote-request-actions .danger-button {
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 0.72rem;
+}
+
 .stats-menu-card {
   overflow: hidden;
   border: 1px solid var(--line);
@@ -3460,6 +3516,11 @@ h1 {
 
   .dashboard-panel[data-dashboard-panel="users"] {
     grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+    gap: 18px 22px;
+  }
+
+  .dashboard-panel[data-dashboard-panel="requests"] {
+    grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
     gap: 18px 22px;
   }
 

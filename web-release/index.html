@@ -6,7 +6,7 @@
     <title>Menu Matrix</title>
     <link rel="icon" type="image/svg+xml" href="assets/app-icon.svg" />
     <link rel="apple-touch-icon" href="assets/app-icon-launcher-preview.png" />
-    <link rel="stylesheet" href="styles.css?v=editor-swipe-actions" />
+    <link rel="stylesheet" href="styles.css?v=remote-requests" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -393,6 +393,7 @@
       <nav class="dashboard-tabs" role="tablist" aria-label="Dashboard sections">
         <button class="dashboard-tab is-active" type="button" role="tab" aria-selected="true" data-dashboard-tab="account">Account</button>
         <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="users">Users</button>
+        <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="requests">Requests</button>
         <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="auth">Authentications</button>
         <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="payments">Payments</button>
         <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="restaurants">Restaurants</button>
@@ -521,6 +522,36 @@
             <strong>Users</strong>
           </div>
           <div id="userList" class="user-list"></div>
+        </section>
+      </section>
+
+      <section class="dashboard-panel" data-dashboard-panel="requests" hidden>
+        <section class="user-manager">
+          <div class="section-heading">
+            <p class="kicker">Remote prompts</p>
+            <strong>Requests</strong>
+          </div>
+          <div id="remoteRequestSummary" class="dashboard-metric-grid"></div>
+          <form id="remoteRequestForm" class="user-form remote-request-form">
+            <label>
+              Menu
+              <select id="remoteRequestMenu"></select>
+            </label>
+            <label>
+              Prompt
+              <textarea id="remoteRequestPrompt" rows="5" placeholder="Describe the change you want Codex to make..." required></textarea>
+            </label>
+            <button class="save-button" type="submit">Save request</button>
+            <p id="remoteRequestMessage" class="login-message" role="status"></p>
+          </form>
+        </section>
+
+        <section class="user-manager">
+          <div class="section-heading">
+            <p class="kicker">Synced queue</p>
+            <strong>Saved requests</strong>
+          </div>
+          <div id="remoteRequestList" class="dashboard-list remote-request-list"></div>
         </section>
       </section>
 
@@ -1153,6 +1184,6 @@
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js?v=editor-swipe-actions"></script>
+    <script src="app.js?v=remote-requests"></script>
   </body>
 </html>
