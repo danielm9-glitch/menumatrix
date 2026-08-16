@@ -6466,7 +6466,7 @@ function renderMenu({ preserveScroll = false, anchorItemId = "", scrollSnapshot 
 
     const rowEditButton = row.querySelector(".row-edit-button");
     const canEditItem = state.editing && canEditCategory(item.category);
-    const canSwipeItem = !state.sharedMenu && canEditCategory(item.category);
+    const canSwipeItem = state.editing && !state.sharedMenu && canEditCategory(item.category);
     rowEditButton.hidden = !canEditItem;
     rowEditButton.addEventListener("click", (event) => {
       event.stopPropagation();
@@ -6804,9 +6804,11 @@ function attachRowSwipeHandlers(row, item) {
 }
 
 function handleRowSwipeStart(event, row, item) {
+  if (event.isPrimary === false) return;
   if (event.button !== undefined && event.button !== 0) return;
   const interactiveTarget = event.target.closest("button, input, textarea, select, a");
   if (interactiveTarget && !interactiveTarget.classList.contains("item-toggle")) return;
+  if (rowSwipeState) cancelRowSwipe();
 
   rowSwipeState = {
     row,
@@ -6825,13 +6827,22 @@ function handleRowSwipeMove(event) {
 
   const deltaX = event.clientX - rowSwipeState.startX;
   const deltaY = event.clientY - rowSwipeState.startY;
-  if (!rowSwipeState.active && Math.abs(deltaX) < 24) return;
-  if (!rowSwipeState.active && Math.abs(deltaX) < Math.abs(deltaY) * 1.35) {
-    cancelRowSwipe();
-    return;
+  const absX = Math.abs(deltaX);
+  const absY = Math.abs(deltaY);
+
+  if (!rowSwipeState.active) {
+    if (absY > 10 && absY > absX * 0.9) {
+      cancelRowSwipe();
+      return;
+    }
+    if (absX < 42) return;
+    if (absX < absY * 1.8) {
+      cancelRowSwipe();
+      return;
+    }
   }
 
-  event.preventDefault();
+  if (event.pointerType === "mouse" && event.cancelable) event.preventDefault();
   rowSwipeState.active = true;
   if (!rowSwipeState.hasPointerCapture) {
     rowSwipeState.row.setPointerCapture?.(event.pointerId);
