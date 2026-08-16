@@ -6541,7 +6541,7 @@ function renderMenu({ preserveScroll = false, anchorItemId = "", scrollSnapshot 
 
     const rowEditButton = row.querySelector(".row-edit-button");
     const canEditItem = state.editing && canEditCategory(item.category);
-    const canSwipeItem = state.editing && !state.sharedMenu && canEditCategory(item.category);
+    const canSwipeItem = !state.sharedMenu && canEditCategory(item.category);
     rowEditButton.hidden = !canEditItem;
     rowEditButton.addEventListener("click", (event) => {
       event.stopPropagation();
