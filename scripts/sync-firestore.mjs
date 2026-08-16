@@ -89,11 +89,26 @@ const defaultMenus = [
   {
     id: "mott32-las-vegas",
     name: "Mott 32 Las Vegas",
+    restaurantId: "restaurant-mott32-las-vegas",
+    restaurantName: "Mott 32 Las Vegas",
     owner: "admin",
     label: "Chinese menu training",
     categories: ["Starters", "Mains", "Drinks"],
     items: defaultMenuItems,
     designSettings: defaultDesign
+  }
+];
+
+const defaultRestaurants = [
+  {
+    id: "restaurant-mott32-las-vegas",
+    name: "Mott 32 Las Vegas",
+    owner: "admin",
+    location: "Las Vegas",
+    cuisine: "Chinese fine dining",
+    notes: "Default training workspace.",
+    createdAt: "",
+    updatedAt: ""
   }
 ];
 
@@ -204,9 +219,37 @@ function getMenusForSync(existingDocument) {
   return defaultMenus;
 }
 
-async function patchMenuDocument(idToken, menus) {
+function getRestaurantsForSync(existingDocument, menus) {
+  const fields = existingDocument?.fields || null;
+  if (fields?.restaurants) {
+    const existing = fromFirestoreValue(fields.restaurants);
+    if (Array.isArray(existing)) return existing;
+  }
+
+  const restaurants = new Map(defaultRestaurants.map((restaurant) => [restaurant.id, restaurant]));
+  menus.forEach((menu) => {
+    if (!menu.restaurantId && !menu.restaurantName) return;
+    const id = menu.restaurantId || `restaurant-${String(menu.restaurantName || menu.name).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
+    if (!restaurants.has(id)) {
+      restaurants.set(id, {
+        id,
+        name: menu.restaurantName || menu.name || "Restaurant",
+        owner: menu.owner || "admin",
+        location: "",
+        cuisine: "",
+        notes: "",
+        createdAt: "",
+        updatedAt: ""
+      });
+    }
+  });
+  return [...restaurants.values()];
+}
+
+async function patchMenuDocument(idToken, menus, restaurants) {
   const fields = {
     menus: toFirestoreValue(menus),
+    restaurants: toFirestoreValue(restaurants),
     source: toFirestoreValue("manual-codex-sync"),
     schemaVersion: toFirestoreValue(2),
     updatedAt: toFirestoreValue(new Date().toISOString())
@@ -232,9 +275,10 @@ async function main() {
   const legacyDocument = existingDocument ? null : await getCurrentDocument(idToken, legacyRestaurantDocumentPath);
   const migratedFromLegacy = !existingDocument && Boolean(legacyDocument);
   const menus = getMenusForSync(existingDocument || legacyDocument);
-  await patchMenuDocument(idToken, menus);
+  const restaurants = getRestaurantsForSync(existingDocument || legacyDocument, menus);
+  await patchMenuDocument(idToken, menus, restaurants);
   console.log(
-    `Synced ${menus.length} menu(s) to Firestore document ${menuDocumentPath}.` +
+    `Synced ${restaurants.length} restaurant(s) and ${menus.length} menu(s) to Firestore document ${menuDocumentPath}.` +
       (migratedFromLegacy ? ` Migrated data from ${legacyRestaurantDocumentPath}.` : "")
   );
 }

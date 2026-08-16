@@ -9,6 +9,15 @@
       "panelColor": "#fffaf2"
     }
   },
+  "restaurants": {
+    "restaurant-mott32-las-vegas": {
+      "name": "Mott 32 Las Vegas",
+      "owner": "admin",
+      "location": "Las Vegas",
+      "cuisine": "Chinese fine dining",
+      "notes": "Default restaurant workspace for Menu Matrix training."
+    }
+  },
   "menuItems": {
     "peking-duck": {
       "name": "Apple Wood Roasted 42 Days Peking Duck",

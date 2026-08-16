@@ -134,10 +134,16 @@
               <p id="menusDirectoryKicker" class="kicker">Restaurants</p>
               <h2 id="menusDirectoryTitle">Menus</h2>
             </div>
-            <button id="createMenuButton" class="create-menu-button" type="button">
-              <span aria-hidden="true">+</span>
-              New blank menu
-            </button>
+            <div class="menu-create-actions">
+              <button id="createRestaurantButton" class="create-menu-button" type="button">
+                <span aria-hidden="true">+</span>
+                New restaurant
+              </button>
+              <button id="createMenuButton" class="create-menu-button secondary-create-button" type="button">
+                <span aria-hidden="true">+</span>
+                Add menu
+              </button>
+            </div>
           </div>
 
           <section id="restaurantList" class="restaurant-list" aria-label="Available restaurant menus"></section>
@@ -457,10 +463,10 @@
               <select id="accountMenuSelect" required></select>
             </label>
             <label>
-              Restaurant name
-              <input id="accountRestaurantName" placeholder="Restaurant name" required />
+              Restaurant
+              <select id="accountRestaurantSelect" required></select>
             </label>
-            <button class="save-button" type="submit">Link menu to restaurant</button>
+            <button class="save-button" type="submit">Attach menu to restaurant</button>
             <p id="accountRestaurantMessage" class="login-message" role="status"></p>
           </form>
           <div id="accountRestaurantLinks" class="dashboard-list"></div>
@@ -653,6 +659,100 @@
         <div id="pdfItemList" class="pdf-item-list"></div>
       </section>
     </main>
+
+    <dialog id="restaurantDialog" class="item-dialog" aria-labelledby="restaurantDialogTitle">
+      <form id="restaurantForm" method="dialog" class="item-form">
+        <div class="dialog-head">
+          <div>
+            <p class="kicker">Client setup</p>
+            <h2 id="restaurantDialogTitle">New restaurant</h2>
+          </div>
+          <button class="icon-button" type="button" aria-label="Close restaurant setup" id="closeRestaurantButton">x</button>
+        </div>
+
+        <label>
+          Restaurant name
+          <input id="restaurantNameInput" placeholder="Restaurant name" required />
+        </label>
+        <div class="form-grid">
+          <label>
+            Location
+            <input id="restaurantLocationInput" placeholder="City, property, or address" />
+          </label>
+          <label>
+            Cuisine / concept
+            <input id="restaurantCuisineInput" placeholder="Chinese, steakhouse, lounge..." />
+          </label>
+        </div>
+        <label>
+          Notes
+          <textarea id="restaurantNotesInput" rows="3" placeholder="Basic client or restaurant notes"></textarea>
+        </label>
+        <section class="form-subsection">
+          <div>
+            <p class="kicker">First branch</p>
+            <strong>Create the first menu</strong>
+          </div>
+          <div class="form-grid">
+            <label>
+              Menu name
+              <input id="restaurantInitialMenuName" placeholder="Food menu" />
+            </label>
+            <label>
+              Menu type
+              <select id="restaurantInitialMenuType">
+                <option value="Food menu">Food menu</option>
+                <option value="Cocktails">Cocktails</option>
+                <option value="Wine">Wine</option>
+                <option value="Desserts">Desserts</option>
+                <option value="Training menu">Training menu</option>
+              </select>
+            </label>
+          </div>
+        </section>
+        <p id="restaurantDialogMessage" class="login-message" role="status"></p>
+        <div class="form-actions single-action">
+          <button class="save-button" type="submit">Create restaurant</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="menuBranchDialog" class="item-dialog" aria-labelledby="menuBranchDialogTitle">
+      <form id="menuBranchForm" method="dialog" class="item-form">
+        <div class="dialog-head">
+          <div>
+            <p class="kicker">Menu branch</p>
+            <h2 id="menuBranchDialogTitle">Add menu</h2>
+          </div>
+          <button class="icon-button" type="button" aria-label="Close menu branch setup" id="closeMenuBranchButton">x</button>
+        </div>
+
+        <label>
+          Restaurant
+          <select id="menuBranchRestaurantSelect" required></select>
+        </label>
+        <div class="form-grid">
+          <label>
+            Menu name
+            <input id="menuBranchNameInput" placeholder="Food menu" required />
+          </label>
+          <label>
+            Menu type
+            <select id="menuBranchTypeSelect">
+              <option value="Food menu">Food menu</option>
+              <option value="Cocktails">Cocktails</option>
+              <option value="Wine">Wine</option>
+              <option value="Desserts">Desserts</option>
+              <option value="Training menu">Training menu</option>
+            </select>
+          </label>
+        </div>
+        <p id="menuBranchDialogMessage" class="login-message" role="status"></p>
+        <div class="form-actions single-action">
+          <button class="save-button" type="submit">Create menu</button>
+        </div>
+      </form>
+    </dialog>
 
     <dialog id="itemDialog" class="item-dialog" aria-labelledby="dialogTitle">
       <form id="itemForm" method="dialog" class="item-form">
@@ -1182,6 +1282,6 @@
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js?v=users-auth-section"></script>
+    <script src="app.js?v=restaurant-workspaces"></script>
   </body>
 </html>

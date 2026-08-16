@@ -5,6 +5,7 @@ const usersStorageKey = "restaurant-menu-matrix-users";
 const currentUserKey = "restaurant-menu-matrix-current-user";
 const designStorageKey = "restaurant-menu-matrix-design";
 const menusStorageKey = "restaurant-menu-matrix-restaurant-menus";
+const restaurantsStorageKey = "restaurant-menu-matrix-restaurants";
 const categoriesStorageKey = "restaurant-menu-matrix-categories";
 const savedShareCodesStorageKey = "restaurant-menu-matrix-saved-share-codes";
 const remoteRequestsStorageKey = "restaurant-menu-matrix-remote-requests";
@@ -1937,6 +1938,7 @@ const defaultMenuItems = [
 
 const allergyOptions = ["Capsaicin", "Dairy", "Egg", "Fish", "Garlic", "Gluten", "Mushroom", "Nut", "Onion", "Peanut", "Pork", "Seafood", "Sesame", "Shellfish", "Soy", "Wheat"];
 const defaultRestaurantMenuId = "mott32-las-vegas";
+const defaultRestaurantId = "restaurant-mott32-las-vegas";
 
 if (localStorage.getItem(authFlowKey) !== currentAuthFlow) {
   localStorage.removeItem(currentUserKey);
@@ -1944,6 +1946,9 @@ if (localStorage.getItem(authFlowKey) !== currentAuthFlow) {
 }
 
 let restaurantMenus = loadRestaurantMenus();
+let restaurants = loadRestaurants(null, restaurantMenus);
+restaurantMenus = reconcileMenuRestaurantLinks(restaurantMenus, restaurants);
+restaurants = reconcileRestaurants(restaurants, restaurantMenus);
 const initialRestaurantMenu = restaurantMenus[0];
 let menuItems = initialRestaurantMenu?.items || [];
 let users = loadUsers();
@@ -2113,6 +2118,7 @@ const menusUserStatus = document.querySelector("#menusUserStatus");
 const menusLogoutButton = document.querySelector("#menusLogoutButton");
 const backToMenusButton = document.querySelector("#backToMenusButton");
 const createMenuButton = document.querySelector("#createMenuButton");
+const createRestaurantButton = document.querySelector("#createRestaurantButton");
 const adminHomeSummary = document.querySelector("#adminHomeSummary");
 const adminHomeDashboardButton = document.querySelector("#adminHomeDashboardButton");
 const adminHomeMetrics = document.querySelector("#adminHomeMetrics");
@@ -2173,7 +2179,7 @@ const accountPasswordResetButton = document.querySelector("#accountPasswordReset
 const accountPasswordMessage = document.querySelector("#accountPasswordMessage");
 const accountRestaurantForm = document.querySelector("#accountRestaurantForm");
 const accountMenuSelect = document.querySelector("#accountMenuSelect");
-const accountRestaurantName = document.querySelector("#accountRestaurantName");
+const accountRestaurantSelect = document.querySelector("#accountRestaurantSelect");
 const accountRestaurantMessage = document.querySelector("#accountRestaurantMessage");
 const accountRestaurantLinks = document.querySelector("#accountRestaurantLinks");
 const deleteAccountButton = document.querySelector("#deleteAccountButton");
@@ -2190,6 +2196,23 @@ const deleteAccountSlider = document.querySelector("#deleteAccountSlider");
 const deleteAccountSliderThumb = document.querySelector("#deleteAccountSliderThumb");
 const deleteAccountSliderText = document.querySelector("#deleteAccountSliderText");
 const deleteAccountMessage = document.querySelector("#deleteAccountMessage");
+const restaurantDialog = document.querySelector("#restaurantDialog");
+const restaurantForm = document.querySelector("#restaurantForm");
+const closeRestaurantButton = document.querySelector("#closeRestaurantButton");
+const restaurantNameInput = document.querySelector("#restaurantNameInput");
+const restaurantLocationInput = document.querySelector("#restaurantLocationInput");
+const restaurantCuisineInput = document.querySelector("#restaurantCuisineInput");
+const restaurantNotesInput = document.querySelector("#restaurantNotesInput");
+const restaurantInitialMenuName = document.querySelector("#restaurantInitialMenuName");
+const restaurantInitialMenuType = document.querySelector("#restaurantInitialMenuType");
+const restaurantDialogMessage = document.querySelector("#restaurantDialogMessage");
+const menuBranchDialog = document.querySelector("#menuBranchDialog");
+const menuBranchForm = document.querySelector("#menuBranchForm");
+const closeMenuBranchButton = document.querySelector("#closeMenuBranchButton");
+const menuBranchRestaurantSelect = document.querySelector("#menuBranchRestaurantSelect");
+const menuBranchNameInput = document.querySelector("#menuBranchNameInput");
+const menuBranchTypeSelect = document.querySelector("#menuBranchTypeSelect");
+const menuBranchDialogMessage = document.querySelector("#menuBranchDialogMessage");
 const backToMenuButton = document.querySelector("#backToMenuButton");
 const backFromPdfButton = document.querySelector("#backFromPdfButton");
 const pdfItemList = document.querySelector("#pdfItemList");
@@ -2541,10 +2564,181 @@ function loadRestaurantMenus(user = null) {
   return [defaultMenu];
 }
 
+function getRestaurantIdFromName(name, fallback = "") {
+  const slug = String(name || fallback || "restaurant")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64);
+  return `restaurant-${slug || Date.now()}`;
+}
+
+function loadRestaurants(user = null, menus = []) {
+  const savedRestaurants = localStorage.getItem(getRestaurantsStorageKey(user));
+
+  if (savedRestaurants) {
+    try {
+      const parsed = JSON.parse(savedRestaurants);
+      if (Array.isArray(parsed)) {
+        return reconcileRestaurants(parsed.map(normalizeRestaurant), menus, getWorkspaceOwner(user));
+      }
+    } catch {
+      // Fall through to deriving restaurants from existing menus.
+    }
+  }
+
+  if (isOwnerWorkspace(user) && !menus.length) return [];
+  return reconcileRestaurants([], menus, getWorkspaceOwner(user));
+}
+
+function normalizeRestaurant(restaurant = {}, index = 0) {
+  const name = String(restaurant.name || restaurant.restaurantName || `Restaurant ${index + 1}`).trim();
+  const id = String(restaurant.id || getRestaurantIdFromName(name, `restaurant-${index + 1}`)).trim();
+  const timestamp = typeof restaurant.createdAt === "string" && restaurant.createdAt ? restaurant.createdAt : "";
+
+  return {
+    id,
+    name,
+    owner: restaurant.owner || primaryAdminUsername,
+    location: String(restaurant.location || restaurant.address || "").trim(),
+    cuisine: String(restaurant.cuisine || restaurant.concept || "").trim(),
+    notes: String(restaurant.notes || "").trim(),
+    createdAt: timestamp,
+    updatedAt: typeof restaurant.updatedAt === "string" ? restaurant.updatedAt : timestamp
+  };
+}
+
+function sanitizeRestaurantForStorage(restaurant) {
+  return normalizeRestaurant(restaurant);
+}
+
+function reconcileRestaurants(sourceRestaurants = [], menus = restaurantMenus, workspaceOwner = primaryAdminUsername) {
+  const merged = new Map();
+
+  sourceRestaurants.map(normalizeRestaurant).forEach((restaurant) => {
+    if (restaurant.id && restaurant.name) merged.set(restaurant.id, restaurant);
+  });
+
+  menus.forEach((menu) => {
+    const menuRestaurantName = String(menu.restaurantName || "").trim();
+    const menuRestaurantId = String(menu.restaurantId || "").trim();
+    if (!menuRestaurantName && !menuRestaurantId) return;
+
+    const id = menuRestaurantId || getRestaurantIdFromName(menuRestaurantName, menu.id);
+    if (merged.has(id)) {
+      const current = merged.get(id);
+      merged.set(id, {
+        ...current,
+        name: current.name || menuRestaurantName,
+        owner: current.owner || getMenuOwner(menu),
+        updatedAt: getLatestTimestampString(current.updatedAt, menu.updatedAt)
+      });
+      return;
+    }
+
+    merged.set(
+      id,
+      normalizeRestaurant({
+        id,
+        name: menuRestaurantName || menu.name || "Restaurant",
+        owner: getMenuOwner(menu) || workspaceOwner,
+        createdAt: menu.updatedAt || "",
+        updatedAt: menu.updatedAt || ""
+      })
+    );
+  });
+
+  return [...merged.values()];
+}
+
+function reconcileMenuRestaurantLinks(menus = restaurantMenus, sourceRestaurants = restaurants) {
+  const byId = new Map((sourceRestaurants || []).map((restaurant) => [restaurant.id, restaurant]));
+  const byName = new Map(
+    (sourceRestaurants || []).map((restaurant) => [restaurant.name.toLowerCase(), restaurant])
+  );
+
+  return menus.map((menu) => {
+    const restaurantName = String(menu.restaurantName || "").trim();
+    const restaurantId = String(menu.restaurantId || "").trim();
+    const linkedRestaurant =
+      (restaurantId && byId.get(restaurantId)) ||
+      (restaurantName && byName.get(restaurantName.toLowerCase())) ||
+      null;
+    const nextRestaurantId = linkedRestaurant?.id || restaurantId || (restaurantName ? getRestaurantIdFromName(restaurantName, menu.id) : "");
+    const nextRestaurantName = linkedRestaurant?.name || restaurantName || "";
+
+    return {
+      ...menu,
+      restaurantId: nextRestaurantId,
+      restaurantName: nextRestaurantName
+    };
+  });
+}
+
+function getRestaurantById(restaurantId) {
+  return restaurants.find((restaurant) => restaurant.id === restaurantId) || null;
+}
+
+function getRestaurantForMenu(menu) {
+  if (!menu) return null;
+  return getRestaurantById(menu.restaurantId) ||
+    restaurants.find((restaurant) => restaurant.name.toLowerCase() === String(menu.restaurantName || "").toLowerCase()) ||
+    null;
+}
+
+function getVisibleRestaurants() {
+  const visibleMenus = getVisibleRestaurantMenus();
+  const user = getActiveUser();
+  if (!user) return [];
+
+  const visibleRestaurantIds = new Set(visibleMenus.map((menu) => menu.restaurantId).filter(Boolean));
+  return restaurants.filter((restaurant) => {
+    if (isAdmin()) return true;
+    if (restaurant.owner === user.username) return true;
+    return visibleRestaurantIds.has(restaurant.id);
+  });
+}
+
+function getMenusForRestaurant(restaurantId, menus = getVisibleRestaurantMenus()) {
+  return menus.filter((menu) => menu.restaurantId === restaurantId);
+}
+
+function getUnlinkedMenus(menus = getVisibleRestaurantMenus()) {
+  return menus.filter((menu) => !menu.restaurantId);
+}
+
+function canManageRestaurant(restaurant) {
+  const user = getActiveUser();
+  return Boolean(user && restaurant && (isAdmin() || restaurant.owner === user.username));
+}
+
+function canCreateRestaurantWorkspace() {
+  const user = getActiveUser();
+  return Boolean(user && (isAdmin() || user.role === "owner"));
+}
+
+function getLinkableRestaurants() {
+  const user = getActiveUser();
+  if (!user) return [];
+  if (isAdmin()) return restaurants;
+  return restaurants.filter((restaurant) => restaurant.owner === user.username);
+}
+
+function getRestaurantMenuTotal(restaurantId, menus = restaurantMenus) {
+  return menus.filter((menu) => menu.restaurantId === restaurantId).length;
+}
+
+function getRestaurantItemTotal(restaurantId, menus = restaurantMenus) {
+  return menus
+    .filter((menu) => menu.restaurantId === restaurantId)
+    .reduce((sum, menu) => sum + (Array.isArray(menu.items) ? menu.items.length : 0), 0);
+}
+
 function createDefaultRestaurantMenu() {
   return {
     id: defaultRestaurantMenuId,
     name: "Mott 32 Las Vegas",
+    restaurantId: defaultRestaurantId,
     restaurantName: "Mott 32 Las Vegas",
     owner: primaryAdminUsername,
     label: "Chinese menu training",
@@ -2662,6 +2856,8 @@ function normalizeRestaurantMenu(menu, index = 0) {
   const menuIsMott32 = isMott32Menu({ id, name });
   const design = menu.designSettings || (isDefaultMenu ? loadDesignSettings() : { ...defaultDesign, heroImage: "" });
   const items = Array.isArray(menu.items) ? menu.items : isDefaultMenu ? loadMenuItems() : [];
+  const restaurantName = menu.restaurantName || menu.restaurant || (isDefaultMenu ? "Mott 32 Las Vegas" : "");
+  const restaurantId = menu.restaurantId || (restaurantName ? getRestaurantIdFromName(restaurantName, id) : "");
   const normalizedItems = menuIsMott32
     ? clearDefaultStockImagesForMenuItems(applyMott32HistoryFactsToItems(items))
     : items.map(normalizeMenuItem);
@@ -2674,7 +2870,8 @@ function normalizeRestaurantMenu(menu, index = 0) {
   return {
     id,
     name,
-    restaurantName: menu.restaurantName || menu.restaurant || (isDefaultMenu ? "Mott 32 Las Vegas" : ""),
+    restaurantId,
+    restaurantName,
     owner: menu.owner || primaryAdminUsername,
     label: menu.label || (isDefaultMenu ? "Chinese menu training" : "Blank menu"),
     shareCode: typeof menu.shareCode === "string" ? menu.shareCode : "",
@@ -3587,7 +3784,10 @@ function persistActiveRestaurantMenuData() {
 }
 
 function saveRestaurantMenus({ sync = true } = {}) {
+  restaurantMenus = reconcileMenuRestaurantLinks(restaurantMenus, restaurants);
+  restaurants = reconcileRestaurants(restaurants, restaurantMenus, getWorkspaceOwner());
   localStorage.setItem(getRestaurantMenusStorageKey(), JSON.stringify(restaurantMenus.map(sanitizeRestaurantMenuForStorage)));
+  localStorage.setItem(getRestaurantsStorageKey(), JSON.stringify(restaurants.map(sanitizeRestaurantForStorage)));
   if (sync) {
     scheduleCloudSave();
     scheduleSharedMenuSnapshotsSave();
@@ -4146,6 +4346,7 @@ async function migrateInlineItemPhotosToCloud() {
   if (changed) {
     syncActiveRestaurantMenuData();
     localStorage.setItem(getRestaurantMenusStorageKey(), JSON.stringify(restaurantMenus.map(sanitizeRestaurantMenuForStorage)));
+    localStorage.setItem(getRestaurantsStorageKey(), JSON.stringify(restaurants.map(sanitizeRestaurantForStorage)));
   }
 
   return migratedCount;
@@ -4336,6 +4537,11 @@ function getWorkspaceDocumentIdForOwner(owner = primaryAdminUsername) {
 function getRestaurantMenusStorageKey(user = getActiveUser()) {
   const docId = getWorkspaceDocumentId(user);
   return docId === firebaseMenuDocumentId ? menusStorageKey : `${menusStorageKey}-${docId}`;
+}
+
+function getRestaurantsStorageKey(user = getActiveUser()) {
+  const docId = getWorkspaceDocumentId(user);
+  return docId === firebaseMenuDocumentId ? restaurantsStorageKey : `${restaurantsStorageKey}-${docId}`;
 }
 
 function getRemoteRequestsStorageKey(user = getActiveUser()) {
@@ -4743,6 +4949,7 @@ function getSharedMenuContentSignature({ code = "", menu = {}, categories: share
     menu: {
       id: sanitizedMenu.id,
       name: sanitizedMenu.name,
+      restaurantId: sanitizedMenu.restaurantId,
       restaurantName: sanitizedMenu.restaurantName,
       label: sanitizedMenu.label,
       shareCode: sanitizedMenu.shareCode,
@@ -5168,6 +5375,7 @@ async function syncSharedMenuSnapshots() {
 
   if (changed) {
     localStorage.setItem(getRestaurantMenusStorageKey(), JSON.stringify(restaurantMenus.map(sanitizeRestaurantMenuForStorage)));
+    localStorage.setItem(getRestaurantsStorageKey(), JSON.stringify(restaurants.map(sanitizeRestaurantForStorage)));
   }
 }
 
@@ -5595,8 +5803,8 @@ function connectCloudWorkspaceForCurrentUser() {
   setSyncStatus("Connecting to Firebase...");
   cloudSync.unsubscribe = cloudSync.ref.onSnapshot(
     (snapshot) => {
-      if (!snapshot.exists) {
-        if (restaurantMenus.length) {
+    if (!snapshot.exists) {
+        if (restaurantMenus.length || restaurants.length) {
           setSyncStatus("Creating Firebase menu copy...");
           uploadCloudSnapshot("initial");
         } else {
@@ -5735,9 +5943,14 @@ function applyCloudSnapshot(data) {
     if (Array.isArray(data.categories)) {
       mergeCategories(data.categories, { sync: false });
     }
+    const cloudRestaurants = Array.isArray(data.restaurants)
+      ? data.restaurants.map((restaurant, index) => normalizeRestaurant({ ...restaurant, owner: restaurant.owner || workspaceOwner }, index))
+      : null;
     if (Array.isArray(data.menus) && data.menus.length) {
       const mergedSnapshot = mergeCloudMenusWithLocal(data.menus, workspaceOwner);
       restaurantMenus = mergedSnapshot.menus;
+      restaurants = reconcileRestaurants(cloudRestaurants || restaurants, restaurantMenus, workspaceOwner);
+      restaurantMenus = reconcileMenuRestaurantLinks(restaurantMenus, restaurants);
       shouldResaveLocalPreserves = mergedSnapshot.hasLocalPreserves;
       const visibleMenus = getVisibleRestaurantMenus();
       if (!visibleMenus.some((menu) => menu.id === state.activeRestaurantMenu)) {
@@ -5747,6 +5960,7 @@ function applyCloudSnapshot(data) {
       syncActiveRestaurantMenuData();
     } else if (isOwnerWorkspace()) {
       restaurantMenus = [];
+      restaurants = reconcileRestaurants(cloudRestaurants || [], restaurantMenus, workspaceOwner);
       state.activeRestaurantMenu = "";
       saveRestaurantMenus({ sync: false });
       syncActiveRestaurantMenuData();
@@ -5758,6 +5972,8 @@ function applyCloudSnapshot(data) {
         designSettings: data.designSettings && typeof data.designSettings === "object" ? data.designSettings : defaultDesign
       });
       restaurantMenus = [legacyMenu];
+      restaurants = reconcileRestaurants(cloudRestaurants || [], restaurantMenus, workspaceOwner);
+      restaurantMenus = reconcileMenuRestaurantLinks(restaurantMenus, restaurants);
       const visibleMenus = getVisibleRestaurantMenus();
       state.activeRestaurantMenu = visibleMenus[0]?.id || "";
       saveRestaurantMenus({ sync: false });
@@ -5816,6 +6032,7 @@ async function uploadCloudSnapshot(reason) {
     await cloudSync.ref.set(
       {
         categories,
+        restaurants: restaurants.map(sanitizeRestaurantForStorage),
         menus: restaurantMenus.map((menu) => sanitizeRestaurantMenuForStorage(menu, { allowInlineImages: false })),
         remoteRequests: remoteRequests.map(sanitizeRemoteRequestForStorage),
         source: reason,
@@ -5856,6 +6073,7 @@ function sanitizeRestaurantMenuForStorage(menu, options = {}) {
   return {
     id: menu.id || `menu-${Date.now()}`,
     name: menu.name || "Untitled Menu",
+    restaurantId: menu.restaurantId || "",
     restaurantName: menu.restaurantName || "",
     owner: menu.owner || primaryAdminUsername,
     label: menu.label || "Menu training",
@@ -5965,70 +6183,147 @@ function renderRestaurantList() {
   restaurantList.replaceChildren();
 
   const visibleMenus = getSortedRestaurantMenus(getVisibleRestaurantMenus());
+  const visibleRestaurants = getVisibleRestaurants();
+  const unlinkedMenus = getUnlinkedMenus(visibleMenus);
+  const canCreateWorkspace = canCreateRestaurantWorkspace();
 
-  if (!visibleMenus.length) {
+  createRestaurantButton.hidden = !canCreateWorkspace;
+  createMenuButton.hidden = !canCreateWorkspace;
+  createMenuButton.disabled = canCreateWorkspace && !getLinkableRestaurants().length;
+  createMenuButton.title = createMenuButton.disabled ? "Create a restaurant first." : "";
+
+  if (!visibleRestaurants.length && !unlinkedMenus.length) {
     const empty = document.createElement("p");
     empty.className = "empty-state restaurant-empty";
-    empty.textContent = "No menus yet. Create a blank menu to start a restaurant.";
+    empty.textContent = "No restaurants yet. Create a restaurant first, then add its menus.";
     restaurantList.append(empty);
     return;
   }
 
-  visibleMenus.forEach((menu) => {
-    const button = document.createElement("button");
-    button.className = "restaurant-card";
-    button.classList.toggle("is-active", menu.id === state.activeRestaurantMenu);
-    button.type = "button";
-    button.addEventListener("click", () => openRestaurantMenu(menu.id));
-
-    const image = menu.designSettings?.heroImage ? document.createElement("img") : document.createElement("span");
-    if (menu.designSettings?.heroImage) {
-      image.src = menu.designSettings.heroImage;
-      image.alt = `${menu.name} logo`;
-    } else {
-      image.className = "restaurant-card-placeholder";
-      image.setAttribute("aria-hidden", "true");
-    }
-
-    const info = document.createElement("span");
-    info.className = "restaurant-card-copy";
-    const name = document.createElement("strong");
-    const details = document.createElement("span");
-    name.textContent = menu.name;
-    details.textContent = `${menu.restaurantName ? `${menu.restaurantName} - ` : ""}${menu.label} - ${menu.items.length} items`;
-    info.append(name, details);
-
-    if (isAdmin()) {
-      const stats = document.createElement("span");
-      stats.className = "restaurant-card-stats";
-      stats.textContent = `${getMenuStats(menu).clicks} clicks - ${getMenuFullnessPercent(menu)}% full`;
-      info.append(stats);
-    }
-
-    const notificationIndicator = document.createElement("span");
-    const unreadCount = getUnreadNotificationCount(menu);
-    notificationIndicator.className = "restaurant-card-notifications";
-    notificationIndicator.classList.toggle("has-unread", unreadCount > 0);
-    notificationIndicator.textContent = unreadCount ? formatNotificationCount(unreadCount) : "0";
-    notificationIndicator.setAttribute(
-      "aria-label",
-      unreadCount ? `${unreadCount} unread menu notifications` : "No unread menu notifications"
-    );
-
-    button.append(image, info, notificationIndicator);
-    restaurantList.append(button);
+  visibleRestaurants.forEach((restaurant) => {
+    const restaurantMenusForCard = getMenusForRestaurant(restaurant.id, visibleMenus);
+    restaurantList.append(createRestaurantGroupCard(restaurant, restaurantMenusForCard));
   });
+
+  if (unlinkedMenus.length) {
+    const unlinkedGroup = createRestaurantGroupCard(
+      {
+        id: "",
+        name: "Unassigned menus",
+        location: "",
+        cuisine: "",
+        owner: getActiveUser()?.username || primaryAdminUsername
+      },
+      unlinkedMenus
+    );
+    restaurantList.append(unlinkedGroup);
+  }
+}
+
+function createRestaurantGroupCard(restaurant, menus) {
+  const group = document.createElement("article");
+  group.className = "restaurant-group";
+
+  const header = document.createElement("div");
+  header.className = "restaurant-group-head";
+
+  const copy = document.createElement("div");
+  const name = document.createElement("h3");
+  const meta = document.createElement("p");
+  name.textContent = restaurant.name;
+  const infoPieces = [restaurant.cuisine, restaurant.location].filter(Boolean);
+  meta.textContent = infoPieces.length ? infoPieces.join(" - ") : "Restaurant workspace";
+  copy.append(name, meta);
+
+  const badges = document.createElement("div");
+  badges.className = "restaurant-group-badges";
+  const menuBadge = document.createElement("span");
+  menuBadge.className = "dashboard-badge";
+  menuBadge.textContent = `${menus.length} menu${menus.length === 1 ? "" : "s"}`;
+  badges.append(menuBadge);
+
+  if (canManageRestaurant(restaurant)) {
+    const addMenu = document.createElement("button");
+    addMenu.className = "small-icon-action restaurant-add-menu-button";
+    addMenu.type = "button";
+    addMenu.textContent = "+";
+    addMenu.setAttribute("aria-label", `Add menu to ${restaurant.name}`);
+    addMenu.addEventListener("click", () => openMenuBranchDialog(restaurant.id));
+    badges.append(addMenu);
+  }
+
+  header.append(copy, badges);
+  group.append(header);
+
+  const menuList = document.createElement("div");
+  menuList.className = "restaurant-branch-list";
+
+  if (!menus.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state restaurant-empty";
+    empty.textContent = "No menus yet. Add a food, cocktail, wine, or training menu.";
+    menuList.append(empty);
+  } else {
+    menus.forEach((menu) => menuList.append(createMenuBranchCard(menu)));
+  }
+
+  group.append(menuList);
+  return group;
+}
+
+function createMenuBranchCard(menu) {
+  const button = document.createElement("button");
+  button.className = "restaurant-card menu-branch-card";
+  button.classList.toggle("is-active", menu.id === state.activeRestaurantMenu);
+  button.type = "button";
+  button.addEventListener("click", () => openRestaurantMenu(menu.id));
+
+  const image = menu.designSettings?.heroImage ? document.createElement("img") : document.createElement("span");
+  if (menu.designSettings?.heroImage) {
+    image.src = menu.designSettings.heroImage;
+    image.alt = `${menu.name} logo`;
+  } else {
+    image.className = "restaurant-card-placeholder";
+    image.setAttribute("aria-hidden", "true");
+  }
+
+  const info = document.createElement("span");
+  info.className = "restaurant-card-copy";
+  const name = document.createElement("strong");
+  const details = document.createElement("span");
+  name.textContent = menu.name;
+  details.textContent = `${menu.label} - ${menu.items.length} items`;
+  info.append(name, details);
+
+  const stats = document.createElement("span");
+  stats.className = "restaurant-card-stats";
+  stats.textContent = `${getMenuStats(menu).clicks} clicks - ${getMenuFullnessPercent(menu)}% full`;
+  info.append(stats);
+
+  const notificationIndicator = document.createElement("span");
+  const unreadCount = getUnreadNotificationCount(menu);
+  notificationIndicator.className = "restaurant-card-notifications";
+  notificationIndicator.classList.toggle("has-unread", unreadCount > 0);
+  notificationIndicator.textContent = unreadCount ? formatNotificationCount(unreadCount) : "0";
+  notificationIndicator.setAttribute(
+    "aria-label",
+    unreadCount ? `${unreadCount} unread menu notifications` : "No unread menu notifications"
+  );
+
+  button.append(image, info, notificationIndicator);
+  return button;
 }
 
 function renderAdminHomeSummary() {
   const activeUser = getActiveUser();
   const visibleMenus = getVisibleRestaurantMenus();
+  const visibleRestaurants = getVisibleRestaurants();
   const isAdminUser = isAdmin();
   const showHomeAnalytics = Boolean(activeUser);
   menusPage.classList.toggle("is-admin-home", showHomeAnalytics);
   adminHomeSummary.hidden = !showHomeAnalytics;
-  menusDirectoryKicker.textContent = isAdminUser ? "Sorted by activity" : "Created menus";
-  menusDirectoryTitle.textContent = isAdminUser ? "Menus by clicks and fullness" : "Your menus";
+  menusDirectoryKicker.textContent = isAdminUser ? "Restaurant workspaces" : "Your workspaces";
+  menusDirectoryTitle.textContent = "Restaurants and menus";
 
   if (!showHomeAnalytics) {
     adminHomeMetrics.replaceChildren();
@@ -6037,7 +6332,7 @@ function renderAdminHomeSummary() {
   }
 
   homeSummaryKicker.textContent = isAdminUser ? "Admin dashboard" : "Menu analytics";
-  homeSummaryTitle.textContent = isAdminUser ? "Quick summary" : "Your summary";
+  homeSummaryTitle.textContent = isAdminUser ? "Workspace summary" : "Your workspace";
   adminHomeDashboardButton.hidden = false;
   adminHomeDashboardButton.textContent = isAdminUser ? "Open dashboard" : "Dashboard";
 
@@ -6058,25 +6353,23 @@ function renderAdminHomeSummary() {
   });
   const totalItems = menus.reduce((sum, menu) => sum + menu.items.length, 0);
   const totalClicks = menus.reduce((sum, menu) => sum + getMenuStats(menu).clicks, 0);
+  const averageFullness = menus.length
+    ? Math.round(menus.reduce((sum, menu) => sum + getMenuFullnessPercent(menu), 0) / menus.length)
+    : 0;
 
   if (isAdminUser) {
     const activeAccounts = getVisibleUsers().filter((user) => user.status !== "pending").length;
     adminHomeMetrics.replaceChildren(
-      createDashboardMetric("Menus", String(menus.length), "Created restaurants"),
-      createDashboardMetric("Items", String(totalItems), "Across every menu"),
-      createDashboardMetric("Clicks", String(totalClicks), "Menu opens tracked"),
+      createDashboardMetric("Restaurants", String(visibleRestaurants.length), `${menus.length} menus`),
+      createDashboardMetric("Activity", String(totalClicks), "Menu opens"),
+      createDashboardMetric("Content", String(totalItems), `${averageFullness}% avg full`),
       createDashboardMetric("Users", String(activeAccounts), "Active accounts")
     );
   } else {
-    const linkedMenus = menus.filter((menu) => menu.restaurantName).length;
-    const averageFullness = menus.length
-      ? Math.round(menus.reduce((sum, menu) => sum + getMenuFullnessPercent(menu), 0) / menus.length)
-      : 0;
     adminHomeMetrics.replaceChildren(
-      createDashboardMetric("Menus", String(menus.length), "Created by you"),
-      createDashboardMetric("Items", String(totalItems), "Across your menus"),
-      createDashboardMetric("Linked", String(linkedMenus), "Menus tied to restaurants"),
-      createDashboardMetric("Fullness", `${averageFullness}%`, menus.length ? "Average completion" : "Create a menu to start")
+      createDashboardMetric("Restaurants", String(visibleRestaurants.length), "Created by you"),
+      createDashboardMetric("Menus", String(menus.length), "Across restaurants"),
+      createDashboardMetric("Content", String(totalItems), menus.length ? `${averageFullness}% avg full` : "Create a restaurant first")
     );
   }
 
@@ -6379,17 +6672,140 @@ function handleDeleteSliderKeydown(event) {
   }
 }
 
-function createBlankRestaurantMenu() {
+function openRestaurantDialog() {
   const activeUser = getActiveUser();
-  if (!activeUser) return;
+  if (!activeUser || !canCreateRestaurantWorkspace()) return;
 
+  restaurantForm.reset();
+  restaurantDialogMessage.textContent = "";
+  restaurantInitialMenuName.value = "Food menu";
+  restaurantInitialMenuType.value = "Food menu";
+  restaurantDialog.showModal();
+  restaurantNameInput.focus();
+}
+
+function closeRestaurantDialog() {
+  restaurantDialog.close();
+}
+
+function createRestaurantWithInitialMenu(event) {
+  event.preventDefault();
+
+  const activeUser = getActiveUser();
+  const name = restaurantNameInput.value.trim();
+  if (!activeUser || !name) {
+    restaurantDialogMessage.textContent = "Enter a restaurant name.";
+    return;
+  }
+
+  const timestamp = new Date().toISOString();
+  const baseRestaurantId = getRestaurantIdFromName(name, `${Date.now()}`);
+  const restaurantId = restaurants.some((restaurant) => restaurant.id === baseRestaurantId)
+    ? `${baseRestaurantId}-${Date.now()}`
+    : baseRestaurantId;
+  const restaurant = normalizeRestaurant({
+    id: restaurantId,
+    name,
+    owner: activeUser.username,
+    location: restaurantLocationInput.value.trim(),
+    cuisine: restaurantCuisineInput.value.trim(),
+    notes: restaurantNotesInput.value.trim(),
+    createdAt: timestamp,
+    updatedAt: timestamp
+  });
+  const menuName = restaurantInitialMenuName.value.trim() || restaurantInitialMenuType.value || "Food menu";
+  const menu = buildBlankRestaurantMenu({
+    activeUser,
+    restaurant,
+    menuName,
+    label: restaurantInitialMenuType.value || "Food menu"
+  });
+
+  restaurants = [restaurant, ...restaurants.filter((candidate) => candidate.id !== restaurant.id)];
+  restaurantMenus = [menu, ...restaurantMenus];
+  state.activeRestaurantMenu = menu.id;
+  resetMenuFilters();
+  menuItems = [];
+  designSettings = menu.designSettings;
+  saveRestaurantMenus();
+  applyDesignSettings();
+  renderRestaurantList();
+  closeRestaurantDialog();
+  showScreen("menu");
+}
+
+function openMenuBranchDialog(restaurantId = "") {
+  const activeUser = getActiveUser();
+  if (!activeUser || !canCreateRestaurantWorkspace()) return;
+
+  const linkableRestaurants = getLinkableRestaurants();
+  if (!linkableRestaurants.length) {
+    openRestaurantDialog();
+    return;
+  }
+
+  menuBranchForm.reset();
+  menuBranchDialogMessage.textContent = "";
+  menuBranchRestaurantSelect.replaceChildren();
+  linkableRestaurants.forEach((restaurant) => {
+    const option = document.createElement("option");
+    option.value = restaurant.id;
+    option.textContent = restaurant.name;
+    menuBranchRestaurantSelect.append(option);
+  });
+  menuBranchRestaurantSelect.value = linkableRestaurants.some((restaurant) => restaurant.id === restaurantId)
+    ? restaurantId
+    : linkableRestaurants[0].id;
+  menuBranchTypeSelect.value = "Food menu";
+  menuBranchNameInput.value = "Food menu";
+  menuBranchDialog.showModal();
+  menuBranchNameInput.focus();
+  menuBranchNameInput.select();
+}
+
+function closeMenuBranchDialog() {
+  menuBranchDialog.close();
+}
+
+function createMenuBranch(event) {
+  event.preventDefault();
+
+  const activeUser = getActiveUser();
+  const restaurant = getLinkableRestaurants().find((candidate) => candidate.id === menuBranchRestaurantSelect.value);
+  const menuName = menuBranchNameInput.value.trim();
+  if (!activeUser || !restaurant || !menuName) {
+    menuBranchDialogMessage.textContent = "Choose a restaurant and menu name.";
+    return;
+  }
+
+  const menu = buildBlankRestaurantMenu({
+    activeUser,
+    restaurant,
+    menuName,
+    label: menuBranchTypeSelect.value || "Food menu"
+  });
+
+  restaurantMenus = [menu, ...restaurantMenus];
+  state.activeRestaurantMenu = menu.id;
+  resetMenuFilters();
+  menuItems = [];
+  designSettings = menu.designSettings;
+  saveRestaurantMenus();
+  applyDesignSettings();
+  renderRestaurantList();
+  closeMenuBranchDialog();
+  showScreen("menu");
+}
+
+function buildBlankRestaurantMenu({ activeUser, restaurant, menuName, label = "Food menu" }) {
   const blankCount = restaurantMenus.filter((menu) => menu.id.startsWith("blank-menu-")).length + 1;
   const blankMenu = normalizeRestaurantMenu({
     id: `blank-menu-${Date.now()}`,
-    name: `Blank Menu ${blankCount}`,
-    restaurantName: "",
+    name: menuName || `Blank Menu ${blankCount}`,
+    restaurantId: restaurant?.id || "",
+    restaurantName: restaurant?.name || "",
     owner: activeUser.username,
-    label: "Blank menu",
+    label,
     categories: [...categories],
     items: [],
     stats: normalizeMenuStats(),
@@ -6400,18 +6816,30 @@ function createBlankRestaurantMenu() {
   }, restaurantMenus.length);
   addMenuNotification(blankMenu, {
     title: "Menu created",
-    detail: `${blankMenu.name} was created as a blank menu.`,
+    detail: `${blankMenu.name} was created for ${blankMenu.restaurantName || "a restaurant"}.`,
     type: "menu-create"
   });
 
-  restaurantMenus = [blankMenu, ...restaurantMenus];
-  state.activeRestaurantMenu = blankMenu.id;
-  menuItems = [];
-  designSettings = blankMenu.designSettings;
-  saveRestaurantMenus();
-  applyDesignSettings();
-  renderRestaurantList();
-  showScreen("menu");
+  return blankMenu;
+}
+
+function createBlankRestaurantMenu() {
+  if (getLinkableRestaurants().length) {
+    openMenuBranchDialog();
+    return;
+  }
+
+  openRestaurantDialog();
+}
+
+function resetMenuFilters() {
+  state.category = "all";
+  state.query = "";
+  state.openItems.clear();
+  state.allergies.clear();
+  state.ingredients.clear();
+  searchInput.value = "";
+  setActiveCategoryTab();
 }
 
 function getVisibleItems() {
@@ -7241,7 +7669,8 @@ function renderAccountDashboard() {
 
   const visibleMenus = getVisibleRestaurantMenus();
   const linkableMenus = getLinkableRestaurantMenus();
-  const linkedMenus = visibleMenus.filter((menu) => menu.restaurantName);
+  const linkableRestaurants = getLinkableRestaurants();
+  const visibleRestaurants = getVisibleRestaurants();
   deleteAccountButton.disabled = !canDeleteOwnAccount(activeUser);
   if (!canDeleteOwnAccount(activeUser) && !accountDeleteStatus.textContent) {
     accountDeleteStatus.textContent = "The primary admin account cannot be deleted here.";
@@ -7260,8 +7689,8 @@ function renderAccountDashboard() {
   accountProfileSummary.replaceChildren(
     createDashboardMetric("Signed in as", activeUser.username, getPrivilegeLabel(activeUser)),
     createDashboardMetric("Email", activeUser.email || "Not set", emailStatus),
-    createDashboardMetric("Menus", String(visibleMenus.length), "Visible in your workspace"),
-    createDashboardMetric("Linked restaurants", String(linkedMenus.length), "Menus assigned to a restaurant")
+    createDashboardMetric("Restaurants", String(visibleRestaurants.length), "Created in your workspace"),
+    createDashboardMetric("Menus", String(visibleMenus.length), "Attached to restaurants")
   );
 
   if (document.activeElement !== accountEmailInput) {
@@ -7269,15 +7698,21 @@ function renderAccountDashboard() {
   }
 
   const previousMenuId = accountMenuSelect.value;
+  const previousRestaurantId = accountRestaurantSelect.value;
   accountMenuSelect.replaceChildren();
+  accountRestaurantSelect.replaceChildren();
 
-  if (!linkableMenus.length) {
+  if (!linkableMenus.length || !linkableRestaurants.length) {
     const option = document.createElement("option");
     option.value = "";
-    option.textContent = "Create a menu first";
+    option.textContent = linkableMenus.length ? "Create a restaurant first" : "Create a menu first";
     accountMenuSelect.append(option);
+    const restaurantOption = document.createElement("option");
+    restaurantOption.value = "";
+    restaurantOption.textContent = "Create a restaurant first";
+    accountRestaurantSelect.append(restaurantOption);
     accountMenuSelect.disabled = true;
-    accountRestaurantName.disabled = true;
+    accountRestaurantSelect.disabled = true;
   } else {
     linkableMenus.forEach((menu) => {
       const option = document.createElement("option");
@@ -7285,12 +7720,21 @@ function renderAccountDashboard() {
       option.textContent = menu.name;
       accountMenuSelect.append(option);
     });
+    linkableRestaurants.forEach((restaurant) => {
+      const option = document.createElement("option");
+      option.value = restaurant.id;
+      option.textContent = restaurant.name;
+      accountRestaurantSelect.append(option);
+    });
     accountMenuSelect.disabled = false;
-    accountRestaurantName.disabled = false;
+    accountRestaurantSelect.disabled = false;
     accountMenuSelect.value = linkableMenus.some((menu) => menu.id === previousMenuId) ? previousMenuId : linkableMenus[0].id;
+    accountRestaurantSelect.value = linkableRestaurants.some((restaurant) => restaurant.id === previousRestaurantId)
+      ? previousRestaurantId
+      : linkableRestaurants[0].id;
   }
 
-  syncSelectedRestaurantName();
+  syncSelectedRestaurantChoice();
   renderAccountRestaurantLinks();
 }
 
@@ -7307,7 +7751,7 @@ function renderAccountRestaurantLinks() {
     accountRestaurantLinks.append(
       createDashboardListRow({
         title: menu.name,
-        meta: menu.restaurantName ? `Linked restaurant: ${menu.restaurantName}` : "Not linked to a restaurant yet",
+        meta: menu.restaurantName ? `${menu.restaurantName} - ${menu.label}` : "Not linked to a restaurant yet",
         badge: `${menu.items.length} items`,
         onClick: () => openRestaurantMenu(menu.id)
       })
@@ -7315,15 +7759,11 @@ function renderAccountRestaurantLinks() {
   });
 }
 
-function syncSelectedRestaurantName() {
+function syncSelectedRestaurantChoice() {
   const menu = getLinkableRestaurantMenus().find((candidate) => candidate.id === accountMenuSelect.value);
-  if (!menu) {
-    accountRestaurantName.value = "";
-    return;
-  }
-
-  if (document.activeElement !== accountRestaurantName) {
-    accountRestaurantName.value = menu.restaurantName || "";
+  const linkedRestaurantId = menu?.restaurantId || "";
+  if (linkedRestaurantId && [...accountRestaurantSelect.options].some((option) => option.value === linkedRestaurantId)) {
+    accountRestaurantSelect.value = linkedRestaurantId;
   }
 }
 
@@ -7504,25 +7944,27 @@ function linkMenuToRestaurant(event) {
   event.preventDefault();
 
   const menuId = accountMenuSelect.value;
-  const restaurantName = accountRestaurantName.value.trim();
+  const restaurantId = accountRestaurantSelect.value;
   const menu = getLinkableRestaurantMenus().find((candidate) => candidate.id === menuId);
-  if (!menu || !restaurantName) {
-    accountRestaurantMessage.textContent = "Choose a menu and enter a restaurant name.";
+  const restaurant = getLinkableRestaurants().find((candidate) => candidate.id === restaurantId);
+  if (!menu || !restaurant) {
+    accountRestaurantMessage.textContent = "Choose a menu and restaurant.";
     return;
   }
 
-  menu.restaurantName = restaurantName;
+  menu.restaurantId = restaurant.id;
+  menu.restaurantName = restaurant.name;
   if (menu.label === "Blank menu") {
     menu.label = "Menu training";
   }
 
   addMenuNotification(menu, {
     title: "Restaurant linked",
-    detail: `${menu.name} was linked to ${restaurantName}.`,
+    detail: `${menu.name} was attached to ${restaurant.name}.`,
     type: "restaurant-link"
   });
   saveRestaurantMenus();
-  accountRestaurantMessage.textContent = `${menu.name} is linked to ${restaurantName}.`;
+  accountRestaurantMessage.textContent = `${menu.name} is attached to ${restaurant.name}.`;
   renderAccountDashboard();
   renderRestaurantList();
 }
@@ -7590,8 +8032,10 @@ function showDeleteAccountSlider() {
 
 async function deleteOwnerWorkspaceData(user) {
   const workspaceStorageKey = getRestaurantMenusStorageKey(user);
+  const restaurantStorageKey = getRestaurantsStorageKey(user);
   const workspaceDocId = getWorkspaceDocumentId(user);
   localStorage.removeItem(workspaceStorageKey);
+  localStorage.removeItem(restaurantStorageKey);
 
   if (isOwnerWorkspace(user) && workspaceDocId !== firebaseMenuDocumentId && cloudSync.client?.db) {
     await cloudSync.client.db.collection("menus").doc(workspaceDocId).delete();
@@ -7625,6 +8069,9 @@ function finishSelfAccountDeletion() {
   state.editing = false;
   localStorage.removeItem(currentUserKey);
   restaurantMenus = loadRestaurantMenus(null);
+  restaurants = loadRestaurants(null, restaurantMenus);
+  restaurantMenus = reconcileMenuRestaurantLinks(restaurantMenus, restaurants);
+  restaurants = reconcileRestaurants(restaurants, restaurantMenus, primaryAdminUsername);
   state.activeRestaurantMenu = restaurantMenus[0]?.id || defaultRestaurantMenuId;
   syncActiveRestaurantMenuData();
   applyDesignSettings();
@@ -7854,18 +8301,29 @@ function createCustomizationSwatch(label, color) {
 function renderDashboardRestaurants() {
   dashboardRestaurantList.replaceChildren();
 
-  if (!restaurantMenus.length) {
+  if (!restaurants.length) {
     dashboardRestaurantList.append(createDashboardEmpty("No restaurants have been created yet."));
     return;
   }
 
-  restaurantMenus.forEach((menu) => {
+  restaurants.forEach((restaurant) => {
+    const restaurantMenuCount = getRestaurantMenuTotal(restaurant.id);
+    const restaurantItemCount = getRestaurantItemTotal(restaurant.id);
+    const metaPieces = [
+      restaurant.cuisine,
+      restaurant.location,
+      `${restaurantMenuCount} menu${restaurantMenuCount === 1 ? "" : "s"}`,
+      `${restaurantItemCount} item${restaurantItemCount === 1 ? "" : "s"}`
+    ].filter(Boolean);
     dashboardRestaurantList.append(
       createDashboardListRow({
-        title: menu.name,
-        meta: `${menu.restaurantName ? `${menu.restaurantName} - ` : ""}${menu.label} - ${menu.items.length} items`,
-        badge: `Owner: ${getMenuOwner(menu)}`,
-        onClick: () => openRestaurantMenu(menu.id)
+        title: restaurant.name,
+        meta: metaPieces.join(" - "),
+        badge: `Owner: ${restaurant.owner}`,
+        onClick: () => {
+          const firstMenu = restaurantMenus.find((menu) => menu.restaurantId === restaurant.id);
+          if (firstMenu) openRestaurantMenu(firstMenu.id);
+        }
       })
     );
   });
@@ -7913,7 +8371,7 @@ function renderDashboardRequests() {
   remoteRequestMenu.replaceChildren();
   remoteRequestMenu.append(new Option("General app request", ""));
   restaurantMenus.forEach((menu) => {
-    remoteRequestMenu.append(new Option(menu.name, menu.id));
+    remoteRequestMenu.append(new Option(menu.restaurantName ? `${menu.restaurantName} / ${menu.name}` : menu.name, menu.id));
   });
   remoteRequestMenu.value = [...remoteRequestMenu.options].some((option) => option.value === selectedMenuId)
     ? selectedMenuId
@@ -8236,9 +8694,11 @@ function renderDashboardStats() {
   const allItemRows = statsByMenu.flatMap((entry) => entry.itemRows.map((item) => ({ ...item, menuName: entry.menu.name })));
   const topItem = allItemRows.sort((a, b) => b.clicks - a.clicks)[0];
   const quizStats = getQuizStats(results);
+  const restaurantCount = new Set(statMenus.map((menu) => menu.restaurantId).filter(Boolean)).size;
 
   dashboardStatsSummary.replaceChildren(
-    createDashboardMetric("Menus", String(statMenus.length), isAdmin() ? "Tracked restaurant menus" : "Menus visible to you"),
+    createDashboardMetric("Restaurants", String(restaurantCount), isAdmin() ? "Tracked client workspaces" : "Your restaurant workspaces"),
+    createDashboardMetric("Menus", String(statMenus.length), "Food, cocktail, wine, and training branches"),
     createDashboardMetric("Menu opens", String(totalMenuClicks), "Every menu launch from now forward"),
     createDashboardMetric("Item opens", String(totalItemClicks), "Dish expansions tracked from now forward"),
     createDashboardMetric("Quiz attempts", String(results.length), results.length ? `${quizStats.average}% average score` : "No completed quizzes yet"),
@@ -10140,6 +10600,9 @@ function exitSharedMenu() {
   state.ingredients.clear();
   searchInput.value = "";
   restaurantMenus = loadRestaurantMenus(getActiveUser());
+  restaurants = loadRestaurants(getActiveUser(), restaurantMenus);
+  restaurantMenus = reconcileMenuRestaurantLinks(restaurantMenus, restaurants);
+  restaurants = reconcileRestaurants(restaurants, restaurantMenus, getWorkspaceOwner());
   state.activeRestaurantMenu = getVisibleRestaurantMenus()[0]?.id || "";
   syncActiveRestaurantMenuData();
   applyDesignSettings();
@@ -10149,6 +10612,9 @@ function exitSharedMenu() {
 
 function activateWorkspaceForCurrentUser() {
   restaurantMenus = loadRestaurantMenus(getActiveUser());
+  restaurants = loadRestaurants(getActiveUser(), restaurantMenus);
+  restaurantMenus = reconcileMenuRestaurantLinks(restaurantMenus, restaurants);
+  restaurants = reconcileRestaurants(restaurants, restaurantMenus, getWorkspaceOwner());
   remoteRequests = loadRemoteRequests(getActiveUser());
   resetMenuViewForCurrentUser();
   connectCloudWorkspaceForCurrentUser();
@@ -10586,7 +11052,8 @@ function createMenuAccessFieldset(user, options = {}) {
     input.value = menu.id;
     input.checked = hasFullMenuAccess || assignedMenuIds.includes(menu.id);
     input.disabled = user.role === "admin";
-    label.append(input, document.createTextNode(` ${menu.name || "Untitled menu"}`));
+    const labelText = menu.restaurantName ? `${menu.restaurantName} / ${menu.name || "Untitled menu"}` : menu.name || "Untitled menu";
+    label.append(input, document.createTextNode(` ${labelText}`));
     fieldset.append(label);
   });
 
@@ -12131,7 +12598,12 @@ accountVerifyEmailButton.addEventListener("click", verifyAccountEmail);
 accountPasswordForm.addEventListener("submit", changeAccountPassword);
 accountPasswordResetButton.addEventListener("click", sendAccountPasswordReset);
 accountRestaurantForm.addEventListener("submit", linkMenuToRestaurant);
-accountMenuSelect.addEventListener("change", syncSelectedRestaurantName);
+accountMenuSelect.addEventListener("change", syncSelectedRestaurantChoice);
+createRestaurantButton.addEventListener("click", openRestaurantDialog);
+restaurantForm.addEventListener("submit", createRestaurantWithInitialMenu);
+closeRestaurantButton.addEventListener("click", closeRestaurantDialog);
+menuBranchForm.addEventListener("submit", createMenuBranch);
+closeMenuBranchButton.addEventListener("click", closeMenuBranchDialog);
 deleteAccountButton.addEventListener("click", openDeleteAccountDialog);
 closeDeleteAccountButton.addEventListener("click", closeDeleteAccountDialog);
 cancelDeleteAccountButton.addEventListener("click", closeDeleteAccountDialog);
