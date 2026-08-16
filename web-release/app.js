@@ -6488,7 +6488,7 @@ function renderMenu({ preserveScroll = false, anchorItemId = "", scrollSnapshot 
     });
 
     const ingredientList = row.querySelector(".ingredient-list");
-    const ingredients = getItemIngredientTerms(item).slice(0, 6);
+    const ingredients = getItemIngredientTerms(item);
     const ingredientLabels = ingredients.length ? ingredients : ["No ingredient notes"];
     ingredientLabels.forEach((ingredient) => {
       const tag = document.createElement("span");
@@ -8522,7 +8522,7 @@ function getPrintableItemMarkup(item) {
     : "";
   const price = pdfIncludePrices.checked ? `<span class="price">${formatMenuPrice(item.price)}</span>` : "";
   const allergens = getItemAllergens(item);
-  const ingredients = getItemIngredientTerms(item).slice(0, 12);
+  const ingredients = getItemIngredientTerms(item);
   const allergenMarkup = pdfIncludeAllergens.checked
     ? `
       <section class="detail-block">
