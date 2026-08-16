@@ -1957,6 +1957,7 @@ const state = {
   sharedMenu: null,
   sharedCode: "",
   sharedMenuUpdatedAt: "",
+  sharedMenuSignature: "",
   demoMode: false,
   editing: false,
   localItemEditTimes: {},
@@ -4616,6 +4617,54 @@ function createSharedMenuSnapshotPayload(code, data = {}) {
   };
 }
 
+function getSharedMenuContentSignature({ code = "", menu = {}, categories: sharedCategories = [], owner = "", menuId = "" } = {}) {
+  const normalizedCode = normalizeShareCode(code || menu.shareCode);
+  const menuCategories = Array.isArray(sharedCategories) && sharedCategories.length
+    ? sharedCategories
+    : Array.isArray(menu.categories)
+      ? menu.categories
+      : [];
+  const sanitizedMenu = sanitizeRestaurantMenuForStorage(
+    {
+      ...menu,
+      shareCode: normalizedCode,
+      categories: menuCategories.length ? menuCategories : menu.categories
+    },
+    { allowInlineImages: false }
+  );
+
+  return JSON.stringify({
+    code: normalizedCode,
+    owner: owner || sanitizedMenu.owner || "",
+    menuId: menuId || sanitizedMenu.id || "",
+    categories: getUniqueCategories(menuCategories.length ? menuCategories : sanitizedMenu.categories),
+    menu: {
+      id: sanitizedMenu.id,
+      name: sanitizedMenu.name,
+      restaurantName: sanitizedMenu.restaurantName,
+      label: sanitizedMenu.label,
+      shareCode: sanitizedMenu.shareCode,
+      categories: sanitizedMenu.categories,
+      designSettings: sanitizedMenu.designSettings,
+      items: sanitizedMenu.items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        category: item.category,
+        diet: item.diet,
+        style: item.style,
+        heat: item.heat,
+        allergens: item.allergens,
+        ingredients: item.ingredients,
+        details: item.details,
+        image: item.image,
+        images: item.images,
+        price: item.price
+      }))
+    }
+  });
+}
+
 function getShareWorkspaceDocumentId(data = {}) {
   const sharedMenuData = data.menu && typeof data.menu === "object" ? data.menu : {};
   const explicitDocId = data.workspaceDocId || data.workspaceId || sharedMenuData.workspaceDocId || "";
@@ -4677,6 +4726,7 @@ async function refreshShareDocumentFromLivePayload(payload) {
   const doc = getShareDocument(code);
   if (!doc || !payload?.menu) return;
 
+  const nextUpdatedAt = payload.updatedAt || new Date().toISOString();
   await doc.set(
     {
       code,
@@ -4687,7 +4737,7 @@ async function refreshShareDocumentFromLivePayload(payload) {
       categories: payload.categories,
       quizResults: normalizeQuizResults(payload.menu.quizResults),
       menu: sanitizeRestaurantMenuForStorage({ ...payload.menu, shareCode: code }, { allowInlineImages: false }),
-      updatedAt: new Date().toISOString()
+      updatedAt: nextUpdatedAt
     },
     { merge: true }
   );
@@ -4848,13 +4898,37 @@ function openSharedMenuSnapshot(
     name: menu?.name || "Shared menu",
     shareCode: normalizedCode
   });
+  const nextSignature = getSharedMenuContentSignature({
+    code: normalizedCode,
+    menu: sharedMenu,
+    categories: incomingCategories,
+    owner,
+    menuId
+  });
+  const isSameSharedContent =
+    preserveView &&
+    state.sharedMenu &&
+    state.sharedCode === normalizedCode &&
+    state.sharedMenuSignature === nextSignature;
 
   state.sharedMenu = sharedMenu;
   state.sharedCode = normalizedCode;
   state.sharedMenuUpdatedAt = updatedAt || "";
+  state.sharedMenuSignature = nextSignature;
   state.demoMode = false;
   state.currentUser = null;
   state.editing = false;
+
+  if (isSameSharedContent) {
+    saveSharedCodeLocally(normalizedCode, sharedMenu.name, sharedMenu, {
+      categories: incomingCategories,
+      updatedAt,
+      owner,
+      menuId
+    });
+    if (subscribe) subscribeToSharedMenuUpdates(normalizedCode);
+    return;
+  }
 
   if (preserveView) {
     const availableItemIds = new Set(sharedMenu.items.map((item) => item.id));
@@ -4898,6 +4972,7 @@ function openDemoMenu() {
   state.sharedMenu = demoMenu;
   state.sharedCode = "";
   state.sharedMenuUpdatedAt = "";
+  state.sharedMenuSignature = "";
   state.demoMode = true;
   state.currentUser = null;
   state.screen = "shared";
@@ -9662,6 +9737,7 @@ function exitSharedMenu() {
   state.sharedMenu = null;
   state.sharedCode = "";
   state.sharedMenuUpdatedAt = "";
+  state.sharedMenuSignature = "";
   state.demoMode = false;
   state.screen = getActiveUser() ? "menus" : "login";
   state.category = "all";
