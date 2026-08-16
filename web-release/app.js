@@ -20,6 +20,7 @@ const menuStatsEventLimit = 80;
 const itemStatsEventLimit = 40;
 const menuNotificationsLimit = 120;
 const remoteRequestsLimit = 80;
+const remoteRequestCommentsLimit = 20;
 const legacyMott32HeroImage = "https://www.nicepng.com/png/detail/809-8099031_mott32-las-vegas-mott-32-logo.png";
 const defaultHeroImage = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 260'%3E%3Crect width='640' height='260' fill='%23f7f1e6'/%3E%3Ctext x='320' y='116' text-anchor='middle' font-family='Georgia%2C serif' font-size='84' font-weight='700' fill='%2319211d'%3EMOTT 32%3C/text%3E%3Ctext x='320' y='168' text-anchor='middle' font-family='Arial%2C sans-serif' font-size='22' letter-spacing='8' fill='%2366716b'%3ELAS VEGAS%3C/text%3E%3C/svg%3E";
 const defaultFrontMediaUrl = "assets/login-background.mp4";
@@ -4350,6 +4351,24 @@ function getRemoteRequestTime(request = {}) {
   return 0;
 }
 
+function normalizeRemoteRequestComment(comment = {}) {
+  const createdAt = typeof comment.createdAt === "string" ? comment.createdAt : new Date().toISOString();
+  return {
+    id: comment.id || `comment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    author: String(comment.author || "Admin"),
+    body: String(comment.body || "").trim(),
+    createdAt
+  };
+}
+
+function normalizeRemoteRequestComments(comments = []) {
+  return (Array.isArray(comments) ? comments : [])
+    .map(normalizeRemoteRequestComment)
+    .filter((comment) => comment.body)
+    .sort((first, second) => Date.parse(second.createdAt || "") - Date.parse(first.createdAt || ""))
+    .slice(0, remoteRequestCommentsLimit);
+}
+
 function normalizeRemoteRequest(request = {}) {
   const createdAt = typeof request.createdAt === "string" ? request.createdAt : new Date().toISOString();
   const updatedAt = typeof request.updatedAt === "string" ? request.updatedAt : createdAt;
@@ -4363,7 +4382,11 @@ function normalizeRemoteRequest(request = {}) {
     status,
     createdBy: String(request.createdBy || ""),
     createdAt,
-    updatedAt
+    updatedAt,
+    startedAt: typeof request.startedAt === "string" ? request.startedAt : "",
+    completedAt: typeof request.completedAt === "string" ? request.completedAt : "",
+    completionNote: String(request.completionNote || request.result || request.note || "").trim(),
+    comments: normalizeRemoteRequestComments(request.comments)
   };
 }
 
@@ -7927,6 +7950,10 @@ function createRemoteRequestCard(request) {
   badge.textContent = formatRemoteRequestStatus(request.status);
   head.append(title, badge);
 
+  const statusLine = document.createElement("p");
+  statusLine.className = "dashboard-note remote-request-status-line";
+  statusLine.textContent = getRemoteRequestStatusLine(request);
+
   const prompt = document.createElement("p");
   prompt.className = "remote-request-prompt";
   prompt.textContent = request.prompt;
@@ -7935,21 +7962,105 @@ function createRemoteRequestCard(request) {
   meta.className = "dashboard-note";
   meta.textContent = `${request.createdBy || "Admin"} - ${formatQuizDate(request.createdAt)}`;
 
+  const result = document.createElement("div");
+  result.className = "remote-request-result";
+  const resultKicker = document.createElement("p");
+  resultKicker.className = "kicker";
+  resultKicker.textContent = "What was done";
+  const resultCopy = document.createElement("p");
+  resultCopy.textContent = request.completionNote || (request.status === "done" ? "Complete. No notes added yet." : "Not complete yet.");
+  result.append(resultKicker, resultCopy);
+
+  const comments = createRemoteRequestComments(request);
+  const noteEditor = createRemoteRequestNoteEditor(request);
+
   const actions = document.createElement("div");
   actions.className = "remote-request-actions";
   if (request.status === "new") {
     actions.append(createRemoteRequestActionButton("Start", () => updateRemoteRequestStatus(request.id, "in-progress")));
   }
   if (request.status !== "done") {
-    actions.append(createRemoteRequestActionButton("Mark done", () => updateRemoteRequestStatus(request.id, "done")));
+    actions.append(createRemoteRequestActionButton("Complete", () => updateRemoteRequestStatus(request.id, "done")));
   } else {
     actions.append(createRemoteRequestActionButton("Reopen", () => updateRemoteRequestStatus(request.id, "new")));
   }
   actions.append(createRemoteRequestActionButton("Copy", () => copyRemoteRequestPrompt(request)));
   actions.append(createRemoteRequestActionButton("Archive", () => updateRemoteRequestStatus(request.id, "archived"), "danger-button"));
 
-  card.append(head, prompt, meta, actions);
+  card.append(head, statusLine, prompt, meta, result, comments, noteEditor, actions);
   return card;
+}
+
+function getRemoteRequestStatusLine(request) {
+  const parts = [`Status: ${formatRemoteRequestStatus(request.status)}`, `Created ${formatQuizDate(request.createdAt)}`];
+  if (request.startedAt) parts.push(`Started ${formatQuizDate(request.startedAt)}`);
+  if (request.completedAt) parts.push(`Completed ${formatQuizDate(request.completedAt)}`);
+  return parts.join(" - ");
+}
+
+function createRemoteRequestComments(request) {
+  const comments = normalizeRemoteRequestComments(request.comments);
+  const list = document.createElement("div");
+  list.className = "remote-request-comments";
+
+  if (!comments.length) {
+    const empty = document.createElement("p");
+    empty.className = "dashboard-note";
+    empty.textContent = "No comments yet.";
+    list.append(empty);
+    return list;
+  }
+
+  comments.forEach((comment) => {
+    const row = document.createElement("div");
+    row.className = "remote-request-comment";
+    const meta = document.createElement("small");
+    meta.textContent = `${comment.author} - ${formatQuizDate(comment.createdAt)}`;
+    const body = document.createElement("p");
+    body.textContent = comment.body;
+    row.append(meta, body);
+    list.append(row);
+  });
+
+  return list;
+}
+
+function createRemoteRequestNoteEditor(request) {
+  const details = document.createElement("details");
+  details.className = "remote-request-note-editor";
+  const summary = document.createElement("summary");
+  summary.textContent = "Update notes";
+
+  const form = document.createElement("form");
+  form.className = "remote-request-note-form";
+
+  const completionLabel = document.createElement("label");
+  completionLabel.textContent = "What was done";
+  const completionInput = document.createElement("textarea");
+  completionInput.rows = 3;
+  completionInput.value = request.completionNote || "";
+  completionLabel.append(completionInput);
+
+  const commentLabel = document.createElement("label");
+  commentLabel.textContent = "New comment";
+  const commentInput = document.createElement("textarea");
+  commentInput.rows = 2;
+  commentInput.placeholder = "Add a progress note or clarification.";
+  commentLabel.append(commentInput);
+
+  const button = document.createElement("button");
+  button.className = "save-button";
+  button.type = "submit";
+  button.textContent = "Save notes";
+
+  form.append(completionLabel, commentLabel, button);
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    saveRemoteRequestNotes(request.id, completionInput.value, commentInput.value);
+  });
+
+  details.append(summary, form);
+  return details;
 }
 
 function createRemoteRequestActionButton(label, onClick, className = "action-button") {
@@ -7966,7 +8077,7 @@ function formatRemoteRequestStatus(status) {
     {
       new: "New",
       "in-progress": "In progress",
-      done: "Done",
+      done: "Complete",
       archived: "Archived"
     }[status] || "New"
   );
@@ -8005,17 +8116,52 @@ function submitRemoteRequest(event) {
 }
 
 function updateRemoteRequestStatus(requestId, status) {
+  const now = new Date().toISOString();
   remoteRequests = remoteRequests.map((request) =>
     request.id === requestId
       ? {
           ...request,
           status,
-          updatedAt: new Date().toISOString()
+          startedAt: status === "in-progress" && !request.startedAt ? now : request.startedAt,
+          completedAt: status === "done" ? now : status === "new" ? "" : request.completedAt,
+          updatedAt: now
         }
       : request
   );
   saveRemoteRequests();
   if (remoteRequestMessage) remoteRequestMessage.textContent = "Request updated.";
+}
+
+function saveRemoteRequestNotes(requestId, completionNote, commentBody) {
+  const now = new Date().toISOString();
+  const author = getActiveUser()?.username || getActiveUser()?.email || "Admin";
+  const normalizedCompletionNote = String(completionNote || "").trim();
+  const normalizedComment = String(commentBody || "").trim();
+
+  remoteRequests = remoteRequests.map((request) => {
+    if (request.id !== requestId) return request;
+
+    const comments = normalizeRemoteRequestComments(request.comments);
+    if (normalizedComment) {
+      comments.unshift({
+        id: `comment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        author,
+        body: normalizedComment,
+        createdAt: now
+      });
+    }
+
+    return {
+      ...request,
+      completionNote: normalizedCompletionNote,
+      comments: normalizeRemoteRequestComments(comments),
+      completedAt: request.status === "done" && normalizedCompletionNote && !request.completedAt ? now : request.completedAt,
+      updatedAt: now
+    };
+  });
+
+  saveRemoteRequests();
+  if (remoteRequestMessage) remoteRequestMessage.textContent = "Request notes saved.";
 }
 
 async function copyRemoteRequestPrompt(request) {

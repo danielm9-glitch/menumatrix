@@ -1011,6 +1011,70 @@ h1 {
   white-space: pre-wrap;
 }
 
+.remote-request-status-line {
+  margin: -2px 0 0;
+}
+
+.remote-request-result,
+.remote-request-comment {
+  display: grid;
+  gap: 4px;
+  border-radius: 8px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--leaf) 8%, white);
+}
+
+.remote-request-result p,
+.remote-request-comment p {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 800;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.remote-request-comments {
+  display: grid;
+  gap: 8px;
+}
+
+.remote-request-comment {
+  background: color-mix(in srgb, var(--gold) 10%, white);
+}
+
+.remote-request-comment small {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+.remote-request-note-editor {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: var(--panel);
+}
+
+.remote-request-note-editor summary {
+  cursor: pointer;
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 950;
+}
+
+.remote-request-note-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.remote-request-note-form textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
 .remote-request-actions {
   display: flex;
   flex-wrap: wrap;
