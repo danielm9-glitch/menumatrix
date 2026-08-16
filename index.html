@@ -6,7 +6,7 @@
     <title>Menu Matrix</title>
     <link rel="icon" type="image/svg+xml" href="assets/app-icon.svg" />
     <link rel="apple-touch-icon" href="assets/app-icon-launcher-preview.png" />
-    <link rel="stylesheet" href="styles.css?v=jade-copper-theme" />
+    <link rel="stylesheet" href="styles.css?v=users-auth-section" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -394,7 +394,6 @@
         <button class="dashboard-tab is-active" type="button" role="tab" aria-selected="true" data-dashboard-tab="account">Account</button>
         <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="users">Users</button>
         <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="requests">Requests</button>
-        <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="auth">Authentications</button>
         <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="payments">Payments</button>
         <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="restaurants">Restaurants</button>
         <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="menus">Menus</button>
@@ -514,6 +513,14 @@
               <p id="userMessage" class="login-message" role="status"></p>
             </form>
           </div>
+          <div class="user-authentication-summary">
+            <div class="section-heading">
+              <p class="kicker">Firebase</p>
+              <strong>Authentications</strong>
+            </div>
+            <div id="dashboardAuthSummary" class="dashboard-metric-grid"></div>
+            <p class="dashboard-note">Email verification is active for self-registered owner accounts. Admin-created editor accounts still use the invite/manual flow for now.</p>
+          </div>
         </section>
 
         <section class="user-manager">
@@ -553,15 +560,6 @@
           </div>
           <div id="remoteRequestList" class="dashboard-list remote-request-list"></div>
         </section>
-      </section>
-
-      <section class="dashboard-panel" data-dashboard-panel="auth" hidden>
-        <div class="section-heading">
-          <p class="kicker">Firebase</p>
-          <strong>Authentications</strong>
-        </div>
-        <div id="dashboardAuthSummary" class="dashboard-metric-grid"></div>
-        <p class="dashboard-note">Email verification is active for self-registered owner accounts. Admin-created editor accounts still use the invite/manual flow for now.</p>
       </section>
 
       <section class="dashboard-panel" data-dashboard-panel="payments" hidden>
@@ -1184,6 +1182,6 @@
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js?v=jade-copper-theme"></script>
+    <script src="app.js?v=users-auth-section"></script>
   </body>
 </html>

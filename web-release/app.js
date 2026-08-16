@@ -7730,6 +7730,7 @@ function handleDeleteAccountSliderKeydown(event) {
 
 function showDashboardTab(tabName) {
   if (tabName === "quiz-results") tabName = "stats";
+  if (tabName === "auth") tabName = "users";
 
   if (!canAccessDashboardTab(tabName)) {
     tabName = "account";

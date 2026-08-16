@@ -1303,6 +1303,19 @@ h1 {
   gap: 12px;
 }
 
+.user-authentication-summary {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: color-mix(in srgb, var(--leaf) 6%, var(--white));
+}
+
+.user-authentication-summary .dashboard-note {
+  margin: 0;
+}
+
 .access-control-slot {
   display: grid;
 }
@@ -3588,10 +3601,13 @@ h1 {
     gap: 18px 22px;
   }
 
-  .dashboard-panel[data-dashboard-panel="auth"] .dashboard-metric-grid,
   .dashboard-panel[data-dashboard-panel="payments"] .dashboard-metric-grid,
   .dashboard-panel[data-dashboard-panel="customization"] .dashboard-metric-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .user-authentication-summary .dashboard-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .dashboard-panel[data-dashboard-panel="stats"] .dashboard-metric-grid {
