@@ -8,12 +8,12 @@ const legacyRestaurantDocumentPath = "restaurants/mott32-las-vegas";
 
 const defaultHeroImage = "https://www.nicepng.com/png/detail/809-8099031_mott32-las-vegas-mott-32-logo.png";
 const defaultDesign = {
-  ink: "#19211d",
-  leaf: "#2f7d56",
-  gold: "#d99d2b",
-  aqua: "#317c8e",
-  page: "#f8f2e8",
-  panel: "#fbfaf6",
+  ink: "#18231f",
+  leaf: "#24745a",
+  gold: "#c47a2c",
+  aqua: "#2f8b96",
+  page: "#f4efe5",
+  panel: "#fffaf2",
   heroImage: defaultHeroImage
 };
 

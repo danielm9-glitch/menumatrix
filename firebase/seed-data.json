@@ -2,11 +2,11 @@
   "appSettings": {
     "global": {
       "heroImageUrl": "https://www.nicepng.com/png/detail/809-8099031_mott32-las-vegas-mott-32-logo.png",
-      "primaryColor": "#2f7d56",
-      "accentColor": "#317c8e",
-      "priceColor": "#d99d2b",
-      "backgroundColor": "#f8f2e8",
-      "panelColor": "#fbfaf6"
+      "primaryColor": "#24745a",
+      "accentColor": "#2f8b96",
+      "priceColor": "#c47a2c",
+      "backgroundColor": "#f4efe5",
+      "panelColor": "#fffaf2"
     }
   },
   "menuItems": {

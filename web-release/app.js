@@ -27,12 +27,12 @@ const defaultFrontMediaUrl = "assets/login-background.mp4";
 const maxInlineVideoUploadSize = 850000;
 const itemPhotoCloudUploadsEnabled = window.MENU_MATRIX_ENABLE_STORAGE_UPLOADS !== false;
 const defaultDesign = {
-  ink: "#19211d",
-  leaf: "#2f7d56",
-  gold: "#d99d2b",
-  aqua: "#317c8e",
-  page: "#f8f2e8",
-  panel: "#fbfaf6",
+  ink: "#18231f",
+  leaf: "#24745a",
+  gold: "#c47a2c",
+  aqua: "#2f8b96",
+  page: "#f4efe5",
+  panel: "#fffaf2",
   heroImage: defaultHeroImage,
   itemPhotoSize: 96,
   frontMediaType: "video",

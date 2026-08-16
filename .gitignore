@@ -5,6 +5,7 @@ dist/
 build/
 .cache/
 .firebase/
+theme-previews/
 
 # Generated release archive
 menu-matrix-web-release.zip
