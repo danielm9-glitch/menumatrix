@@ -2038,7 +2038,7 @@ const featureAnnouncementItems = [
   },
   {
     title: "Quiz sheet",
-    detail: "Logged-in menu editors can open Quiz and use Sheet to print or save trainer-ready quiz PDFs."
+    detail: "Logged-in menu editors can open Quiz and use Print Quiz to print or save trainer-ready quiz PDFs."
   }
 ];
 const ingredientVocabulary = [
