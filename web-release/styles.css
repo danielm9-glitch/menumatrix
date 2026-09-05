@@ -2538,6 +2538,18 @@ h1 {
   color: var(--tomato);
 }
 
+.quiz-feedback {
+  color: var(--muted);
+}
+
+.quiz-feedback.is-success {
+  color: var(--leaf);
+}
+
+.quiz-feedback.is-error {
+  color: var(--tomato);
+}
+
 .hero-copy {
   position: absolute;
   right: 18px;

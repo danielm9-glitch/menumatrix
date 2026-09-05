@@ -6,7 +6,7 @@
     <title>Menu Matrix</title>
     <link rel="icon" type="image/svg+xml" href="assets/app-icon.svg" />
     <link rel="apple-touch-icon" href="assets/app-icon-launcher-preview.png" />
-    <link rel="stylesheet" href="styles.css?v=compact-dashboard-viewers-v32" />
+    <link rel="stylesheet" href="styles.css?v=quiz-controls-v33" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -344,7 +344,7 @@
           <p class="kicker">Current score</p>
           <strong id="quizScore">0 / 0</strong>
         </div>
-        <button id="quizNewQuestionButton" class="quick-action-button is-active" type="button">Next question</button>
+        <button id="quizResetButton" class="action-button" type="button">Restart quiz</button>
       </section>
 
       <section id="quizCard" class="study-card quiz-card" aria-live="polite" hidden>
@@ -353,9 +353,9 @@
         <div id="quizOptions" class="quiz-options"></div>
         <div class="form-actions">
           <button id="quizCheckButton" class="save-button" type="button">Check answer</button>
-          <button id="quizResetButton" class="action-button" type="button">Reset score</button>
+          <button id="quizNewQuestionButton" class="quick-action-button is-active" type="button">Next question</button>
         </div>
-        <p id="quizMessage" class="login-message" role="status"></p>
+        <p id="quizMessage" class="login-message quiz-feedback" role="status"></p>
       </section>
 
       <section id="quizResultPanel" class="study-card quiz-result-card" hidden>
@@ -1354,6 +1354,6 @@
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js?v=compact-dashboard-viewers-v32"></script>
+    <script src="app.js?v=quiz-controls-v33"></script>
   </body>
 </html>

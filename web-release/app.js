@@ -10434,6 +10434,14 @@ function nextQuizQuestion() {
   renderQuiz();
 }
 
+function setQuizFeedback(message = "", tone = "neutral") {
+  if (!quizMessage) return;
+
+  quizMessage.textContent = message;
+  quizMessage.classList.toggle("is-success", tone === "success");
+  quizMessage.classList.toggle("is-error", tone === "error");
+}
+
 function renderQuiz() {
   if (!quizPage || state.screen !== "quiz") return;
 
@@ -10452,7 +10460,7 @@ function renderQuiz() {
   if (!hasSession) {
     quizType.textContent = "Ready";
     quizQuestion.textContent = "Enter your name to start.";
-    quizMessage.textContent = "";
+    setQuizFeedback("");
     quizCheckButton.disabled = true;
     quizNewQuestionButton.disabled = true;
     return;
@@ -10461,7 +10469,7 @@ function renderQuiz() {
   if (!state.quiz) {
     quizType.textContent = "Randomized";
     quizQuestion.textContent = "Start a quiz question.";
-    quizMessage.textContent = "No quiz data is ready for this menu yet.";
+    setQuizFeedback("No quiz data is ready for this menu yet.", "error");
     quizCheckButton.disabled = true;
     quizNewQuestionButton.disabled = true;
     return;
@@ -10469,13 +10477,19 @@ function renderQuiz() {
 
   quizType.textContent = `Question ${Math.min(state.quiz.questionNumber || state.quizScore.total + 1, state.quizSession.questionLimit)} of ${state.quizSession.questionLimit} - ${getQuizQuestionModeLabel(state.quizSession.questionMode)} - ${state.quiz.typeLabel}`;
   quizQuestion.textContent = state.quiz.prompt;
-  quizMessage.textContent = isComplete
+  const feedbackMessage = isComplete
     ? state.quizSession.saveMessage || "Quiz complete."
     : state.quiz.answered
       ? state.quiz.message
       : state.quiz.multiple
         ? "Select all that apply."
         : "";
+  const feedbackTone = isComplete
+    ? "success"
+    : state.quiz.answered
+      ? state.quiz.messageTone || "neutral"
+      : "neutral";
+  setQuizFeedback(feedbackMessage, feedbackTone);
   const inputType = state.quiz.multiple ? "checkbox" : "radio";
 
   state.quiz.options.forEach((option) => {
@@ -10511,7 +10525,7 @@ function checkQuizAnswer() {
 
   const selected = [...quizOptions.querySelectorAll("input:checked")].map((input) => input.value);
   if (!selected.length) {
-    quizMessage.textContent = "Choose an answer first.";
+    setQuizFeedback("Choose an answer first.", "error");
     return;
   }
 
@@ -10521,6 +10535,7 @@ function checkQuizAnswer() {
   state.quiz.answered = true;
   state.quiz.selected = selected;
   state.quiz.message = isCorrect ? `Correct. ${state.quiz.explanation}` : `Not quite. ${state.quiz.explanation}`;
+  state.quiz.messageTone = isCorrect ? "success" : "error";
   state.quizScore.total += 1;
   if (isCorrect) state.quizScore.correct += 1;
   if (state.quizScore.total >= state.quizSession.questionLimit) {
@@ -10540,7 +10555,7 @@ function resetQuizScore() {
   quizSetupForm?.reset();
   const activeUser = getActiveUser();
   if (quizTakerName && activeUser?.username) quizTakerName.value = activeUser.username;
-  quizMessage.textContent = "";
+  setQuizFeedback("");
   renderQuiz();
 }
 
