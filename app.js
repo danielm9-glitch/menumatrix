@@ -2028,6 +2028,7 @@ const formatter = new Intl.NumberFormat("en-US", {
 });
 
 const flashcardModes = ["mixed", "allergies", "ingredients"];
+const quizQuestionModes = ["all", "ingredients", "allergies"];
 const ingredientVocabulary = [
   "Abalone",
   "Almond",
@@ -2151,7 +2152,9 @@ const quickCategoryButton = document.querySelector("#quickCategoryButton");
 const quickShareMenuButton = document.querySelector("#quickShareMenuButton");
 const quickFlashcardButton = document.querySelector("#quickFlashcardButton");
 const quickQuizButton = document.querySelector("#quickQuizButton");
+const quickQuizPdfButton = document.querySelector("#quickQuizPdfButton");
 const pdfBuilderButton = document.querySelector("#pdfBuilderButton");
+const quizPdfButton = document.querySelector("#quizPdfButton");
 const addItemButton = document.querySelector("#addItemButton");
 const deleteMenuButton = document.querySelector("#deleteMenuButton");
 const scanMenuButton = document.querySelector("#scanMenuButton");
@@ -2411,6 +2414,10 @@ const quizResultPanel = document.querySelector("#quizResultPanel");
 const quizResultTitle = document.querySelector("#quizResultTitle");
 const quizResultSummary = document.querySelector("#quizResultSummary");
 const quizStartOverButton = document.querySelector("#quizStartOverButton");
+const quizPdfDialog = document.querySelector("#quizPdfDialog");
+const quizPdfForm = document.querySelector("#quizPdfForm");
+const closeQuizPdfButton = document.querySelector("#closeQuizPdfButton");
+const quizPdfMessage = document.querySelector("#quizPdfMessage");
 
 function normalizeCategoryValue(value) {
   return String(value || "")
@@ -2966,6 +2973,7 @@ function normalizeQuizResult(result = {}) {
     takenAt,
     finishedAt: typeof result.finishedAt === "string" && result.finishedAt ? result.finishedAt : takenAt,
     questionLimit,
+    questionMode: normalizeQuizQuestionMode(result.questionMode || result.focus || result.mode),
     score,
     total,
     percent: total ? Math.round((score / total) * 100) : 0,
@@ -4369,6 +4377,20 @@ function normalizeAssignedMenuIds(values = []) {
   return uniqueValues(values.map((value) => String(value || "").trim()));
 }
 
+function normalizeMenuPermissions(value = {}) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  return Object.fromEntries(
+    Object.entries(source)
+      .map(([menuId, permissions]) => [
+        String(menuId || "").trim(),
+        Array.isArray(permissions)
+          ? getUniqueCategoryValues(permissions.map(normalizeCategoryValue)).filter((permission) => categories.includes(permission))
+          : []
+      ])
+      .filter(([menuId, permissions]) => menuId && permissions.length)
+  );
+}
+
 function normalizeUser(user = {}) {
   const username = String(user.username || "").trim();
   const status = ["active", "pending", "unverified", "deleted"].includes(user.status) ? user.status : "active";
@@ -4386,6 +4408,7 @@ function normalizeUser(user = {}) {
       Array.isArray(user.permissions) && user.permissions.length
         ? getUniqueCategoryValues(user.permissions.map(normalizeCategoryValue)).filter((permission) => categories.includes(permission))
         : [],
+    menuPermissions: normalizeMenuPermissions(user.menuPermissions || user.perMenuPermissions || user.menuAccessPermissions),
     menuIds: explicitMenuIds,
     status,
     firebaseUid: user.firebaseUid || "",
@@ -4403,6 +4426,7 @@ function sanitizeUserForCloud(user) {
     password: normalized.password,
     role: normalized.role,
     permissions: normalized.permissions,
+    menuPermissions: normalized.menuPermissions,
     menuIds: normalized.menuIds,
     status: normalized.status,
     firebaseUid: normalized.firebaseUid,
@@ -4503,6 +4527,15 @@ function getMenuOwner(menu) {
 
 function getAssignedMenuIds(user) {
   return Array.isArray(user?.menuIds) ? normalizeAssignedMenuIds(user.menuIds) : null;
+}
+
+function getUserMenuPermissions(user, menuId) {
+  const normalizedMenuId = String(menuId || "").trim();
+  if (!normalizedMenuId) return null;
+
+  const menuPermissions = normalizeMenuPermissions(user?.menuPermissions);
+  if (Object.prototype.hasOwnProperty.call(menuPermissions, normalizedMenuId)) return menuPermissions[normalizedMenuId];
+  return null;
 }
 
 function canUserAccessMenu(user, menu) {
@@ -5562,11 +5595,13 @@ function canManageCategories() {
 
 function getEditableCategories() {
   const user = getActiveUser();
+  const activeMenu = getActiveRestaurantMenu();
   if (!user) return [];
   if (ownsActiveMenu()) return [...categories];
   if (isAdmin()) return [...categories];
-  if (!canUserAccessMenu(user, getActiveRestaurantMenu())) return [];
-  return user.permissions || [];
+  if (!canUserAccessMenu(user, activeMenu)) return [];
+  const menuPermissions = getUserMenuPermissions(user, activeMenu?.id);
+  return menuPermissions || user.permissions || [];
 }
 
 function canEditCategory(category) {
@@ -6431,6 +6466,7 @@ function renderActiveMenuHeader() {
   const canManageMenuCategories = canManageCategories();
   const canShareMenu = canShareActiveMenu();
   const canUseStudyTools = canStudyActiveMenu();
+  const canUseQuizPdf = canGenerateQuizPdf();
   const canCustomizeMenu = Boolean(activeMenu) && isAdmin();
   const isSharedView = state.screen === "shared";
   const isDemoView = isSharedView && state.demoMode;
@@ -6451,6 +6487,7 @@ function renderActiveMenuHeader() {
   quickShareMenuButton.hidden = !canShareMenu;
   quickFlashcardButton.hidden = !canUseStudyTools;
   quickQuizButton.hidden = !canUseStudyTools;
+  quickQuizPdfButton.hidden = !canUseQuizPdf;
   renderActiveMenuNotificationButton(activeMenu);
   quickMenuActions.hidden =
     quickEditModeButton.hidden &&
@@ -6461,7 +6498,8 @@ function renderActiveMenuHeader() {
     quickCategoryButton.hidden &&
     quickShareMenuButton.hidden &&
     quickFlashcardButton.hidden &&
-    quickQuizButton.hidden;
+    quickQuizButton.hidden &&
+    quickQuizPdfButton.hidden;
 }
 
 function openRestaurantMenu(menuId) {
@@ -8691,19 +8729,15 @@ function renderDashboardStats() {
     (sum, entry) => sum + entry.itemRows.reduce((itemSum, item) => itemSum + item.clicks, 0),
     0
   );
-  const allItemRows = statsByMenu.flatMap((entry) => entry.itemRows.map((item) => ({ ...item, menuName: entry.menu.name })));
-  const topItem = allItemRows.sort((a, b) => b.clicks - a.clicks)[0];
   const quizStats = getQuizStats(results);
   const restaurantCount = new Set(statMenus.map((menu) => menu.restaurantId).filter(Boolean)).size;
+  const totalActivity = totalMenuClicks + totalItemClicks;
 
   dashboardStatsSummary.replaceChildren(
     createDashboardMetric("Restaurants", String(restaurantCount), isAdmin() ? "Tracked client workspaces" : "Your restaurant workspaces"),
-    createDashboardMetric("Menus", String(statMenus.length), "Food, cocktail, wine, and training branches"),
-    createDashboardMetric("Menu opens", String(totalMenuClicks), "Every menu launch from now forward"),
-    createDashboardMetric("Item opens", String(totalItemClicks), "Dish expansions tracked from now forward"),
-    createDashboardMetric("Quiz attempts", String(results.length), results.length ? `${quizStats.average}% average score` : "No completed quizzes yet"),
-    createDashboardMetric("Top item", topItem ? topItem.name : "None yet", topItem ? `${topItem.clicks} opens - ${topItem.menuName}` : "Open dishes to build item stats"),
-    createDashboardMetric("Latest quiz", quizStats.latest ? quizStats.latest.takerName : "None yet", quizStats.latest ? formatQuizDate(quizStats.latest.finishedAt || quizStats.latest.takenAt) : "No quiz has been taken")
+    createDashboardMetric("Menus", String(statMenus.length), `${statMenus.reduce((sum, menu) => sum + menu.items.length, 0)} total items`),
+    createDashboardMetric("Activity", String(totalActivity), `${totalMenuClicks} menu opens - ${totalItemClicks} item opens`),
+    createDashboardMetric("Quizzes", String(results.length), results.length ? `${quizStats.average}% avg - latest ${quizStats.latest.takerName}` : "No completed quizzes yet")
   );
 
   dashboardStatsList.replaceChildren();
@@ -8720,8 +8754,8 @@ function renderDashboardStats() {
       if (quizDifference) return quizDifference;
       return b.menu.items.length - a.menu.items.length;
     })
-    .forEach((entry, index) => {
-      dashboardStatsList.append(createMenuStatsCard(entry, index === 0));
+    .forEach((entry) => {
+      dashboardStatsList.append(createMenuStatsCard(entry, false));
     });
 }
 
@@ -8743,10 +8777,14 @@ function createMenuStatsCard({ menu, stats, itemRows, quizResults }, open = fals
 
   const meta = document.createElement("span");
   meta.className = "stats-menu-meta";
+  const quizStats = getQuizStats(quizResults);
+  const topItem = itemRows[0];
   [
     `${stats.clicks} menu opens`,
     `${itemRows.reduce((sum, item) => sum + item.clicks, 0)} item opens`,
-    `${quizResults.length} quizzes`
+    `${quizResults.length} quizzes`,
+    topItem ? `Top: ${topItem.name}` : "No top item",
+    quizStats.latest ? `Latest quiz: ${quizStats.latest.percent}%` : "No quiz score"
   ].forEach((label) => {
     const pill = document.createElement("span");
     pill.textContent = label;
@@ -8759,21 +8797,15 @@ function createMenuStatsCard({ menu, stats, itemRows, quizResults }, open = fals
 
   summary.append(title, meta, marker);
 
-  const quizStats = getQuizStats(quizResults);
-  const topItem = itemRows[0];
   const body = document.createElement("div");
   body.className = "stats-menu-body";
-  body.append(
-    createStatsMetricStrip([
-      ["Last menu open", stats.lastOpenedAt ? formatQuizDate(stats.lastOpenedAt) : "No timestamp"],
-      ["Most opened item", topItem ? `${topItem.name} (${topItem.clicks})` : "No item opens"],
-      ["Quiz average", quizResults.length ? `${quizStats.average}%` : "No quizzes"],
-      ["Best quiz", quizResults.length ? `${quizStats.highest}%` : "No quizzes"]
-    ]),
+  const tableGrid = document.createElement("div");
+  tableGrid.className = "stats-table-grid";
+  tableGrid.append(
     createStatsTable(
       "Recent menu opens",
       ["#", "Timestamp"],
-      stats.recentOpens.slice(0, 10).map((timestamp, index) => [String(index + 1), formatQuizDate(timestamp)]),
+      stats.recentOpens.slice(0, 5).map((timestamp, index) => [String(index + 1), formatQuizDate(timestamp)]),
       stats.clicks
         ? "Older menu opens were counted before timestamp history was added."
         : "No menu opens have been tracked yet."
@@ -8781,7 +8813,7 @@ function createMenuStatsCard({ menu, stats, itemRows, quizResults }, open = fals
     createStatsTable(
       "Most opened items",
       ["Item", "Category", "Opens", "Last opened"],
-      itemRows.slice(0, 10).map((item) => [
+      itemRows.slice(0, 6).map((item) => [
         item.name,
         item.category,
         String(item.clicks),
@@ -8791,15 +8823,24 @@ function createMenuStatsCard({ menu, stats, itemRows, quizResults }, open = fals
     ),
     createStatsTable(
       "Quiz results",
-      ["Name", "Score", "Questions", "Taken"],
-      quizResults.slice(0, 10).map((result) => [
+      ["Name", "Score", "Questions / focus", "Taken"],
+      quizResults.slice(0, 6).map((result) => [
         result.takerName,
         `${result.score}/${result.total} (${result.percent}%)`,
-        String(result.questionLimit || result.total),
+        `${result.questionLimit || result.total} - ${getQuizQuestionModeLabel(result.questionMode)}`,
         `${formatQuizDate(result.finishedAt || result.takenAt)} - ${result.source === "shared-code" ? "Shared code" : "Logged in"}`
       ]),
       "No quiz results for this menu yet."
     )
+  );
+  body.append(
+    createStatsMetricStrip([
+      ["Last menu open", stats.lastOpenedAt ? formatQuizDate(stats.lastOpenedAt) : "No timestamp"],
+      ["Most opened item", topItem ? `${topItem.name} (${topItem.clicks})` : "No item opens"],
+      ["Quiz average", quizResults.length ? `${quizStats.average}%` : "No quizzes"],
+      ["Best quiz", quizResults.length ? `${quizStats.highest}%` : "No quizzes"]
+    ]),
+    tableGrid
   );
 
   details.append(summary, body);
@@ -9025,12 +9066,14 @@ function toggleCreateUserPanel() {
 }
 
 function renderNewUserAccessControls({ reset = false } = {}) {
-  if (!newUserPermissionsSlot || !newUserMenuAccessSlot) return;
+  if (!newUserMenuAccessSlot) return;
 
   const permissions = reset ? [] : getSelectedPermissions(userForm);
   const menuIds = reset ? [] : getSelectedMenuIds(userForm);
-  newUserPermissionsSlot.replaceChildren(createPermissionFieldset({ role: "editor", permissions }));
-  newUserMenuAccessSlot.replaceChildren(createMenuAccessFieldset({ role: "editor", menuIds }));
+  const menuPermissions = reset ? {} : getSelectedMenuPermissions(userForm);
+  newUserPermissionsSlot?.replaceChildren();
+  if (newUserPermissionsSlot) newUserPermissionsSlot.hidden = true;
+  newUserMenuAccessSlot.replaceChildren(createMenuAccessFieldset({ role: "editor", permissions, menuIds, menuPermissions }));
 }
 
 function setCreateMethod(method) {
@@ -9513,6 +9556,269 @@ function getPrintableItemMarkup(item) {
   `;
 }
 
+function canGenerateQuizPdf() {
+  const activeUser = getActiveUser();
+  const activeMenu = getActiveRestaurantMenu();
+  return Boolean(activeUser && activeMenu && canUserAccessMenu(activeUser, activeMenu) && menuItems.length);
+}
+
+function openQuizPdfDialog() {
+  if (!canGenerateQuizPdf()) return;
+
+  closeDrawer();
+  quizPdfForm?.reset();
+  quizPdfMessage.textContent = "";
+  quizPdfDialog.showModal();
+}
+
+function closeQuizPdfDialog() {
+  quizPdfDialog.close();
+  quizPdfForm?.reset();
+  quizPdfMessage.textContent = "";
+}
+
+function getSelectedQuizPdfQuestionCount() {
+  return Math.max(5, Number(getSelectedRadioValue(quizPdfForm, "quizPdfQuestionCount", "5")) || 5);
+}
+
+function getSelectedQuizPdfQuestionMode() {
+  return normalizeQuizQuestionMode(getSelectedRadioValue(quizPdfForm, "quizPdfQuestionMode", "all"));
+}
+
+function generateQuizPdf(event) {
+  event.preventDefault();
+  if (!canGenerateQuizPdf()) return;
+
+  const questionLimit = getSelectedQuizPdfQuestionCount();
+  const questionMode = getSelectedQuizPdfQuestionMode();
+  const questions = createQuizQuestionSet(questionLimit, questionMode);
+
+  if (!questions.length) {
+    quizPdfMessage.textContent = `No ${getQuizQuestionModeLabel(questionMode).toLowerCase()} quiz data is ready for this menu yet.`;
+    return;
+  }
+
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) {
+    quizPdfMessage.textContent = "Allow popups to create the quiz PDF page.";
+    return;
+  }
+
+  printWindow.document.write(getPrintableQuizHtml(questions, questionMode));
+  printWindow.document.close();
+  printWindow.focus();
+  quizPdfMessage.textContent = `Quiz PDF ready with ${questions.length} question${questions.length === 1 ? "" : "s"}.`;
+  setTimeout(() => printWindow.print(), 300);
+}
+
+function getQuizAnswerLabels(question) {
+  const labelsByValue = new Map(question.options.map((option) => [option.value, option.label]));
+  return question.answers.map((answer) => labelsByValue.get(answer) || answer);
+}
+
+function getPrintableQuizHtml(questions, questionMode) {
+  const activeMenu = getActiveRestaurantMenu();
+  const modeLabel = getQuizQuestionModeLabel(questionMode);
+  const generatedAt = new Date().toISOString();
+  const questionMarkup = questions
+    .map(
+      (question, index) => `
+        <article class="quiz-question">
+          <p class="question-kicker">Question ${index + 1} - ${escapeHtml(question.typeLabel)} - ${question.multiple ? "Select all that apply" : "Choose one"}</p>
+          <h2>${escapeHtml(question.prompt)}</h2>
+          <ul>
+            ${question.options
+              .map(
+                (option) => `
+                  <li>
+                    <span class="${question.multiple ? "checkbox" : "radio"}"></span>
+                    <span>${escapeHtml(option.label)}</span>
+                  </li>
+                `
+              )
+              .join("")}
+          </ul>
+        </article>
+      `
+    )
+    .join("");
+  const answerMarkup = questions
+    .map(
+      (question, index) => `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${escapeHtml(getQuizAnswerLabels(question).join(", "))}</td>
+          <td>${escapeHtml(question.explanation || "")}</td>
+        </tr>
+      `
+    )
+    .join("");
+
+  return `
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>${escapeHtml(activeMenu?.name || "Menu")} Quiz PDF</title>
+        <style>
+          @page { margin: 0.48in; }
+          * { box-sizing: border-box; }
+          :root {
+            --ink: ${designSettings.ink};
+            --muted: #66716b;
+            --line: #ded9cd;
+            --leaf: ${designSettings.leaf};
+            --gold: ${designSettings.gold};
+            --paper: ${designSettings.panel};
+            --page: ${designSettings.page};
+          }
+          body {
+            margin: 0;
+            background: var(--page);
+            color: var(--ink);
+            font-family: Inter, Arial, sans-serif;
+            line-height: 1.35;
+          }
+          header {
+            display: grid;
+            gap: 8px;
+            margin-bottom: 18px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 16px;
+            background: #fffdfa;
+            break-inside: avoid;
+          }
+          .kicker,
+          .question-kicker {
+            margin: 0;
+            color: var(--leaf);
+            font-size: 10px;
+            font-weight: 900;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+          }
+          h1 {
+            margin: 0;
+            font-size: 30px;
+            line-height: 1;
+          }
+          .subtitle {
+            margin: 0;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 800;
+          }
+          .quiz-question {
+            display: grid;
+            gap: 10px;
+            margin-bottom: 12px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 13px;
+            background: #fffdfa;
+            break-inside: avoid;
+          }
+          h2 {
+            margin: 0;
+            font-size: 15px;
+            line-height: 1.25;
+          }
+          ul {
+            display: grid;
+            gap: 7px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+          }
+          li {
+            display: grid;
+            grid-template-columns: 18px minmax(0, 1fr);
+            gap: 8px;
+            align-items: start;
+            color: var(--ink);
+            font-size: 12px;
+            font-weight: 700;
+          }
+          .checkbox,
+          .radio {
+            width: 14px;
+            height: 14px;
+            border: 1.5px solid var(--leaf);
+            background: white;
+          }
+          .radio {
+            border-radius: 999px;
+          }
+          .checkbox {
+            border-radius: 3px;
+          }
+          .answer-key {
+            margin-top: 18px;
+            break-before: page;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fffdfa;
+            font-size: 11px;
+          }
+          th,
+          td {
+            border: 1px solid var(--line);
+            padding: 8px;
+            text-align: left;
+            vertical-align: top;
+          }
+          th {
+            color: var(--muted);
+            font-size: 9px;
+            font-weight: 950;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+          }
+          @media print {
+            body {
+              background: white;
+            }
+            header,
+            .quiz-question,
+            table {
+              print-color-adjust: exact;
+              -webkit-print-color-adjust: exact;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <header>
+          <p class="kicker">Menu Matrix Quiz</p>
+          <h1>${escapeHtml(activeMenu?.name || "Selected Menu")}</h1>
+          <p class="subtitle">${escapeHtml(activeMenu?.restaurantName || "Training menu")} - ${modeLabel} - ${questions.length} question${questions.length === 1 ? "" : "s"} - Generated ${formatQuizDate(generatedAt)}</p>
+        </header>
+        ${questionMarkup}
+        <section class="answer-key">
+          <header>
+            <p class="kicker">Answer key</p>
+            <h1>Quiz answers</h1>
+            <p class="subtitle">Use this section for grading or trainer review.</p>
+          </header>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Answer</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>${answerMarkup}</tbody>
+          </table>
+        </section>
+      </body>
+    </html>
+  `;
+}
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -9528,6 +9834,24 @@ function escapeAttribute(value) {
 
 function canStudyActiveMenu() {
   return Boolean((getActiveUser() || state.sharedMenu) && getActiveRestaurantMenu() && menuItems.length);
+}
+
+function normalizeQuizQuestionMode(value) {
+  const mode = String(value || "all").toLowerCase();
+  return quizQuestionModes.includes(mode) ? mode : "all";
+}
+
+function getQuizQuestionModeLabel(value) {
+  const mode = normalizeQuizQuestionMode(value);
+  return {
+    all: "All",
+    ingredients: "Ingredients only",
+    allergies: "Allergies only"
+  }[mode];
+}
+
+function getSelectedRadioValue(container, name, fallback = "") {
+  return container?.querySelector(`input[name='${name}']:checked`)?.value || fallback;
 }
 
 function randomItem(values) {
@@ -9753,8 +10077,11 @@ function closeQuizPage() {
 }
 
 function getSelectedQuizQuestionCount() {
-  const selected = quizSetupForm?.querySelector("input[name='quizQuestionCount']:checked");
-  return Math.max(5, Number(selected?.value) || 5);
+  return Math.max(5, Number(getSelectedRadioValue(quizSetupForm, "quizQuestionCount", "5")) || 5);
+}
+
+function getSelectedQuizQuestionMode() {
+  return normalizeQuizQuestionMode(getSelectedRadioValue(quizSetupForm, "quizQuestionMode", "all"));
 }
 
 function startQuizSession(event) {
@@ -9769,6 +10096,7 @@ function startQuizSession(event) {
   }
 
   const questionLimit = getSelectedQuizQuestionCount();
+  const questionMode = getSelectedQuizQuestionMode();
   state.quizScore = {
     correct: 0,
     total: 0
@@ -9777,6 +10105,7 @@ function startQuizSession(event) {
     id: `quiz-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     takerName,
     questionLimit,
+    questionMode,
     startedAt: new Date().toISOString(),
     finishedAt: "",
     menuId: activeMenu?.id || "",
@@ -9792,14 +10121,24 @@ function startQuizSession(event) {
   nextQuizQuestion();
 }
 
-function createQuizQuestion() {
-  const availableBuilders = [
+function getQuizQuestionBuilders(mode = "all") {
+  const allergyBuilders = [
     createAllergenYesNoQuestion,
-    createIngredientYesNoQuestion,
     createAllergenMultiQuestion,
-    createItemByAllergenQuestion,
+    createItemByAllergenQuestion
+  ];
+  const ingredientBuilders = [
+    createIngredientYesNoQuestion,
     createItemByIngredientQuestion
   ];
+  const normalizedMode = normalizeQuizQuestionMode(mode);
+  if (normalizedMode === "allergies") return allergyBuilders;
+  if (normalizedMode === "ingredients") return ingredientBuilders;
+  return [...allergyBuilders, ...ingredientBuilders];
+}
+
+function createQuizQuestion(mode = "all") {
+  const availableBuilders = getQuizQuestionBuilders(mode);
   const shuffledBuilders = shuffleValues(availableBuilders);
 
   for (const builder of shuffledBuilders) {
@@ -9808,6 +10147,30 @@ function createQuizQuestion() {
   }
 
   return null;
+}
+
+function createQuizQuestionSet(questionLimit, mode = "all") {
+  const limit = Math.max(1, Number(questionLimit) || 5);
+  const questions = [];
+  const seenQuestions = new Set();
+  const maxAttempts = limit * 14;
+
+  for (let attempt = 0; questions.length < limit && attempt < maxAttempts; attempt += 1) {
+    const question = createQuizQuestion(mode);
+    if (!question) break;
+
+    const signature = `${question.prompt}|${question.answers.join("|")}`;
+    const shouldKeepDuplicate = attempt > limit * 7;
+    if (seenQuestions.has(signature) && !shouldKeepDuplicate) continue;
+
+    seenQuestions.add(signature);
+    questions.push({
+      ...question,
+      questionNumber: questions.length + 1
+    });
+  }
+
+  return questions;
 }
 
 function createAllergenYesNoQuestion() {
@@ -9957,7 +10320,7 @@ function nextQuizQuestion() {
     return;
   }
 
-  state.quiz = createQuizQuestion();
+  state.quiz = createQuizQuestion(state.quizSession.questionMode);
   if (state.quiz) {
     state.quiz.questionNumber = state.quizScore.total + 1;
   }
@@ -9996,7 +10359,7 @@ function renderQuiz() {
     return;
   }
 
-  quizType.textContent = `Question ${Math.min(state.quiz.questionNumber || state.quizScore.total + 1, state.quizSession.questionLimit)} of ${state.quizSession.questionLimit} - ${state.quiz.typeLabel}`;
+  quizType.textContent = `Question ${Math.min(state.quiz.questionNumber || state.quizScore.total + 1, state.quizSession.questionLimit)} of ${state.quizSession.questionLimit} - ${getQuizQuestionModeLabel(state.quizSession.questionMode)} - ${state.quiz.typeLabel}`;
   quizQuestion.textContent = state.quiz.prompt;
   quizMessage.textContent = isComplete
     ? state.quizSession.saveMessage || "Quiz complete."
@@ -10087,6 +10450,7 @@ function getCurrentQuizResult() {
     takenAt: state.quizSession.startedAt,
     finishedAt: state.quizSession.finishedAt || new Date().toISOString(),
     questionLimit: state.quizSession.questionLimit,
+    questionMode: state.quizSession.questionMode,
     score: state.quizScore.correct,
     total: state.quizScore.total,
     source: state.sharedMenu ? "shared-code" : "logged-in"
@@ -10114,6 +10478,7 @@ function renderQuizResult() {
   quizResultSummary.replaceChildren(
     createDashboardMetric("Score", `${result.percent}%`, `${result.score} correct out of ${result.total}`),
     createDashboardMetric("Questions", String(result.total), `${result.menuName || "Menu quiz"}`),
+    createDashboardMetric("Focus", getQuizQuestionModeLabel(result.questionMode), "Question type"),
     createDashboardMetric("Taken", formatQuizDate(result.takenAt), result.finishedAt ? `Finished ${formatQuizDate(result.finishedAt)}` : ""),
     createDashboardMetric("Saved", state.quizSession.saveMessage || "Result ready", "Visible in the admin dashboard")
   );
@@ -10237,6 +10602,7 @@ function renderAdminState() {
   if (showingInviteSetup) codeLoginForm.hidden = true;
   adminControls.hidden = !activeUser;
   pdfBuilderButton.hidden = !activeUser;
+  quizPdfButton.hidden = !canGenerateQuizPdf();
   scanMenuButton.hidden = !canEditAnyCategory();
   importPdfButton.hidden = !canEditAnyCategory();
   categoryManagerButton.hidden = !canManageCategories();
@@ -10842,7 +11208,7 @@ function renderUserList() {
     const details = document.createElement("form");
     details.className = "user-edit-panel";
     details.hidden = true;
-    details.append(createEmailLabel(user), createPasswordLabel(user), createPermissionFieldset(user), createMenuAccessFieldset(user));
+    details.append(createEmailLabel(user), createPasswordLabel(user), createMenuAccessFieldset(user));
 
     if (user.role !== "admin") {
       const actions = document.createElement("div");
@@ -10898,14 +11264,21 @@ function sortUsersByPrivileges(a, b) {
 function getPrivilegeRank(user) {
   if (user.role === "admin") return categories.length + 1;
   if (user.role === "owner") return categories.length;
-  return (user.permissions || []).length;
+  return getUserEditableCategoryTotal(user);
 }
 
 function getPrivilegeLabel(user) {
   if (user.role === "admin") return "All sections";
   if (user.role === "owner") return "Own menus";
-  const sections = (user.permissions || []).map(getCategoryLabel).join(", ") || "No edit access";
-  return `${sections} - ${getMenuAccessLabel(user)}`;
+  const editableCount = getUserEditableCategoryTotal(user);
+  return `${getMenuAccessLabel(user)} - ${editableCount ? `${editableCount} editable section${editableCount === 1 ? "" : "s"}` : "view only"}`;
+}
+
+function getUserEditableCategoryTotal(user) {
+  const menuPermissions = normalizeMenuPermissions(user?.menuPermissions);
+  const perMenuTotal = Object.values(menuPermissions).reduce((sum, permissions) => sum + permissions.length, 0);
+  if (perMenuTotal) return perMenuTotal;
+  return Array.isArray(user?.permissions) ? user.permissions.length : 0;
 }
 
 function getCategoryLabel(category) {
@@ -11018,6 +11391,90 @@ function createPermissionFieldset(user, options = {}) {
   return createAccessAccordion("Can modify", detail, fieldset, options);
 }
 
+function getInitialMenuPermissionSelection(user, menuId) {
+  const menuPermissions = getUserMenuPermissions(user, menuId);
+  if (menuPermissions) return menuPermissions;
+  return Array.isArray(user?.permissions)
+    ? getUniqueCategoryValues(user.permissions.map(normalizeCategoryValue)).filter((permission) => categories.includes(permission))
+    : [];
+}
+
+function createMenuPermissionBranch(menu, selectedPermissions = [], { disabled = false } = {}) {
+  const details = document.createElement("details");
+  details.className = "menu-permission-branch";
+  details.open = !disabled && Boolean(selectedPermissions.length);
+
+  const summary = document.createElement("summary");
+  summary.className = "menu-permission-summary";
+
+  const copy = document.createElement("span");
+  const heading = document.createElement("strong");
+  const count = document.createElement("small");
+  heading.textContent = "Can modify";
+  copy.append(heading, count);
+
+  const chevron = document.createElement("span");
+  chevron.className = "access-chevron";
+  chevron.textContent = ">";
+  summary.append(copy, chevron);
+
+  const tools = document.createElement("div");
+  tools.className = "menu-permission-tools";
+
+  const selectAllButton = document.createElement("button");
+  selectAllButton.className = "small-toggle";
+  selectAllButton.type = "button";
+  selectAllButton.textContent = "Select all";
+
+  const clearButton = document.createElement("button");
+  clearButton.className = "small-toggle";
+  clearButton.type = "button";
+  clearButton.textContent = "Clear";
+
+  tools.append(selectAllButton, clearButton);
+
+  const grid = document.createElement("div");
+  grid.className = "menu-permission-grid";
+  const selectedSet = new Set(selectedPermissions);
+
+  categories.forEach((category) => {
+    const label = document.createElement("label");
+    label.className = "menu-permission-option";
+
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.name = "menuPermission";
+    input.value = category;
+    input.dataset.menuId = menu.id;
+    input.checked = selectedSet.has(category);
+    input.disabled = disabled;
+
+    label.append(input, document.createTextNode(` ${getCategoryLabel(category)}`));
+    grid.append(label);
+  });
+
+  const updateCount = () => {
+    const selectedCount = grid.querySelectorAll("input[name='menuPermission']:checked").length;
+    count.textContent = selectedCount
+      ? `${selectedCount} of ${categories.length} selected`
+      : "View only";
+  };
+  const setAll = (isSelected) => {
+    grid.querySelectorAll("input[name='menuPermission']").forEach((input) => {
+      if (!input.disabled) input.checked = isSelected;
+    });
+    updateCount();
+  };
+
+  selectAllButton.addEventListener("click", () => setAll(true));
+  clearButton.addEventListener("click", () => setAll(false));
+  grid.addEventListener("change", updateCount);
+  updateCount();
+
+  details.append(summary, tools, grid);
+  return details;
+}
+
 function createMenuAccessFieldset(user, options = {}) {
   const fieldset = document.createElement("fieldset");
   fieldset.className = "permission-group";
@@ -11025,6 +11482,14 @@ function createMenuAccessFieldset(user, options = {}) {
   const legend = document.createElement("legend");
   legend.textContent = "Menus";
   fieldset.append(legend);
+
+  if (user.role === "admin") {
+    const note = document.createElement("p");
+    note.className = "permission-note";
+    note.textContent = "Admins keep full access to every menu and category.";
+    fieldset.append(note);
+    return createAccessAccordion("Menu access", getMenuAccessLabel(user), fieldset, options);
+  }
 
   if (user.role === "owner") {
     const note = document.createElement("p");
@@ -11043,18 +11508,45 @@ function createMenuAccessFieldset(user, options = {}) {
   }
 
   const assignedMenuIds = getAssignedMenuIds(user);
-  const hasFullMenuAccess = user.role === "admin" || assignedMenuIds === null;
+  const hasFullMenuAccess = assignedMenuIds === null;
   restaurantMenus.forEach((menu) => {
+    const branch = document.createElement("section");
+    branch.className = "menu-access-branch";
+
     const label = document.createElement("label");
+    label.className = "menu-access-row";
     const input = document.createElement("input");
     input.type = "checkbox";
     input.name = "menuAccess";
     input.value = menu.id;
     input.checked = hasFullMenuAccess || assignedMenuIds.includes(menu.id);
-    input.disabled = user.role === "admin";
     const labelText = menu.restaurantName ? `${menu.restaurantName} / ${menu.name || "Untitled menu"}` : menu.name || "Untitled menu";
-    label.append(input, document.createTextNode(` ${labelText}`));
-    fieldset.append(label);
+    const labelCopy = document.createElement("span");
+    labelCopy.innerHTML = `<strong>${escapeHtml(labelText)}</strong><small>${escapeHtml(getMenuOwner(menu))}</small>`;
+    label.append(input, labelCopy);
+
+    const permissions = Array.isArray(user.menuPermissions?.[menu.id])
+      ? user.menuPermissions[menu.id]
+      : Array.isArray(options.menuPermissions?.[menu.id])
+        ? options.menuPermissions[menu.id]
+        : getInitialMenuPermissionSelection(user, menu.id);
+    const permissionBranch = createMenuPermissionBranch(menu, permissions, { disabled: !input.checked });
+    const updateBranchState = () => {
+      const isEnabled = input.checked;
+      branch.classList.toggle("is-disabled", !isEnabled);
+      permissionBranch.querySelectorAll("input[name='menuPermission']").forEach((permissionInput) => {
+        permissionInput.disabled = !isEnabled;
+      });
+      permissionBranch.querySelectorAll("button").forEach((button) => {
+        button.disabled = !isEnabled;
+      });
+      if (isEnabled) permissionBranch.open = true;
+    };
+
+    input.addEventListener("change", updateBranchState);
+    branch.append(label, permissionBranch);
+    updateBranchState();
+    fieldset.append(branch);
   });
 
   return createAccessAccordion("Menu access", getMenuAccessLabel(user), fieldset, options);
@@ -11074,11 +11566,30 @@ function getMenuAccessLabel(user) {
 }
 
 function getSelectedPermissions(container) {
-  return [...container.querySelectorAll("input[name='permissions']:checked")].map((input) => input.value);
+  const permissions = [
+    ...[...container.querySelectorAll("input[name='permissions']:checked")].map((input) => input.value),
+    ...[...container.querySelectorAll("input[name='menuPermission']:checked")].map((input) => input.value)
+  ];
+  return getUniqueCategoryValues(permissions.map(normalizeCategoryValue)).filter((permission) => categories.includes(permission));
 }
 
 function getSelectedMenuIds(container) {
   return [...container.querySelectorAll("input[name='menuAccess']:checked")].map((input) => input.value);
+}
+
+function getSelectedMenuPermissions(container) {
+  const selectedMenuIds = new Set(getSelectedMenuIds(container));
+  const menuPermissions = {};
+
+  container.querySelectorAll("input[name='menuPermission']:checked").forEach((input) => {
+    const menuId = String(input.dataset.menuId || "").trim();
+    const permission = normalizeCategoryValue(input.value);
+    if (!menuId || !selectedMenuIds.has(menuId) || !categories.includes(permission)) return;
+    if (!menuPermissions[menuId]) menuPermissions[menuId] = [];
+    menuPermissions[menuId].push(permission);
+  });
+
+  return normalizeMenuPermissions(menuPermissions);
 }
 
 function saveUser(event) {
@@ -11090,11 +11601,7 @@ function saveUser(event) {
   const isInvite = createMethod.value === "invite";
   const permissions = getSelectedPermissions(userForm);
   const menuIds = getSelectedMenuIds(userForm);
-
-  if (!permissions.length) {
-    userMessage.textContent = "Choose at least one section.";
-    return;
-  }
+  const menuPermissions = getSelectedMenuPermissions(userForm);
 
   if (restaurantMenus.length && !menuIds.length) {
     userMessage.textContent = "Choose at least one menu this user can access.";
@@ -11113,6 +11620,7 @@ function saveUser(event) {
     password: isInvite ? "" : newPassword.value,
     role: "editor",
     permissions,
+    menuPermissions,
     menuIds,
     status: isInvite ? "pending" : "active",
     createdAt: existingIndex >= 0 ? users[existingIndex].createdAt || "" : new Date().toISOString(),
@@ -11205,11 +11713,7 @@ function updateUser(event, username) {
   const form = event.currentTarget;
   const permissions = getSelectedPermissions(form);
   const menuIds = getSelectedMenuIds(form);
-
-  if (!permissions.length) {
-    userMessage.textContent = "Choose at least one section.";
-    return;
-  }
+  const menuPermissions = getSelectedMenuPermissions(form);
 
   if (users[userIndex].role === "editor" && restaurantMenus.length && !menuIds.length) {
     userMessage.textContent = "Choose at least one menu this user can access.";
@@ -11221,6 +11725,7 @@ function updateUser(event, username) {
     email: form.elements.email.value,
     password: form.elements.password.value,
     permissions,
+    menuPermissions,
     updatedAt: new Date().toISOString()
   };
   if (users[userIndex].role === "editor") updatedUser.menuIds = menuIds;
@@ -11415,7 +11920,15 @@ function renameCategory(category, value) {
     ...user,
     permissions: Array.isArray(user.permissions)
       ? getUniqueCategories(user.permissions.map((permission) => (permission === category ? nextCategory : permission)))
-      : user.permissions
+      : user.permissions,
+    menuPermissions: normalizeMenuPermissions(
+      Object.fromEntries(
+        Object.entries(user.menuPermissions || {}).map(([menuId, permissions]) => [
+          menuId,
+          Array.isArray(permissions) ? permissions.map((permission) => (permission === category ? nextCategory : permission)) : []
+        ])
+      )
+    )
   }));
   if (state.category === category) state.category = nextCategory;
 
@@ -11455,7 +11968,15 @@ function deleteCategory(category) {
   });
   users = users.map((user) => ({
     ...user,
-    permissions: Array.isArray(user.permissions) ? user.permissions.filter((permission) => permission !== category) : user.permissions
+    permissions: Array.isArray(user.permissions) ? user.permissions.filter((permission) => permission !== category) : user.permissions,
+    menuPermissions: normalizeMenuPermissions(
+      Object.fromEntries(
+        Object.entries(user.menuPermissions || {}).map(([menuId, permissions]) => [
+          menuId,
+          Array.isArray(permissions) ? permissions.filter((permission) => permission !== category) : []
+        ])
+      )
+    )
   }));
   if (state.category === category) state.category = "all";
 
@@ -12567,6 +13088,10 @@ saveShareCodeButton.addEventListener("click", saveShareCode);
 copyShareCodeButton.addEventListener("click", copyShareCode);
 pdfBuilderButton.addEventListener("click", openPdfPage);
 quickPdfBuilderButton.addEventListener("click", openPdfPage);
+quizPdfButton.addEventListener("click", openQuizPdfDialog);
+quickQuizPdfButton.addEventListener("click", openQuizPdfDialog);
+closeQuizPdfButton.addEventListener("click", closeQuizPdfDialog);
+quizPdfForm.addEventListener("submit", generateQuizPdf);
 backFromPdfButton.addEventListener("click", closePdfPage);
 selectAllPdfButton.addEventListener("click", () => setPdfSelection(true));
 clearPdfButton.addEventListener("click", () => setPdfSelection(false));
