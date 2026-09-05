@@ -6997,6 +6997,8 @@ function getVisibleItems() {
   const selectedIngredients = [...state.ingredients];
 
   return menuItems.filter((item) => {
+    if (isDeletedMenuItem(item) || isLocallyDeletedMenuItem(item)) return false;
+
     const ingredientText = getItemIngredientText(item);
     const ingredientTerms = getItemIngredientTerms(item);
     const ingredientSource = `${ingredientText} ${ingredientTerms.join(" ")}`.toLowerCase();
@@ -10071,20 +10073,45 @@ function getItemIngredientTerms(item) {
   return inferIngredientTermsFromText(`${getItemIngredientText(item)} ${item?.description || ""}`);
 }
 
+function isDeletedMenuItem(item) {
+  const status = String(item?.status || item?.state || "").toLowerCase();
+  return Boolean(status === "deleted" || item?.deleted === true || item?.deletedAt);
+}
+
+function isLocallyDeletedMenuItem(item) {
+  if (!item?.id) return false;
+  const localDeletedAt = Number(state.localDeletedItemTimes[item.id]) || 0;
+  return Boolean(localDeletedAt && localDeletedAt >= getMenuItemUpdatedAtMs(item));
+}
+
+function getActiveStudyItems() {
+  const activeMenu = getActiveRestaurantMenu();
+  const sourceItems = Array.isArray(activeMenu?.items) ? activeMenu.items : menuItems;
+  const seenIds = new Set();
+
+  return sourceItems
+    .map(normalizeMenuItem)
+    .filter((item) => {
+      if (!item.id || seenIds.has(item.id) || isDeletedMenuItem(item) || isLocallyDeletedMenuItem(item)) return false;
+      seenIds.add(item.id);
+      return true;
+    });
+}
+
 function getStudyItemsWithAllergens() {
-  return menuItems.filter((item) => getItemAllergens(item).length);
+  return getActiveStudyItems().filter((item) => getItemAllergens(item).length);
 }
 
 function getStudyItemsWithIngredients() {
-  return menuItems.filter((item) => getItemIngredientTerms(item).length || getItemIngredientText(item));
+  return getActiveStudyItems().filter((item) => getItemIngredientTerms(item).length || getItemIngredientText(item));
 }
 
 function getAllStudyAllergens() {
-  return uniqueValues(menuItems.flatMap(getItemAllergens));
+  return uniqueValues(getActiveStudyItems().flatMap(getItemAllergens));
 }
 
 function getAllStudyIngredientTerms() {
-  return uniqueValues(menuItems.flatMap(getItemIngredientTerms));
+  return uniqueValues(getActiveStudyItems().flatMap(getItemIngredientTerms));
 }
 
 function escapeRegExp(value = "") {
@@ -10193,7 +10220,8 @@ function nextFlashcard() {
       ? randomItem(["allergies", "ingredients"])
       : state.flashcardMode;
   const deck = mode === "allergies" ? getStudyItemsWithAllergens() : getStudyItemsWithIngredients();
-  const item = randomItem(deck.length ? deck : menuItems);
+  const activeItems = getActiveStudyItems();
+  const item = randomItem(deck.length ? deck : activeItems);
   if (!item) return;
 
   state.flashcard = {
@@ -10371,7 +10399,7 @@ function createQuizQuestionSet(questionLimit, mode = "all") {
 }
 
 function createAllergenYesNoQuestion() {
-  const item = randomItem(menuItems);
+  const item = randomItem(getActiveStudyItems());
   const allAllergens = getAllStudyAllergens();
   if (!item || !allAllergens.length) return null;
 
@@ -10396,7 +10424,7 @@ function createAllergenYesNoQuestion() {
 }
 
 function createIngredientYesNoQuestion() {
-  const item = randomItem(menuItems);
+  const item = randomItem(getActiveStudyItems());
   const allTerms = getAllStudyIngredientTerms();
   if (!item || !allTerms.length) return null;
 
@@ -10444,13 +10472,14 @@ function createItemByAllergenQuestion() {
   const allergen = randomItem(allAllergens);
   if (!allergen) return null;
 
-  const correctItems = menuItems.filter((item) => {
+  const activeItems = getActiveStudyItems();
+  const correctItems = activeItems.filter((item) => {
     return getItemAllergens(item).includes(allergen) && !itemTitleMentionsStudyTerm(item, allergen);
   });
   return createItemMatchQuestion({
     term: allergen,
     correctItems,
-    distractorItems: menuItems.filter((item) => {
+    distractorItems: activeItems.filter((item) => {
       return !getItemAllergens(item).includes(allergen) && !itemTitleMentionsStudyTerm(item, allergen);
     }),
     singularPrompt: (value) => `Which item lists ${value} as an allergy note?`,
@@ -10465,13 +10494,14 @@ function createItemByIngredientQuestion() {
   const term = randomItem(allTerms);
   if (!term) return null;
 
-  const correctItems = menuItems.filter((item) => {
+  const activeItems = getActiveStudyItems();
+  const correctItems = activeItems.filter((item) => {
     return getItemIngredientTerms(item).includes(term) && !itemTitleMentionsStudyTerm(item, term);
   });
   return createItemMatchQuestion({
     term,
     correctItems,
-    distractorItems: menuItems.filter((item) => {
+    distractorItems: activeItems.filter((item) => {
       return !getItemIngredientTerms(item).includes(term) && !itemTitleMentionsStudyTerm(item, term);
     }),
     singularPrompt: (value) => `Which item mentions ${value} in its menu notes?`,
