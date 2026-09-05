@@ -1982,6 +1982,7 @@ const state = {
   screen: loadCurrentUser() ? "menus" : "login",
   activeRestaurantMenu: initialRestaurantMenu?.id || defaultRestaurantMenuId,
   dashboardTab: "users",
+  dashboardFocusMenuId: "",
   dashboardReturnScreen: "menus",
   flashcardMode: "mixed",
   flashcard: null,
@@ -2447,6 +2448,7 @@ const quizResultTitle = document.querySelector("#quizResultTitle");
 const quizResultSummary = document.querySelector("#quizResultSummary");
 const quizStartOverButton = document.querySelector("#quizStartOverButton");
 const quizSheetButton = document.querySelector("#quizSheetButton");
+const quizStatsButton = document.querySelector("#quizStatsButton");
 const quizPdfDialog = document.querySelector("#quizPdfDialog");
 const quizPdfForm = document.querySelector("#quizPdfForm");
 const closeQuizPdfButton = document.querySelector("#closeQuizPdfButton");
@@ -8860,8 +8862,15 @@ function renderDashboardStats() {
     return;
   }
 
+  const focusedStatsMenuId = state.dashboardFocusMenuId;
+
   statsByMenu
     .sort((a, b) => {
+      if (focusedStatsMenuId) {
+        if (a.menu.id === focusedStatsMenuId && b.menu.id !== focusedStatsMenuId) return -1;
+        if (b.menu.id === focusedStatsMenuId && a.menu.id !== focusedStatsMenuId) return 1;
+      }
+
       const clickDifference = b.stats.clicks - a.stats.clicks;
       if (clickDifference) return clickDifference;
       const quizDifference = b.quizResults.length - a.quizResults.length;
@@ -8869,7 +8878,7 @@ function renderDashboardStats() {
       return b.menu.items.length - a.menu.items.length;
     })
     .forEach((entry) => {
-      dashboardStatsList.append(createMenuStatsCard(entry, false));
+      dashboardStatsList.append(createMenuStatsCard(entry, entry.menu.id === focusedStatsMenuId));
     });
 }
 
@@ -9674,6 +9683,20 @@ function canGenerateQuizPdf() {
   const activeUser = getActiveUser();
   const activeMenu = getActiveRestaurantMenu();
   return Boolean(activeUser && activeMenu && canUserAccessMenu(activeUser, activeMenu) && menuItems.length);
+}
+
+function canViewQuizStats() {
+  const activeUser = getActiveUser();
+  const activeMenu = getActiveRestaurantMenu();
+  return Boolean(activeUser && activeMenu && canUserAccessMenu(activeUser, activeMenu) && canEditAnyCategory());
+}
+
+function openQuizStats() {
+  if (!canViewQuizStats()) return;
+
+  const activeMenu = getActiveRestaurantMenu();
+  state.dashboardFocusMenuId = activeMenu?.id || "";
+  openUsersPage("stats");
 }
 
 function openQuizPdfDialog() {
@@ -10576,6 +10599,7 @@ function renderQuiz() {
   const hasSession = Boolean(state.quizSession);
   const isComplete = Boolean(state.quizSession?.completed);
   if (quizSheetButton) quizSheetButton.hidden = !canGenerateQuizPdf();
+  if (quizStatsButton) quizStatsButton.hidden = !canViewQuizStats();
   quizSetupPanel.hidden = hasSession;
   quizScorePanel.hidden = !hasSession;
   quizCard.hidden = !hasSession;
@@ -10854,6 +10878,7 @@ function renderAdminState() {
   adminControls.hidden = !activeUser;
   pdfBuilderButton.hidden = !activeUser;
   if (quizSheetButton) quizSheetButton.hidden = state.screen !== "quiz" || !canGenerateQuizPdf();
+  if (quizStatsButton) quizStatsButton.hidden = state.screen !== "quiz" || !canViewQuizStats();
   scanMenuButton.hidden = !canEditAnyCategory();
   importPdfButton.hidden = !canEditAnyCategory();
   categoryManagerButton.hidden = !canManageCategories();
@@ -13340,6 +13365,7 @@ copyShareCodeButton.addEventListener("click", copyShareCode);
 pdfBuilderButton.addEventListener("click", openPdfPage);
 quickPdfBuilderButton.addEventListener("click", openPdfPage);
 quizSheetButton?.addEventListener("click", openQuizPdfDialog);
+quizStatsButton?.addEventListener("click", openQuizStats);
 closeQuizPdfButton?.addEventListener("click", closeQuizPdfDialog);
 quizPdfForm?.addEventListener("submit", generateQuizPdf);
 closeFeatureAnnouncementButton?.addEventListener("click", closeFeatureAnnouncement);

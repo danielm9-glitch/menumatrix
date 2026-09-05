@@ -6,7 +6,7 @@
     <title>Menu Matrix</title>
     <link rel="icon" type="image/svg+xml" href="assets/app-icon.svg" />
     <link rel="apple-touch-icon" href="assets/app-icon-launcher-preview.png" />
-    <link rel="stylesheet" href="styles.css?v=quiz-active-items-v35" />
+    <link rel="stylesheet" href="styles.css?v=quiz-stats-action-v36" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -309,7 +309,10 @@
           <p class="kicker">Training</p>
           <h1>Quiz</h1>
         </div>
-        <button id="quizSheetButton" class="study-header-action" type="button" aria-label="Print quiz PDF" hidden>Print Quiz</button>
+        <div class="study-header-actions">
+          <button id="quizSheetButton" class="study-header-action" type="button" aria-label="Print quiz PDF" hidden>Print Quiz</button>
+          <button id="quizStatsButton" class="study-header-action" type="button" aria-label="View quiz stats" hidden>Quiz Stats</button>
+        </div>
       </header>
 
       <section id="quizSetupPanel" class="study-card quiz-setup-card">
@@ -1354,6 +1357,6 @@
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js?v=quiz-active-items-v35"></script>
+    <script src="app.js?v=quiz-stats-action-v36"></script>
   </body>
 </html>
