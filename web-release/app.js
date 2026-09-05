@@ -10,7 +10,9 @@ const categoriesStorageKey = "restaurant-menu-matrix-categories";
 const savedShareCodesStorageKey = "restaurant-menu-matrix-saved-share-codes";
 const remoteRequestsStorageKey = "restaurant-menu-matrix-remote-requests";
 const authFlowKey = "restaurant-menu-matrix-auth-flow";
+const featureAnnouncementStorageKey = "restaurant-menu-matrix-feature-announcement";
 const currentAuthFlow = "login-first-menus";
+const currentFeatureAnnouncementVersion = "quiz-sheet-and-focus-v1";
 const firebaseMenuDocumentId = "main";
 const primaryAdminUsername = "admin";
 const cloudOcrEndpoint = window.MENU_MATRIX_OCR_ENDPOINT || "";
@@ -2029,6 +2031,16 @@ const formatter = new Intl.NumberFormat("en-US", {
 
 const flashcardModes = ["mixed", "allergies", "ingredients"];
 const quizQuestionModes = ["all", "ingredients", "allergies"];
+const featureAnnouncementItems = [
+  {
+    title: "Quiz focus",
+    detail: "Before starting a quiz, choose all questions, ingredients only, or allergies only."
+  },
+  {
+    title: "Quiz sheet",
+    detail: "Logged-in menu editors can open Quiz and use Sheet to print or save trainer-ready quiz PDFs."
+  }
+];
 const ingredientVocabulary = [
   "Abalone",
   "Almond",
@@ -2152,9 +2164,7 @@ const quickCategoryButton = document.querySelector("#quickCategoryButton");
 const quickShareMenuButton = document.querySelector("#quickShareMenuButton");
 const quickFlashcardButton = document.querySelector("#quickFlashcardButton");
 const quickQuizButton = document.querySelector("#quickQuizButton");
-const quickQuizPdfButton = document.querySelector("#quickQuizPdfButton");
 const pdfBuilderButton = document.querySelector("#pdfBuilderButton");
-const quizPdfButton = document.querySelector("#quizPdfButton");
 const addItemButton = document.querySelector("#addItemButton");
 const deleteMenuButton = document.querySelector("#deleteMenuButton");
 const scanMenuButton = document.querySelector("#scanMenuButton");
@@ -2414,10 +2424,15 @@ const quizResultPanel = document.querySelector("#quizResultPanel");
 const quizResultTitle = document.querySelector("#quizResultTitle");
 const quizResultSummary = document.querySelector("#quizResultSummary");
 const quizStartOverButton = document.querySelector("#quizStartOverButton");
+const quizSheetButton = document.querySelector("#quizSheetButton");
 const quizPdfDialog = document.querySelector("#quizPdfDialog");
 const quizPdfForm = document.querySelector("#quizPdfForm");
 const closeQuizPdfButton = document.querySelector("#closeQuizPdfButton");
 const quizPdfMessage = document.querySelector("#quizPdfMessage");
+const featureAnnouncementDialog = document.querySelector("#featureAnnouncementDialog");
+const featureAnnouncementList = document.querySelector("#featureAnnouncementList");
+const closeFeatureAnnouncementButton = document.querySelector("#closeFeatureAnnouncementButton");
+const featureAnnouncementDoneButton = document.querySelector("#featureAnnouncementDoneButton");
 
 function normalizeCategoryValue(value) {
   return String(value || "")
@@ -5301,6 +5316,7 @@ function openSharedMenuSnapshot(
   applyDesignSettings();
   renderAllergyChips();
   showScreen(state.screen);
+  if (!preserveView) queueFeatureAnnouncement();
   if (preserveView) {
     window.requestAnimationFrame(() => window.scrollTo(0, previousScrollY));
   }
@@ -5331,6 +5347,7 @@ function openDemoMenu() {
   applyDesignSettings();
   renderAllergyChips();
   showScreen("shared");
+  queueFeatureAnnouncement();
   scrollToPageTop();
 }
 
@@ -6164,6 +6181,52 @@ function scrollToPageTop() {
   });
 }
 
+function shouldShowFeatureAnnouncement() {
+  return Boolean(
+    featureAnnouncementDialog &&
+    featureAnnouncementList &&
+    featureAnnouncementItems.length &&
+    localStorage.getItem(featureAnnouncementStorageKey) !== currentFeatureAnnouncementVersion &&
+    ["menu", "shared"].includes(state.screen) &&
+    getActiveRestaurantMenu()
+  );
+}
+
+function markFeatureAnnouncementSeen() {
+  localStorage.setItem(featureAnnouncementStorageKey, currentFeatureAnnouncementVersion);
+}
+
+function renderFeatureAnnouncement() {
+  if (!featureAnnouncementList) return;
+
+  featureAnnouncementList.replaceChildren();
+  featureAnnouncementItems.forEach((item) => {
+    const row = document.createElement("li");
+    const title = document.createElement("strong");
+    const detail = document.createElement("span");
+    title.textContent = item.title;
+    detail.textContent = item.detail;
+    row.append(title, detail);
+    featureAnnouncementList.append(row);
+  });
+}
+
+function openFeatureAnnouncementIfNeeded() {
+  if (!shouldShowFeatureAnnouncement() || featureAnnouncementDialog.open) return;
+
+  renderFeatureAnnouncement();
+  featureAnnouncementDialog.showModal();
+}
+
+function queueFeatureAnnouncement() {
+  window.setTimeout(openFeatureAnnouncementIfNeeded, 450);
+}
+
+function closeFeatureAnnouncement() {
+  markFeatureAnnouncementSeen();
+  featureAnnouncementDialog?.close();
+}
+
 function goToFrontPage(event) {
   event?.preventDefault();
   closeDrawer();
@@ -6466,7 +6529,6 @@ function renderActiveMenuHeader() {
   const canManageMenuCategories = canManageCategories();
   const canShareMenu = canShareActiveMenu();
   const canUseStudyTools = canStudyActiveMenu();
-  const canUseQuizPdf = canGenerateQuizPdf();
   const canCustomizeMenu = Boolean(activeMenu) && isAdmin();
   const isSharedView = state.screen === "shared";
   const isDemoView = isSharedView && state.demoMode;
@@ -6487,7 +6549,6 @@ function renderActiveMenuHeader() {
   quickShareMenuButton.hidden = !canShareMenu;
   quickFlashcardButton.hidden = !canUseStudyTools;
   quickQuizButton.hidden = !canUseStudyTools;
-  quickQuizPdfButton.hidden = !canUseQuizPdf;
   renderActiveMenuNotificationButton(activeMenu);
   quickMenuActions.hidden =
     quickEditModeButton.hidden &&
@@ -6498,8 +6559,7 @@ function renderActiveMenuHeader() {
     quickCategoryButton.hidden &&
     quickShareMenuButton.hidden &&
     quickFlashcardButton.hidden &&
-    quickQuizButton.hidden &&
-    quickQuizPdfButton.hidden;
+    quickQuizButton.hidden;
 }
 
 function openRestaurantMenu(menuId) {
@@ -6518,6 +6578,7 @@ function openRestaurantMenu(menuId) {
   applyDesignSettings();
   renderAllergyChips();
   showScreen("menu");
+  queueFeatureAnnouncement();
 }
 
 function openRenameMenuDialog() {
@@ -10332,6 +10393,7 @@ function renderQuiz() {
 
   const hasSession = Boolean(state.quizSession);
   const isComplete = Boolean(state.quizSession?.completed);
+  if (quizSheetButton) quizSheetButton.hidden = !canGenerateQuizPdf();
   quizSetupPanel.hidden = hasSession;
   quizScorePanel.hidden = !hasSession;
   quizCard.hidden = !hasSession;
@@ -10602,7 +10664,7 @@ function renderAdminState() {
   if (showingInviteSetup) codeLoginForm.hidden = true;
   adminControls.hidden = !activeUser;
   pdfBuilderButton.hidden = !activeUser;
-  quizPdfButton.hidden = !canGenerateQuizPdf();
+  quizSheetButton.hidden = state.screen !== "quiz" || !canGenerateQuizPdf();
   scanMenuButton.hidden = !canEditAnyCategory();
   importPdfButton.hidden = !canEditAnyCategory();
   categoryManagerButton.hidden = !canManageCategories();
@@ -13088,10 +13150,12 @@ saveShareCodeButton.addEventListener("click", saveShareCode);
 copyShareCodeButton.addEventListener("click", copyShareCode);
 pdfBuilderButton.addEventListener("click", openPdfPage);
 quickPdfBuilderButton.addEventListener("click", openPdfPage);
-quizPdfButton.addEventListener("click", openQuizPdfDialog);
-quickQuizPdfButton.addEventListener("click", openQuizPdfDialog);
+quizSheetButton.addEventListener("click", openQuizPdfDialog);
 closeQuizPdfButton.addEventListener("click", closeQuizPdfDialog);
 quizPdfForm.addEventListener("submit", generateQuizPdf);
+closeFeatureAnnouncementButton.addEventListener("click", closeFeatureAnnouncement);
+featureAnnouncementDoneButton.addEventListener("click", closeFeatureAnnouncement);
+featureAnnouncementDialog.addEventListener("close", markFeatureAnnouncementSeen);
 backFromPdfButton.addEventListener("click", closePdfPage);
 selectAllPdfButton.addEventListener("click", () => setPdfSelection(true));
 clearPdfButton.addEventListener("click", () => setPdfSelection(false));

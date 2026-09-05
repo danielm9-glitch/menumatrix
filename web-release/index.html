@@ -227,7 +227,6 @@
           <button id="quickShareMenuButton" class="quick-action-button" type="button" hidden>Share</button>
           <button id="quickFlashcardButton" class="quick-action-button" type="button" hidden>Flash cards</button>
           <button id="quickQuizButton" class="quick-action-button" type="button" hidden>Quiz</button>
-          <button id="quickQuizPdfButton" class="quick-action-button" type="button" hidden>Quiz PDF</button>
         </section>
 
         <section class="controls" aria-label="Menu filters">
@@ -304,12 +303,13 @@
     </main>
 
     <main id="quizPage" class="app-shell study-page" aria-label="Menu quiz" hidden>
-      <header class="page-top-bar">
+      <header class="page-top-bar has-page-action">
         <button id="backFromQuizButton" class="action-button" type="button">Back</button>
         <div>
           <p class="kicker">Training</p>
           <h1>Quiz</h1>
         </div>
+        <button id="quizSheetButton" class="study-header-action" type="button" aria-label="Create quiz sheet PDF" hidden>Sheet</button>
       </header>
 
       <section id="quizSetupPanel" class="study-card quiz-setup-card">
@@ -373,7 +373,7 @@
         <div class="dialog-head">
           <div>
             <p class="kicker">Training export</p>
-            <h2 id="quizPdfDialogTitle">Create quiz PDF</h2>
+            <h2 id="quizPdfDialogTitle">Quiz Sheet</h2>
           </div>
           <button class="icon-button" type="button" aria-label="Close quiz PDF setup" id="closeQuizPdfButton">x</button>
         </div>
@@ -392,8 +392,22 @@
         </fieldset>
         <p id="quizPdfMessage" class="login-message" role="status"></p>
         <div class="form-actions single-action">
-          <button class="save-button" type="submit">Print / Save Quiz PDF</button>
+          <button class="save-button" type="submit">Print / Save Sheet</button>
         </div>
+      </form>
+    </dialog>
+
+    <dialog id="featureAnnouncementDialog" class="item-dialog feature-announcement-dialog" aria-labelledby="featureAnnouncementTitle">
+      <form method="dialog" class="item-form">
+        <div class="dialog-head">
+          <div>
+            <p class="kicker">What's new</p>
+            <h2 id="featureAnnouncementTitle">New menu tools</h2>
+          </div>
+          <button id="closeFeatureAnnouncementButton" class="icon-button" type="button" aria-label="Close feature update">x</button>
+        </div>
+        <ul id="featureAnnouncementList" class="feature-announcement-list"></ul>
+        <button id="featureAnnouncementDoneButton" class="save-button" type="button">Got it</button>
       </form>
     </dialog>
 
@@ -415,7 +429,6 @@
         <button id="scanMenuButton" class="action-button" type="button" hidden>Scan menu photo</button>
         <button id="importPdfButton" class="action-button" type="button" hidden>Import PDF</button>
         <button id="pdfBuilderButton" class="action-button" type="button" hidden>Create PDF</button>
-        <button id="quizPdfButton" class="action-button" type="button" hidden>Quiz PDF</button>
         <button id="categoryManagerButton" class="action-button" type="button" hidden>Categories</button>
         <button id="shareMenuButton" class="action-button" type="button" hidden>Share menu</button>
         <button id="manageUsersButton" class="action-button" type="button" hidden>Dashboard</button>
