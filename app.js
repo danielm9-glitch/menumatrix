@@ -2035,7 +2035,7 @@ const quizQuestionModes = ["all", "ingredients", "allergies"];
 const featureAnnouncementItems = [
   {
     title: "Creator user access",
-    detail: "Restaurant owners can now invite users, attach them to menus, and choose which categories they can modify.",
+    detail: "Restaurant owners and menu editors can now invite users, attach them to menus, and choose which categories they can modify.",
     audiences: ["user"]
   },
   {
@@ -4616,14 +4616,30 @@ function canUserAccessMenu(user, menu) {
   return owner === getUserWorkspaceOwner(user) && (assignedMenuIds === null || assignedMenuIds.includes(menu.id));
 }
 
+function getEditableCategoriesForMenu(user, menu) {
+  if (!user || !menu) return [];
+  if (user.role === "admin" || getMenuOwner(menu) === user.username) return [...categories];
+  if (user.role !== "editor" || !canUserAccessMenu(user, menu)) return [];
+
+  const menuPermissions = getUserMenuPermissions(user, menu.id);
+  if (hasUserMenuPermissionEntries(user)) return menuPermissions || [];
+  return menuPermissions || user.permissions || [];
+}
+
 function canManageUsers(user = getActiveUser()) {
-  return Boolean(user && (user.role === "admin" || user.role === "owner"));
+  return Boolean(
+    user &&
+      (user.role === "admin" || user.role === "owner" || getAssignableMenusForUserManager(user).length)
+  );
 }
 
 function getAssignableMenusForUserManager(manager = getActiveUser()) {
   if (!manager) return [];
   if (manager.role === "admin") return restaurantMenus;
   if (manager.role === "owner") return restaurantMenus.filter((menu) => getMenuOwner(menu) === manager.username);
+  if (manager.role === "editor") {
+    return getVisibleRestaurantMenus().filter((menu) => getEditableCategoriesForMenu(manager, menu).length);
+  }
   return [];
 }
 
@@ -4640,8 +4656,9 @@ function isUserConnectedToManagedMenus(user, manager = getActiveUser()) {
 function canManageUserAccount(user, manager = getActiveUser()) {
   if (!manager || !user || isDeletedUser(user)) return false;
   if (manager.role === "admin") return true;
-  if (manager.role !== "owner" || user.role !== "editor") return false;
-  return getUserWorkspaceOwner(user) === manager.username || isUserConnectedToManagedMenus(user, manager);
+  if (!["owner", "editor"].includes(manager.role) || user.role !== "editor" || user.username === manager.username) return false;
+  if (manager.role === "editor" && getAssignedMenuIds(user) === null) return false;
+  return isUserConnectedToManagedMenus(user, manager);
 }
 
 function getManageableUsers(manager = getActiveUser()) {
@@ -5699,13 +5716,7 @@ function canManageCategories() {
 function getEditableCategories() {
   const user = getActiveUser();
   const activeMenu = getActiveRestaurantMenu();
-  if (!user) return [];
-  if (ownsActiveMenu()) return [...categories];
-  if (isAdmin()) return [...categories];
-  if (!canUserAccessMenu(user, activeMenu)) return [];
-  const menuPermissions = getUserMenuPermissions(user, activeMenu?.id);
-  if (hasUserMenuPermissionEntries(user)) return menuPermissions || [];
-  return menuPermissions || user.permissions || [];
+  return getEditableCategoriesForMenu(user, activeMenu);
 }
 
 function canEditCategory(category) {
@@ -11773,10 +11784,13 @@ function getInitialMenuPermissionSelection(user, menuId) {
     : [];
 }
 
-function createMenuPermissionBranch(menu, selectedPermissions = [], { disabled = false } = {}) {
+function createMenuPermissionBranch(menu, selectedPermissions = [], { disabled = false, allowedCategories = categories } = {}) {
   const details = document.createElement("details");
   details.className = "menu-permission-branch";
   details.open = !disabled && Boolean(selectedPermissions.length);
+  const grantableCategories = getUniqueCategoryValues(allowedCategories.map(normalizeCategoryValue)).filter((category) =>
+    categories.includes(category)
+  );
 
   const summary = document.createElement("summary");
   summary.className = "menu-permission-summary";
@@ -11809,9 +11823,9 @@ function createMenuPermissionBranch(menu, selectedPermissions = [], { disabled =
 
   const grid = document.createElement("div");
   grid.className = "menu-permission-grid";
-  const selectedSet = new Set(selectedPermissions);
+  const selectedSet = new Set(selectedPermissions.filter((permission) => grantableCategories.includes(permission)));
 
-  categories.forEach((category) => {
+  grantableCategories.forEach((category) => {
     const label = document.createElement("label");
     label.className = "menu-permission-option";
 
@@ -11830,7 +11844,7 @@ function createMenuPermissionBranch(menu, selectedPermissions = [], { disabled =
   const updateCount = () => {
     const selectedCount = grid.querySelectorAll("input[name='menuPermission']:checked").length;
     count.textContent = selectedCount
-      ? `${selectedCount} of ${categories.length} selected`
+      ? `${selectedCount} of ${grantableCategories.length} selected`
       : "View only";
   };
   const setAll = (isSelected) => {
@@ -11906,7 +11920,8 @@ function createMenuAccessFieldset(user, options = {}) {
       : Array.isArray(options.menuPermissions?.[menu.id])
         ? options.menuPermissions[menu.id]
         : getInitialMenuPermissionSelection(user, menu.id);
-    const permissionBranch = createMenuPermissionBranch(menu, permissions, { disabled: !input.checked });
+    const allowedCategories = getEditableCategoriesForMenu(getActiveUser(), menu);
+    const permissionBranch = createMenuPermissionBranch(menu, permissions, { disabled: !input.checked, allowedCategories });
     const updateBranchState = () => {
       const isEnabled = input.checked;
       branch.classList.toggle("is-disabled", !isEnabled);
@@ -11976,6 +11991,15 @@ function getScopedMenuIdsForUserManager() {
   return { allowedMenuIds, menuIds: [...allowedMenuIds] };
 }
 
+function getScopedCategoryMapForUserManager(manager = getActiveUser()) {
+  return new Map(
+    getAssignableMenusForUserManager(manager).map((menu) => [
+      menu.id,
+      new Set(getEditableCategoriesForMenu(manager, menu))
+    ])
+  );
+}
+
 function getSelectedManageableMenuIds(container) {
   const { allowedMenuIds } = getScopedMenuIdsForUserManager();
   return getSelectedMenuIds(container).filter((menuId) => allowedMenuIds.has(menuId));
@@ -11983,10 +12007,55 @@ function getSelectedManageableMenuIds(container) {
 
 function getSelectedManageableMenuPermissions(container) {
   const { allowedMenuIds } = getScopedMenuIdsForUserManager();
+  const allowedCategoriesByMenu = getScopedCategoryMapForUserManager();
   const menuPermissions = getSelectedMenuPermissions(container);
   return normalizeMenuPermissions(
-    Object.fromEntries(Object.entries(menuPermissions).filter(([menuId]) => allowedMenuIds.has(menuId)))
+    Object.fromEntries(
+      Object.entries(menuPermissions)
+        .filter(([menuId]) => allowedMenuIds.has(menuId))
+        .map(([menuId, permissions]) => [
+          menuId,
+          permissions.filter((permission) => allowedCategoriesByMenu.get(menuId)?.has(permission))
+        ])
+    )
   );
+}
+
+function getWorkspaceOwnerForMenuSelection(menuIds = [], manager = getActiveUser(), fallbackUser = null) {
+  const selectedMenuIds = new Set(menuIds);
+  const selectedOwners = uniqueValues(
+    restaurantMenus
+      .filter((menu) => selectedMenuIds.has(menu.id))
+      .map(getMenuOwner)
+      .filter(Boolean)
+  );
+
+  if (selectedOwners.length === 1) return selectedOwners[0];
+  return fallbackUser?.workspaceOwner || getUserWorkspaceOwner(manager);
+}
+
+function mergeScopedMenuIdsForUserManager(existingUser, selectedMenuIds, manager = getActiveUser()) {
+  if (!existingUser || manager?.role !== "editor") return selectedMenuIds;
+
+  const { allowedMenuIds } = getScopedMenuIdsForUserManager();
+  const existingMenuIds = getAssignedMenuIds(existingUser) || [];
+  return uniqueValues([
+    ...existingMenuIds.filter((menuId) => !allowedMenuIds.has(menuId)),
+    ...selectedMenuIds
+  ]);
+}
+
+function mergeScopedMenuPermissionsForUserManager(existingUser, selectedMenuPermissions, manager = getActiveUser()) {
+  if (!existingUser || manager?.role !== "editor") return selectedMenuPermissions;
+
+  const { allowedMenuIds } = getScopedMenuIdsForUserManager();
+  const preservedEntries = Object.entries(normalizeMenuPermissions(existingUser.menuPermissions)).filter(
+    ([menuId]) => !allowedMenuIds.has(menuId)
+  );
+  return normalizeMenuPermissions({
+    ...Object.fromEntries(preservedEntries),
+    ...selectedMenuPermissions
+  });
 }
 
 function saveUser(event) {
@@ -11999,8 +12068,12 @@ function saveUser(event) {
   const isInvite = createMethod.value === "invite";
   const menuIds = getSelectedManageableMenuIds(userForm);
   const menuPermissions = getSelectedManageableMenuPermissions(userForm);
-  const permissions = Object.keys(menuPermissions).length ? [] : getSelectedPermissions(userForm);
   const assignableMenuCount = getAssignableMenusForUserManager().length;
+  const existingIndex = users.findIndex((user) => user.username === username);
+  const existingUser = existingIndex >= 0 ? users[existingIndex] : null;
+  const finalMenuIds = mergeScopedMenuIdsForUserManager(existingUser, menuIds, activeUser);
+  const finalMenuPermissions = mergeScopedMenuPermissionsForUserManager(existingUser, menuPermissions, activeUser);
+  const permissions = Object.keys(finalMenuPermissions).length ? [] : getSelectedPermissions(userForm);
 
   if (!assignableMenuCount) {
     userMessage.textContent = "Create a menu first, then connect users to it.";
@@ -12017,7 +12090,6 @@ function saveUser(event) {
     return;
   }
 
-  const existingIndex = users.findIndex((user) => user.username === username);
   if (existingIndex >= 0 && !canManageUserAccount(users[existingIndex], activeUser)) {
     userMessage.textContent = "That username belongs to another workspace. Use a different username.";
     return;
@@ -12029,9 +12101,9 @@ function saveUser(event) {
     password: isInvite ? "" : newPassword.value,
     role: "editor",
     permissions,
-    menuPermissions,
-    menuIds,
-    workspaceOwner: activeUser?.role === "owner" ? activeUser.username : primaryAdminUsername,
+    menuPermissions: finalMenuPermissions,
+    menuIds: finalMenuIds,
+    workspaceOwner: getWorkspaceOwnerForMenuSelection(finalMenuIds, activeUser, existingUser),
     status: isInvite ? "pending" : "active",
     createdAt: existingIndex >= 0 ? users[existingIndex].createdAt || "" : new Date().toISOString(),
     updatedAt: new Date().toISOString()
@@ -12123,7 +12195,9 @@ function updateUser(event, username) {
   const form = event.currentTarget;
   const menuIds = getSelectedManageableMenuIds(form);
   const menuPermissions = getSelectedManageableMenuPermissions(form);
-  const permissions = Object.keys(menuPermissions).length ? [] : getSelectedPermissions(form);
+  const finalMenuIds = mergeScopedMenuIdsForUserManager(users[userIndex], menuIds);
+  const finalMenuPermissions = mergeScopedMenuPermissionsForUserManager(users[userIndex], menuPermissions);
+  const permissions = Object.keys(finalMenuPermissions).length ? [] : getSelectedPermissions(form);
   const assignableMenuCount = getAssignableMenusForUserManager().length;
 
   if (users[userIndex].role === "editor" && !assignableMenuCount) {
@@ -12141,11 +12215,14 @@ function updateUser(event, username) {
     email: form.elements.email.value,
     password: form.elements.password.value,
     permissions,
-    menuPermissions,
-    workspaceOwner: users[userIndex].role === "editor" && getActiveUser()?.role === "owner" ? getActiveUser().username : users[userIndex].workspaceOwner,
+    menuPermissions: finalMenuPermissions,
+    workspaceOwner:
+      users[userIndex].role === "editor"
+        ? getWorkspaceOwnerForMenuSelection(finalMenuIds, getActiveUser(), users[userIndex])
+        : users[userIndex].workspaceOwner,
     updatedAt: new Date().toISOString()
   };
-  if (users[userIndex].role === "editor") updatedUser.menuIds = menuIds;
+  if (users[userIndex].role === "editor") updatedUser.menuIds = finalMenuIds;
   if (users[userIndex].role === "owner") updatedUser.menuIds = null;
   users[userIndex] = updatedUser;
 
