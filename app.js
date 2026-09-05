@@ -9624,18 +9624,18 @@ function canGenerateQuizPdf() {
 }
 
 function openQuizPdfDialog() {
-  if (!canGenerateQuizPdf()) return;
+  if (!quizPdfDialog || !quizPdfForm || !quizPdfMessage || !canGenerateQuizPdf()) return;
 
   closeDrawer();
-  quizPdfForm?.reset();
+  quizPdfForm.reset();
   quizPdfMessage.textContent = "";
   quizPdfDialog.showModal();
 }
 
 function closeQuizPdfDialog() {
-  quizPdfDialog.close();
+  quizPdfDialog?.close();
   quizPdfForm?.reset();
-  quizPdfMessage.textContent = "";
+  if (quizPdfMessage) quizPdfMessage.textContent = "";
 }
 
 function getSelectedQuizPdfQuestionCount() {
@@ -9655,20 +9655,20 @@ function generateQuizPdf(event) {
   const questions = createQuizQuestionSet(questionLimit, questionMode);
 
   if (!questions.length) {
-    quizPdfMessage.textContent = `No ${getQuizQuestionModeLabel(questionMode).toLowerCase()} quiz data is ready for this menu yet.`;
+    if (quizPdfMessage) quizPdfMessage.textContent = `No ${getQuizQuestionModeLabel(questionMode).toLowerCase()} quiz data is ready for this menu yet.`;
     return;
   }
 
   const printWindow = window.open("", "_blank");
   if (!printWindow) {
-    quizPdfMessage.textContent = "Allow popups to create the quiz PDF page.";
+    if (quizPdfMessage) quizPdfMessage.textContent = "Allow popups to create the quiz PDF page.";
     return;
   }
 
   printWindow.document.write(getPrintableQuizHtml(questions, questionMode));
   printWindow.document.close();
   printWindow.focus();
-  quizPdfMessage.textContent = `Quiz PDF ready with ${questions.length} question${questions.length === 1 ? "" : "s"}.`;
+  if (quizPdfMessage) quizPdfMessage.textContent = `Quiz PDF ready with ${questions.length} question${questions.length === 1 ? "" : "s"}.`;
   setTimeout(() => printWindow.print(), 300);
 }
 
@@ -10664,7 +10664,7 @@ function renderAdminState() {
   if (showingInviteSetup) codeLoginForm.hidden = true;
   adminControls.hidden = !activeUser;
   pdfBuilderButton.hidden = !activeUser;
-  quizSheetButton.hidden = state.screen !== "quiz" || !canGenerateQuizPdf();
+  if (quizSheetButton) quizSheetButton.hidden = state.screen !== "quiz" || !canGenerateQuizPdf();
   scanMenuButton.hidden = !canEditAnyCategory();
   importPdfButton.hidden = !canEditAnyCategory();
   categoryManagerButton.hidden = !canManageCategories();
@@ -13150,12 +13150,12 @@ saveShareCodeButton.addEventListener("click", saveShareCode);
 copyShareCodeButton.addEventListener("click", copyShareCode);
 pdfBuilderButton.addEventListener("click", openPdfPage);
 quickPdfBuilderButton.addEventListener("click", openPdfPage);
-quizSheetButton.addEventListener("click", openQuizPdfDialog);
-closeQuizPdfButton.addEventListener("click", closeQuizPdfDialog);
-quizPdfForm.addEventListener("submit", generateQuizPdf);
-closeFeatureAnnouncementButton.addEventListener("click", closeFeatureAnnouncement);
-featureAnnouncementDoneButton.addEventListener("click", closeFeatureAnnouncement);
-featureAnnouncementDialog.addEventListener("close", markFeatureAnnouncementSeen);
+quizSheetButton?.addEventListener("click", openQuizPdfDialog);
+closeQuizPdfButton?.addEventListener("click", closeQuizPdfDialog);
+quizPdfForm?.addEventListener("submit", generateQuizPdf);
+closeFeatureAnnouncementButton?.addEventListener("click", closeFeatureAnnouncement);
+featureAnnouncementDoneButton?.addEventListener("click", closeFeatureAnnouncement);
+featureAnnouncementDialog?.addEventListener("close", markFeatureAnnouncementSeen);
 backFromPdfButton.addEventListener("click", closePdfPage);
 selectAllPdfButton.addEventListener("click", () => setPdfSelection(true));
 clearPdfButton.addEventListener("click", () => setPdfSelection(false));
