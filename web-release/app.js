@@ -12,7 +12,7 @@ const remoteRequestsStorageKey = "restaurant-menu-matrix-remote-requests";
 const authFlowKey = "restaurant-menu-matrix-auth-flow";
 const featureAnnouncementStorageKey = "restaurant-menu-matrix-feature-announcement";
 const currentAuthFlow = "login-first-menus";
-const currentFeatureAnnouncementVersion = "quiz-sheet-and-focus-v1";
+const currentFeatureAnnouncementVersion = "viewer-tools-and-compact-dashboard-v1";
 const firebaseMenuDocumentId = "main";
 const primaryAdminUsername = "admin";
 const cloudOcrEndpoint = window.MENU_MATRIX_OCR_ENDPOINT || "";
@@ -2033,12 +2033,29 @@ const flashcardModes = ["mixed", "allergies", "ingredients"];
 const quizQuestionModes = ["all", "ingredients", "allergies"];
 const featureAnnouncementItems = [
   {
-    title: "Quiz focus",
-    detail: "Before starting a quiz, choose all questions, ingredients only, or allergies only."
+    title: "Fresh shared menus",
+    detail: "When a viewer opens a code, Menu Matrix checks Firebase first so saved menus pull updated photos, items, and quiz data.",
+    audiences: ["viewer"]
   },
   {
-    title: "Quiz sheet",
-    detail: "Logged-in menu editors can open Quiz and use Print Quiz to print or save trainer-ready quiz PDFs."
+    title: "Viewer study tools",
+    detail: "Shared-code viewers can use flashcards and quizzes from the menu banner without creating an account.",
+    audiences: ["viewer"]
+  },
+  {
+    title: "Quiz focus",
+    detail: "Before starting a quiz, choose all questions, ingredients only, or allergies only.",
+    audiences: ["user", "viewer"]
+  },
+  {
+    title: "Print Quiz",
+    detail: "Logged-in menu editors can open Quiz and use Print Quiz to print or save trainer-ready quiz PDFs.",
+    audiences: ["user"]
+  },
+  {
+    title: "Compact dashboard",
+    detail: "Account and dashboard tools are grouped into shorter sections so there is less scrolling.",
+    audiences: ["user"]
   }
 ];
 const ingredientVocabulary = [
@@ -2430,6 +2447,7 @@ const quizPdfForm = document.querySelector("#quizPdfForm");
 const closeQuizPdfButton = document.querySelector("#closeQuizPdfButton");
 const quizPdfMessage = document.querySelector("#quizPdfMessage");
 const featureAnnouncementDialog = document.querySelector("#featureAnnouncementDialog");
+const featureAnnouncementTitle = document.querySelector("#featureAnnouncementTitle");
 const featureAnnouncementList = document.querySelector("#featureAnnouncementList");
 const closeFeatureAnnouncementButton = document.querySelector("#closeFeatureAnnouncementButton");
 const featureAnnouncementDoneButton = document.querySelector("#featureAnnouncementDoneButton");
@@ -6182,25 +6200,51 @@ function scrollToPageTop() {
 }
 
 function shouldShowFeatureAnnouncement() {
+  const audience = getFeatureAnnouncementAudience();
+  const announcementItems = getCurrentFeatureAnnouncementItems(audience);
+
   return Boolean(
     featureAnnouncementDialog &&
     featureAnnouncementList &&
-    featureAnnouncementItems.length &&
-    localStorage.getItem(featureAnnouncementStorageKey) !== currentFeatureAnnouncementVersion &&
+    announcementItems.length &&
+    localStorage.getItem(getFeatureAnnouncementSeenKey(audience)) !== currentFeatureAnnouncementVersion &&
     ["menu", "shared"].includes(state.screen) &&
     getActiveRestaurantMenu()
   );
 }
 
-function markFeatureAnnouncementSeen() {
-  localStorage.setItem(featureAnnouncementStorageKey, currentFeatureAnnouncementVersion);
+function getFeatureAnnouncementAudience() {
+  return state.sharedMenu ? "viewer" : "user";
 }
 
-function renderFeatureAnnouncement() {
+function getFeatureAnnouncementSeenKey(audience = getFeatureAnnouncementAudience()) {
+  return `${featureAnnouncementStorageKey}:${audience}`;
+}
+
+function getCurrentFeatureAnnouncementItems(audience = getFeatureAnnouncementAudience()) {
+  return featureAnnouncementItems.filter((item) => {
+    return !Array.isArray(item.audiences) || item.audiences.includes(audience);
+  });
+}
+
+function getFeatureAnnouncementHeading(audience = getFeatureAnnouncementAudience()) {
+  return audience === "viewer" ? "New viewer tools" : "New menu tools";
+}
+
+function markFeatureAnnouncementSeen() {
+  const audience = featureAnnouncementDialog?.dataset.announcementAudience || getFeatureAnnouncementAudience();
+  localStorage.setItem(getFeatureAnnouncementSeenKey(audience), currentFeatureAnnouncementVersion);
+}
+
+function renderFeatureAnnouncement(audience = getFeatureAnnouncementAudience()) {
   if (!featureAnnouncementList) return;
 
+  if (featureAnnouncementTitle) {
+    featureAnnouncementTitle.textContent = getFeatureAnnouncementHeading(audience);
+  }
+
   featureAnnouncementList.replaceChildren();
-  featureAnnouncementItems.forEach((item) => {
+  getCurrentFeatureAnnouncementItems(audience).forEach((item) => {
     const row = document.createElement("li");
     const title = document.createElement("strong");
     const detail = document.createElement("span");
@@ -6214,7 +6258,9 @@ function renderFeatureAnnouncement() {
 function openFeatureAnnouncementIfNeeded() {
   if (!shouldShowFeatureAnnouncement() || featureAnnouncementDialog.open) return;
 
-  renderFeatureAnnouncement();
+  const audience = getFeatureAnnouncementAudience();
+  featureAnnouncementDialog.dataset.announcementAudience = audience;
+  renderFeatureAnnouncement(audience);
   featureAnnouncementDialog.showModal();
 }
 

@@ -6,7 +6,7 @@
     <title>Menu Matrix</title>
     <link rel="icon" type="image/svg+xml" href="assets/app-icon.svg" />
     <link rel="apple-touch-icon" href="assets/app-icon-launcher-preview.png" />
-    <link rel="stylesheet" href="styles.css?v=feature-announcements-v29" />
+    <link rel="stylesheet" href="styles.css?v=compact-dashboard-viewers-v32" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -457,8 +457,8 @@
         <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="customization">Customization</button>
       </nav>
 
-      <section class="dashboard-panel" data-dashboard-panel="account">
-        <section class="dashboard-panel">
+      <section class="dashboard-panel account-dashboard" data-dashboard-panel="account">
+        <section class="account-summary-card">
           <div class="section-heading">
             <p class="kicker">Overview</p>
             <strong>Account summary</strong>
@@ -466,73 +466,95 @@
           <div id="accountProfileSummary" class="dashboard-metric-grid"></div>
         </section>
 
-        <section class="user-manager">
-          <div class="section-heading">
-            <p class="kicker">Login email</p>
-            <strong>Email and verification</strong>
-          </div>
-          <form id="accountEmailForm" class="user-form">
-            <label>
-              Email
-              <input id="accountEmailInput" type="email" autocomplete="email" required />
-            </label>
-            <div class="account-action-row">
-              <button class="save-button" type="submit">Change email</button>
-              <button id="accountVerifyEmailButton" class="action-button" type="button">Verify email</button>
+        <div class="account-accordion-grid">
+          <details class="account-accordion">
+            <summary>
+              <span class="account-accordion-title">
+                <span>Login email</span>
+                <strong>Email and verification</strong>
+                <small>Change the address or send a verification email.</small>
+              </span>
+            </summary>
+            <div class="account-accordion-body">
+              <form id="accountEmailForm" class="user-form">
+                <label>
+                  Email
+                  <input id="accountEmailInput" type="email" autocomplete="email" required />
+                </label>
+                <div class="account-action-row">
+                  <button class="save-button" type="submit">Change email</button>
+                  <button id="accountVerifyEmailButton" class="action-button" type="button">Verify email</button>
+                </div>
+                <p id="accountEmailMessage" class="login-message" role="status"></p>
+              </form>
             </div>
-            <p id="accountEmailMessage" class="login-message" role="status"></p>
-          </form>
-        </section>
+          </details>
 
-        <section class="user-manager">
-          <div class="section-heading">
-            <p class="kicker">Security</p>
-            <strong>Password</strong>
-          </div>
-          <form id="accountPasswordForm" class="user-form">
-            <label>
-              New password
-              <input id="accountPasswordInput" type="password" autocomplete="new-password" minlength="6" required />
-            </label>
-            <div class="account-action-row">
-              <button class="save-button" type="submit">Change password</button>
-              <button id="accountPasswordResetButton" class="action-button" type="button">Email reset link</button>
+          <details class="account-accordion">
+            <summary>
+              <span class="account-accordion-title">
+                <span>Security</span>
+                <strong>Password</strong>
+                <small>Update the password or send a reset link.</small>
+              </span>
+            </summary>
+            <div class="account-accordion-body">
+              <form id="accountPasswordForm" class="user-form">
+                <label>
+                  New password
+                  <input id="accountPasswordInput" type="password" autocomplete="new-password" minlength="6" required />
+                </label>
+                <div class="account-action-row">
+                  <button class="save-button" type="submit">Change password</button>
+                  <button id="accountPasswordResetButton" class="action-button" type="button">Email reset link</button>
+                </div>
+                <p id="accountPasswordMessage" class="login-message" role="status"></p>
+              </form>
             </div>
-            <p id="accountPasswordMessage" class="login-message" role="status"></p>
-          </form>
-        </section>
+          </details>
 
-        <section class="user-manager">
-          <div class="section-heading">
-            <p class="kicker">Restaurants</p>
-            <strong>Link menus</strong>
-          </div>
-          <form id="accountRestaurantForm" class="user-form">
-            <label>
-              Menu
-              <select id="accountMenuSelect" required></select>
-            </label>
-            <label>
-              Restaurant
-              <select id="accountRestaurantSelect" required></select>
-            </label>
-            <button class="save-button" type="submit">Attach menu to restaurant</button>
-            <p id="accountRestaurantMessage" class="login-message" role="status"></p>
-          </form>
-          <div id="accountRestaurantLinks" class="dashboard-list"></div>
-        </section>
+          <details class="account-accordion">
+            <summary>
+              <span class="account-accordion-title">
+                <span>Restaurants</span>
+                <strong>Menu links</strong>
+                <small>Attach created menus to the right restaurant workspace.</small>
+              </span>
+            </summary>
+            <div class="account-accordion-body">
+              <form id="accountRestaurantForm" class="user-form">
+                <label>
+                  Menu
+                  <select id="accountMenuSelect" required></select>
+                </label>
+                <label>
+                  Restaurant
+                  <select id="accountRestaurantSelect" required></select>
+                </label>
+                <button class="save-button" type="submit">Attach menu to restaurant</button>
+                <p id="accountRestaurantMessage" class="login-message" role="status"></p>
+              </form>
+              <div id="accountRestaurantLinks" class="dashboard-list"></div>
+            </div>
+          </details>
 
-        <section class="user-manager account-danger-zone">
-          <div class="section-heading">
-            <p class="kicker">Danger zone</p>
-            <strong>Delete account</strong>
-          </div>
-          <p class="dashboard-note">
-            Delete your account profile and remove your own menu workspace. This action cannot be undone.
-          </p>
-          <button id="deleteAccountButton" class="danger-button" type="button">Delete my account</button>
-          <p id="accountDeleteStatus" class="login-message" role="status"></p>
-        </section>
+          <details class="account-accordion is-danger">
+            <summary>
+              <span class="account-accordion-title">
+                <span>Danger zone</span>
+                <strong>Delete account</strong>
+                <small>Remove your account profile and your own menu workspace.</small>
+              </span>
+            </summary>
+            <div class="account-accordion-body">
+              <p class="dashboard-note">
+                This action cannot be undone.
+              </p>
+              <button id="deleteAccountButton" class="danger-button" type="button">Delete my account</button>
+              <p id="accountDeleteStatus" class="login-message" role="status"></p>
+            </div>
+          </details>
+        </div>
       </section>
 
       <section class="dashboard-panel" data-dashboard-panel="users" hidden>
@@ -1332,6 +1354,6 @@
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js?v=feature-announcements-v29"></script>
+    <script src="app.js?v=compact-dashboard-viewers-v32"></script>
   </body>
 </html>
