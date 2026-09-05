@@ -12,7 +12,7 @@ const remoteRequestsStorageKey = "restaurant-menu-matrix-remote-requests";
 const authFlowKey = "restaurant-menu-matrix-auth-flow";
 const featureAnnouncementStorageKey = "restaurant-menu-matrix-feature-announcement";
 const currentAuthFlow = "login-first-menus";
-const currentFeatureAnnouncementVersion = "viewer-tools-and-compact-dashboard-v1";
+const currentFeatureAnnouncementVersion = "quiz-title-mask-v1";
 const firebaseMenuDocumentId = "main";
 const primaryAdminUsername = "admin";
 const cloudOcrEndpoint = window.MENU_MATRIX_OCR_ENDPOINT || "";
@@ -2032,6 +2032,11 @@ const formatter = new Intl.NumberFormat("en-US", {
 const flashcardModes = ["mixed", "allergies", "ingredients"];
 const quizQuestionModes = ["all", "ingredients", "allergies"];
 const featureAnnouncementItems = [
+  {
+    title: "Fairer quiz questions",
+    detail: "Quiz prompts now hide the tested ingredient or allergy from dish names when it would give away the answer.",
+    audiences: ["user", "viewer"]
+  },
   {
     title: "Fresh shared menus",
     detail: "When a viewer opens a code, Menu Matrix checks Firebase first so saved menus pull updated photos, items, and quiz data.",
@@ -10082,6 +10087,91 @@ function getAllStudyIngredientTerms() {
   return uniqueValues(menuItems.flatMap(getItemIngredientTerms));
 }
 
+function escapeRegExp(value = "") {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function normalizeQuizTermToken(token = "") {
+  const normalized = String(token || "").toLowerCase();
+  if (normalized.endsWith("ies") && normalized.length > 4) return `${normalized.slice(0, -3)}y`;
+  if (normalized.endsWith("s") && normalized.length > 3) return normalized.slice(0, -1);
+  return normalized;
+}
+
+function getQuizComparableTokens(value = "") {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .map(normalizeQuizTermToken)
+    .filter(Boolean);
+}
+
+function getQuizMaskTerms(terms = []) {
+  return (Array.isArray(terms) ? terms : [terms]).filter((term) => String(term || "").trim());
+}
+
+function doesTextContainStudyTerm(source = "", term = "") {
+  const termTokens = getQuizComparableTokens(term);
+  if (!termTokens.length) return false;
+
+  const sourceTokens = new Set(getQuizComparableTokens(source));
+  return termTokens.every((token) => sourceTokens.has(token));
+}
+
+function doesTextContainAnyStudyTerm(source = "", terms = []) {
+  return getQuizMaskTerms(terms).some((term) => doesTextContainStudyTerm(source, term));
+}
+
+function cleanupMaskedQuizItemName(value = "") {
+  return normalizeText(value)
+    .replace(/\s+([,;:])/g, "$1")
+    .replace(/([,;:])\s*([,;:])+/g, "$1")
+    .replace(/^\s*[,;/&+-]+\s*/g, "")
+    .replace(/\s*[,;/&+-]+\s*$/g, "")
+    .replace(/\s*,\s*/g, ", ")
+    .trim();
+}
+
+function removeStudyTermsFromText(source = "", terms = []) {
+  let masked = String(source || "");
+
+  getQuizMaskTerms(terms).forEach((term) => {
+    const rawTerm = String(term || "").trim();
+    if (!rawTerm) return;
+
+    masked = masked.replace(new RegExp(`\\b${escapeRegExp(rawTerm)}s?\\b`, "gi"), "");
+    getQuizComparableTokens(rawTerm).forEach((token) => {
+      if (token.length < 2) return;
+      masked = masked.replace(new RegExp(`\\b${escapeRegExp(token)}s?\\b`, "gi"), "");
+    });
+  });
+
+  return cleanupMaskedQuizItemName(masked);
+}
+
+function getQuizPromptItemName(item, terms = []) {
+  const originalName = normalizeText(item?.name || "");
+  if (!originalName || !doesTextContainAnyStudyTerm(originalName, terms)) return originalName || "this menu item";
+
+  const nameSections = originalName.split(/\s*,\s*/).filter(Boolean);
+  if (nameSections.length > 1) {
+    const maskedSections = nameSections.filter((section, index) => {
+      return index === 0 || !doesTextContainAnyStudyTerm(section, terms);
+    });
+    const sectionName = cleanupMaskedQuizItemName(maskedSections.join(", "));
+    if (sectionName && !doesTextContainAnyStudyTerm(sectionName, terms)) return sectionName;
+  }
+
+  const maskedName = removeStudyTermsFromText(originalName, terms);
+  return maskedName || "this menu item";
+}
+
+function itemTitleMentionsStudyTerm(item, term) {
+  return doesTextContainStudyTerm(item?.name || "", term);
+}
+
 function openFlashcardPage() {
   if (!canStudyActiveMenu()) return;
 
@@ -10294,7 +10384,7 @@ function createAllergenYesNoQuestion() {
 
   return {
     typeLabel: "Allergy check",
-    prompt: `Does ${item.name} list ${allergen} as an allergy note?`,
+    prompt: `Does ${getQuizPromptItemName(item, allergen)} list ${allergen} as an allergy note?`,
     multiple: false,
     options: [
       { label: "Yes", value: "yes" },
@@ -10319,7 +10409,7 @@ function createIngredientYesNoQuestion() {
 
   return {
     typeLabel: "Ingredient check",
-    prompt: `Do the menu notes for ${item.name} mention ${term}?`,
+    prompt: `Do the menu notes for ${getQuizPromptItemName(item, term)} mention ${term}?`,
     multiple: false,
     options: [
       { label: "Yes", value: "yes" },
@@ -10341,7 +10431,7 @@ function createAllergenMultiQuestion() {
 
   return {
     typeLabel: "Multi select",
-    prompt: `Select every allergy note listed for ${item.name}.`,
+    prompt: `Select every allergy note listed for ${getQuizPromptItemName(item, correct)}.`,
     multiple: true,
     options,
     answers: correct,
@@ -10354,11 +10444,15 @@ function createItemByAllergenQuestion() {
   const allergen = randomItem(allAllergens);
   if (!allergen) return null;
 
-  const correctItems = menuItems.filter((item) => getItemAllergens(item).includes(allergen));
+  const correctItems = menuItems.filter((item) => {
+    return getItemAllergens(item).includes(allergen) && !itemTitleMentionsStudyTerm(item, allergen);
+  });
   return createItemMatchQuestion({
     term: allergen,
     correctItems,
-    distractorItems: menuItems.filter((item) => !getItemAllergens(item).includes(allergen)),
+    distractorItems: menuItems.filter((item) => {
+      return !getItemAllergens(item).includes(allergen) && !itemTitleMentionsStudyTerm(item, allergen);
+    }),
     singularPrompt: (value) => `Which item lists ${value} as an allergy note?`,
     multiplePrompt: (value) => `Select every item below that lists ${value} as an allergy note.`,
     typeLabel: "Find allergy item",
@@ -10371,11 +10465,15 @@ function createItemByIngredientQuestion() {
   const term = randomItem(allTerms);
   if (!term) return null;
 
-  const correctItems = menuItems.filter((item) => getItemIngredientTerms(item).includes(term));
+  const correctItems = menuItems.filter((item) => {
+    return getItemIngredientTerms(item).includes(term) && !itemTitleMentionsStudyTerm(item, term);
+  });
   return createItemMatchQuestion({
     term,
     correctItems,
-    distractorItems: menuItems.filter((item) => !getItemIngredientTerms(item).includes(term)),
+    distractorItems: menuItems.filter((item) => {
+      return !getItemIngredientTerms(item).includes(term) && !itemTitleMentionsStudyTerm(item, term);
+    }),
     singularPrompt: (value) => `Which item mentions ${value} in its menu notes?`,
     multiplePrompt: (value) => `Select every item below that mentions ${value} in its menu notes.`,
     typeLabel: "Find ingredient item",
