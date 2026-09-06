@@ -48,6 +48,41 @@ const defaultDesign = {
 };
 const defaultCategories = ["bbq", "steamed-dim-sum", "baked-fried", "starters", "soups", "birds-nest", "abalone", "market-seafood", "fresh-seafood", "clay-pot", "meat", "vegetables", "rice-noodles", "desserts", "out-of-menu"];
 let categories = loadCategories();
+const restaurantWorkspaceRoles = ["manager", "editor", "trainer", "viewer"];
+const userRoles = ["admin", "owner", ...restaurantWorkspaceRoles];
+const editableRestaurantRoles = ["manager", "editor"];
+const userRoleDefinitions = {
+  admin: {
+    label: "Platform Admin",
+    rank: 60,
+    summary: "Owns the whole app and website."
+  },
+  owner: {
+    label: "Restaurant Owner",
+    rank: 50,
+    summary: "Owns restaurant workspaces, menus, users, branding, and stats."
+  },
+  manager: {
+    label: "Manager",
+    rank: 40,
+    summary: "Manages assigned menus, invites users, imports items, quizzes, and stats."
+  },
+  editor: {
+    label: "Menu Editor",
+    rank: 30,
+    summary: "Edits assigned menus or selected menu categories."
+  },
+  trainer: {
+    label: "Trainer",
+    rank: 20,
+    summary: "Views assigned menus and creates training quizzes."
+  },
+  viewer: {
+    label: "Viewer",
+    rank: 10,
+    summary: "Views assigned menus and study tools."
+  }
+};
 const defaultUsers = [
   {
     username: "admin",
@@ -2276,6 +2311,9 @@ const newEmail = document.querySelector("#newEmail");
 const newEmailLabel = document.querySelector("#newEmailLabel");
 const newPassword = document.querySelector("#newPassword");
 const newPasswordLabel = document.querySelector("#newPasswordLabel");
+const newRole = document.querySelector("#newRole");
+const userSearchInput = document.querySelector("#userSearchInput");
+const userSearchResults = document.querySelector("#userSearchResults");
 const newUserPermissionsSlot = document.querySelector("#newUserPermissionsSlot");
 const newUserMenuAccessSlot = document.querySelector("#newUserMenuAccessSlot");
 const userMessage = document.querySelector("#userMessage");
@@ -2609,7 +2647,7 @@ function loadRestaurantMenus(user = null) {
     }
   }
 
-  if (isOwnerWorkspace(user) || (user?.role === "editor" && getUserWorkspaceOwner(user) !== primaryAdminUsername)) return [];
+  if (isOwnerWorkspace(user) || (isRestaurantWorkspaceRole(user?.role) && getUserWorkspaceOwner(user) !== primaryAdminUsername)) return [];
 
   const defaultMenu = createDefaultRestaurantMenu();
   localStorage.setItem(getRestaurantMenusStorageKey(user), JSON.stringify([sanitizeRestaurantMenuForStorage(defaultMenu)]));
@@ -2761,7 +2799,10 @@ function getUnlinkedMenus(menus = getVisibleRestaurantMenus()) {
 
 function canManageRestaurant(restaurant) {
   const user = getActiveUser();
-  return Boolean(user && restaurant && (isAdmin() || restaurant.owner === user.username));
+  if (!user || !restaurant) return false;
+  if (isAdmin() || restaurant.owner === user.username) return true;
+  if (user.role !== "manager") return false;
+  return getAssignableMenusForUserManager(user).some((menu) => menu.restaurantId === restaurant.id);
 }
 
 function canCreateRestaurantWorkspace() {
@@ -2769,11 +2810,18 @@ function canCreateRestaurantWorkspace() {
   return Boolean(user && (isAdmin() || user.role === "owner"));
 }
 
+function canCreateMenuBranch() {
+  const user = getActiveUser();
+  return Boolean(user && canRoleCreateMenus(user.role));
+}
+
 function getLinkableRestaurants() {
   const user = getActiveUser();
   if (!user) return [];
   if (isAdmin()) return restaurants;
-  return restaurants.filter((restaurant) => restaurant.owner === user.username);
+  if (user.role === "owner") return restaurants.filter((restaurant) => restaurant.owner === user.username);
+  if (user.role === "manager") return getVisibleRestaurants().filter((restaurant) => canManageRestaurant(restaurant));
+  return [];
 }
 
 function getRestaurantMenuTotal(restaurantId, menus = restaurantMenus) {
@@ -4439,12 +4487,12 @@ function normalizeMenuPermissions(value = {}) {
 function normalizeUser(user = {}) {
   const username = String(user.username || "").trim();
   const status = ["active", "pending", "unverified", "deleted"].includes(user.status) ? user.status : "active";
-  const role = ["admin", "owner", "editor"].includes(user.role) ? user.role : "editor";
+  const role = normalizeRole(user.role, "editor");
   const rawWorkspaceOwner = String(user.workspaceOwner || user.createdBy || "").trim();
   const workspaceOwner =
     role === "owner"
       ? username || primaryAdminUsername
-      : role === "editor"
+      : isRestaurantWorkspaceRole(role)
         ? rawWorkspaceOwner || primaryAdminUsername
         : primaryAdminUsername;
   const explicitMenuIds = Array.isArray(user.menuIds)
@@ -4576,10 +4624,69 @@ function isAdmin() {
   return getActiveUser()?.role === "admin";
 }
 
+function normalizeRole(role, fallback = "viewer") {
+  const normalizedRole = String(role || "").trim().toLowerCase();
+  return userRoles.includes(normalizedRole) ? normalizedRole : fallback;
+}
+
+function getRoleDefinition(role) {
+  return userRoleDefinitions[normalizeRole(role)] || userRoleDefinitions.viewer;
+}
+
+function getRoleLabel(role) {
+  return getRoleDefinition(role).label;
+}
+
+function isRestaurantWorkspaceRole(role) {
+  return restaurantWorkspaceRoles.includes(normalizeRole(role));
+}
+
+function canRoleEditMenuContent(role) {
+  return ["admin", "owner", ...editableRestaurantRoles].includes(normalizeRole(role));
+}
+
+function canRoleManageUsers(role) {
+  return ["admin", "owner", "manager"].includes(normalizeRole(role));
+}
+
+function canRoleCreateMenus(role) {
+  return ["admin", "owner", "manager"].includes(normalizeRole(role));
+}
+
+function canRoleManageCategories(role) {
+  return ["admin", "owner", "manager"].includes(normalizeRole(role));
+}
+
+function canRoleUseTrainingAdmin(role) {
+  return ["admin", "owner", "manager", "editor", "trainer"].includes(normalizeRole(role));
+}
+
+function canRoleReceiveCategoryPermissions(role) {
+  return editableRestaurantRoles.includes(normalizeRole(role));
+}
+
+function getAssignableRolesForManager(manager = getActiveUser()) {
+  if (!manager) return [];
+  if (manager.role === "admin") return ["manager", "editor", "trainer", "viewer"];
+  if (manager.role === "owner") return ["manager", "editor", "trainer", "viewer"];
+  if (manager.role === "manager") return ["editor", "trainer", "viewer"];
+  if (manager.role === "editor") return ["trainer", "viewer"];
+  return [];
+}
+
+function normalizeAssignableRole(role, manager = getActiveUser(), fallback = "") {
+  const assignableRoles = getAssignableRolesForManager(manager);
+  const normalizedRole = normalizeRole(role, "");
+  if (assignableRoles.includes(normalizedRole)) return normalizedRole;
+  const fallbackRole = normalizeRole(fallback, "");
+  if (assignableRoles.includes(fallbackRole)) return fallbackRole;
+  return assignableRoles[0] || "viewer";
+}
+
 function getUserWorkspaceOwner(user = getActiveUser()) {
   if (!user) return primaryAdminUsername;
   if (user.role === "owner") return user.username || primaryAdminUsername;
-  if (user.role === "editor") return String(user.workspaceOwner || primaryAdminUsername).trim() || primaryAdminUsername;
+  if (isRestaurantWorkspaceRole(user.role)) return String(user.workspaceOwner || primaryAdminUsername).trim() || primaryAdminUsername;
   return primaryAdminUsername;
 }
 
@@ -4610,7 +4717,7 @@ function canUserAccessMenu(user, menu) {
 
   const owner = getMenuOwner(menu);
   if (owner === user.username) return true;
-  if (user.role !== "editor") return false;
+  if (!isRestaurantWorkspaceRole(user.role)) return false;
 
   const assignedMenuIds = getAssignedMenuIds(user);
   return owner === getUserWorkspaceOwner(user) && (assignedMenuIds === null || assignedMenuIds.includes(menu.id));
@@ -4619,25 +4726,23 @@ function canUserAccessMenu(user, menu) {
 function getEditableCategoriesForMenu(user, menu) {
   if (!user || !menu) return [];
   if (user.role === "admin" || getMenuOwner(menu) === user.username) return [...categories];
-  if (user.role !== "editor" || !canUserAccessMenu(user, menu)) return [];
+  if (!canRoleEditMenuContent(user.role) || !canUserAccessMenu(user, menu)) return [];
 
   const menuPermissions = getUserMenuPermissions(user, menu.id);
   if (hasUserMenuPermissionEntries(user)) return menuPermissions || [];
+  if (user.role === "manager") return [...categories];
   return menuPermissions || user.permissions || [];
 }
 
 function canManageUsers(user = getActiveUser()) {
-  return Boolean(
-    user &&
-      (user.role === "admin" || user.role === "owner" || getAssignableMenusForUserManager(user).length)
-  );
+  return Boolean(user && (canRoleManageUsers(user.role) || (user.role === "editor" && getAssignableMenusForUserManager(user).length)));
 }
 
 function getAssignableMenusForUserManager(manager = getActiveUser()) {
   if (!manager) return [];
   if (manager.role === "admin") return restaurantMenus;
   if (manager.role === "owner") return restaurantMenus.filter((menu) => getMenuOwner(menu) === manager.username);
-  if (manager.role === "editor") {
+  if (["manager", "editor"].includes(manager.role)) {
     return getVisibleRestaurantMenus().filter((menu) => getEditableCategoriesForMenu(manager, menu).length);
   }
   return [];
@@ -4656,8 +4761,9 @@ function isUserConnectedToManagedMenus(user, manager = getActiveUser()) {
 function canManageUserAccount(user, manager = getActiveUser()) {
   if (!manager || !user || isDeletedUser(user)) return false;
   if (manager.role === "admin") return true;
-  if (!["owner", "editor"].includes(manager.role) || user.role !== "editor" || user.username === manager.username) return false;
-  if (manager.role === "editor" && getAssignedMenuIds(user) === null) return false;
+  if (!canManageUsers(manager) || user.username === manager.username) return false;
+  if (!getAssignableRolesForManager(manager).includes(user.role)) return false;
+  if (["manager", "editor"].includes(manager.role) && getAssignedMenuIds(user) === null) return false;
   return isUserConnectedToManagedMenus(user, manager);
 }
 
@@ -4665,8 +4771,7 @@ function getManageableUsers(manager = getActiveUser()) {
   const visibleUsers = getVisibleUsers();
   if (!manager) return [];
   if (manager.role === "admin") return visibleUsers;
-  if (manager.role === "owner") return visibleUsers.filter((user) => canManageUserAccount(user, manager));
-  return [];
+  return visibleUsers.filter((user) => canManageUserAccount(user, manager));
 }
 
 function getWorkspaceOwner(user = getActiveUser()) {
@@ -5015,7 +5120,9 @@ function generateShareCode() {
 }
 
 function canShareActiveMenu() {
-  return Boolean(getActiveUser() && getActiveRestaurantMenu() && (isAdmin() || ownsActiveMenu()));
+  const user = getActiveUser();
+  const activeMenu = getActiveRestaurantMenu();
+  return Boolean(user && activeMenu && canUserAccessMenu(user, activeMenu) && ["admin", "owner", "manager"].includes(user.role));
 }
 
 function getFirebaseDb() {
@@ -5710,7 +5817,21 @@ function ownsActiveMenu() {
 }
 
 function canManageCategories() {
-  return Boolean(getActiveUser() && getActiveRestaurantMenu() && (isAdmin() || ownsActiveMenu()));
+  const user = getActiveUser();
+  const activeMenu = getActiveRestaurantMenu();
+  return Boolean(
+    user &&
+      activeMenu &&
+      canUserAccessMenu(user, activeMenu) &&
+      canRoleManageCategories(user.role) &&
+      (isAdmin() || ownsActiveMenu() || user.role === "manager")
+  );
+}
+
+function canCustomizeActiveMenu() {
+  const user = getActiveUser();
+  const activeMenu = getActiveRestaurantMenu();
+  return Boolean(user && activeMenu && canUserAccessMenu(user, activeMenu) && ["admin", "owner", "manager"].includes(user.role));
 }
 
 function getEditableCategories() {
@@ -6410,10 +6531,11 @@ function renderRestaurantList() {
   const visibleRestaurants = getVisibleRestaurants();
   const unlinkedMenus = getUnlinkedMenus(visibleMenus);
   const canCreateWorkspace = canCreateRestaurantWorkspace();
+  const canCreateMenu = canCreateMenuBranch();
 
   createRestaurantButton.hidden = !canCreateWorkspace;
-  createMenuButton.hidden = !canCreateWorkspace;
-  createMenuButton.disabled = canCreateWorkspace && !getLinkableRestaurants().length;
+  createMenuButton.hidden = !canCreateMenu;
+  createMenuButton.disabled = canCreateMenu && !getLinkableRestaurants().length;
   createMenuButton.title = createMenuButton.disabled ? "Create a restaurant first." : "";
 
   if (!visibleRestaurants.length && !unlinkedMenus.length) {
@@ -6466,7 +6588,7 @@ function createRestaurantGroupCard(restaurant, menus) {
   menuBadge.textContent = `${menus.length} menu${menus.length === 1 ? "" : "s"}`;
   badges.append(menuBadge);
 
-  if (canManageRestaurant(restaurant)) {
+  if (canManageRestaurant(restaurant) && canCreateMenuBranch()) {
     const addMenu = document.createElement("button");
     addMenu.className = "small-icon-action restaurant-add-menu-button";
     addMenu.type = "button";
@@ -6655,7 +6777,7 @@ function renderActiveMenuHeader() {
   const canManageMenuCategories = canManageCategories();
   const canShareMenu = canShareActiveMenu();
   const canUseStudyTools = canStudyActiveMenu();
-  const canCustomizeMenu = Boolean(activeMenu) && isAdmin();
+  const canCustomizeMenu = canCustomizeActiveMenu();
   const isSharedView = state.screen === "shared";
   const isDemoView = isSharedView && state.demoMode;
   currentMenuTitle.textContent = activeMenu?.name || "No menu selected";
@@ -6961,7 +7083,7 @@ function createRestaurantWithInitialMenu(event) {
 
 function openMenuBranchDialog(restaurantId = "") {
   const activeUser = getActiveUser();
-  if (!activeUser || !canCreateRestaurantWorkspace()) return;
+  if (!activeUser || !canCreateMenuBranch()) return;
 
   const linkableRestaurants = getLinkableRestaurants();
   if (!linkableRestaurants.length) {
@@ -7011,6 +7133,7 @@ function createMenuBranch(event) {
   });
 
   restaurantMenus = [menu, ...restaurantMenus];
+  grantActiveManagerAccessToMenu(menu);
   state.activeRestaurantMenu = menu.id;
   resetMenuFilters();
   menuItems = [];
@@ -7022,6 +7145,26 @@ function createMenuBranch(event) {
   showScreen("menu");
 }
 
+function grantActiveManagerAccessToMenu(menu) {
+  const activeUser = getActiveUser();
+  if (!activeUser || activeUser.role !== "manager" || !menu) return;
+
+  const userIndex = users.findIndex((user) => user.username === activeUser.username);
+  if (userIndex < 0) return;
+
+  const currentMenuIds = getAssignedMenuIds(users[userIndex]) || [];
+  users[userIndex] = {
+    ...users[userIndex],
+    menuIds: uniqueValues([...currentMenuIds, menu.id]),
+    menuPermissions: normalizeMenuPermissions({
+      ...users[userIndex].menuPermissions,
+      [menu.id]: [...categories]
+    }),
+    updatedAt: new Date().toISOString()
+  };
+  saveUsers();
+}
+
 function buildBlankRestaurantMenu({ activeUser, restaurant, menuName, label = "Food menu" }) {
   const blankCount = restaurantMenus.filter((menu) => menu.id.startsWith("blank-menu-")).length + 1;
   const blankMenu = normalizeRestaurantMenu({
@@ -7029,7 +7172,7 @@ function buildBlankRestaurantMenu({ activeUser, restaurant, menuName, label = "F
     name: menuName || `Blank Menu ${blankCount}`,
     restaurantId: restaurant?.id || "",
     restaurantName: restaurant?.name || "",
-    owner: activeUser.username,
+    owner: restaurant?.owner || getUserWorkspaceOwner(activeUser),
     label,
     categories: [...categories],
     items: [],
@@ -7049,6 +7192,8 @@ function buildBlankRestaurantMenu({ activeUser, restaurant, menuName, label = "F
 }
 
 function createBlankRestaurantMenu() {
+  if (!canCreateMenuBranch()) return;
+
   if (getLinkableRestaurants().length) {
     openMenuBranchDialog();
     return;
@@ -7889,7 +8034,11 @@ function closeUsersPage() {
 
 function getLinkableRestaurantMenus() {
   if (isAdmin()) return restaurantMenus;
-  return getVisibleRestaurantMenus().filter((menu) => ownsMenu(menu));
+  const user = getActiveUser();
+  if (!user) return [];
+  if (user.role === "owner") return getVisibleRestaurantMenus().filter((menu) => ownsMenu(menu));
+  if (user.role === "manager") return getAssignableMenusForUserManager(user);
+  return [];
 }
 
 function renderAccountDashboard() {
@@ -8430,6 +8579,7 @@ function showDashboardTab(tabName) {
 
 function canAccessDashboardTab(tabName) {
   if (tabName === "users") return canManageUsers();
+  if (tabName === "customization") return isAdmin() || canCustomizeActiveMenu();
   return isAdmin() || tabName === "account" || tabName === "stats";
 }
 
@@ -8437,7 +8587,7 @@ function renderDashboard() {
   const activeUser = getActiveUser();
   if (!activeUser) return;
 
-  dashboardKicker.textContent = isAdmin() ? "Admin" : "Account";
+  dashboardKicker.textContent = isAdmin() ? "Admin" : getRoleLabel(activeUser.role);
   dashboardTitle.textContent = "Dashboard";
   dashboardTabs.forEach((tab) => {
     tab.hidden = !canAccessDashboardTab(tab.dataset.dashboardTab);
@@ -8449,9 +8599,9 @@ function renderDashboard() {
     renderDashboardAuthSummary();
     renderUserList();
   }
+  if (isAdmin() || canCustomizeActiveMenu()) renderDashboardCustomizationSummary();
   if (!isAdmin()) return;
   renderDashboardPaymentsSummary();
-  renderDashboardCustomizationSummary();
   renderDashboardRestaurants();
   renderDashboardMenus();
   renderDashboardRequests();
@@ -8481,18 +8631,14 @@ function createDashboardMetric(label, value, note = "") {
 function renderDashboardAuthSummary() {
   const visibleUsers = getManageableUsers();
   if (!isAdmin()) {
+    const managerCount = visibleUsers.filter((user) => user.role === "manager").length;
+    const editorCount = visibleUsers.filter((user) => user.role === "editor").length;
+    const studyCount = visibleUsers.filter((user) => ["trainer", "viewer"].includes(user.role)).length;
     dashboardAuthSummary.replaceChildren(
-      createDashboardMetric("Connected users", String(visibleUsers.length), "People invited to your menus"),
-      createDashboardMetric(
-        "Can edit",
-        String(visibleUsers.filter((user) => getUserEditableCategoryTotal(user) > 0).length),
-        "Users with category permissions"
-      ),
-      createDashboardMetric(
-        "View only",
-        String(visibleUsers.filter((user) => getUserEditableCategoryTotal(user) === 0).length),
-        "Users with menu access only"
-      ),
+      createDashboardMetric("Connected", String(visibleUsers.length), "People attached to menus"),
+      createDashboardMetric("Managers", String(managerCount), "Can invite and manage"),
+      createDashboardMetric("Editors", String(editorCount), "Can modify categories"),
+      createDashboardMetric("Training", String(studyCount), "Trainer or viewer roles"),
       createDashboardMetric(
         "Pending",
         String(visibleUsers.filter((user) => user.status === "pending").length),
@@ -8505,10 +8651,11 @@ function renderDashboardAuthSummary() {
   dashboardAuthSummary.replaceChildren(
     createDashboardMetric("Total accounts", String(visibleUsers.length), "Local app accounts"),
     createDashboardMetric(
-      "Verified owners",
-      String(visibleUsers.filter((user) => user.role === "owner" && user.status === "active").length),
-      "Email verified restaurant owners"
+      "Owners",
+      String(visibleUsers.filter((user) => user.role === "owner").length),
+      "Restaurant owner accounts"
     ),
+    createDashboardMetric("Managers", String(visibleUsers.filter((user) => user.role === "manager").length), "Restaurant managers"),
     createDashboardMetric(
       "Need attention",
       String(visibleUsers.filter((user) => ["pending", "unverified"].includes(user.status)).length),
@@ -9292,14 +9439,17 @@ function toggleCreateUserPanel() {
 function renderNewUserAccessControls({ reset = false } = {}) {
   if (!newUserMenuAccessSlot) return;
 
+  renderRoleSelectOptions(newRole, reset ? "" : newRole?.value);
+  const selectedRole = normalizeAssignableRole(newRole?.value, getActiveUser());
   const permissions = reset ? [] : getSelectedPermissions(userForm);
   const menuIds = reset ? [] : getSelectedMenuIds(userForm);
   const menuPermissions = reset ? {} : getSelectedMenuPermissions(userForm);
   newUserPermissionsSlot?.replaceChildren();
   if (newUserPermissionsSlot) newUserPermissionsSlot.hidden = true;
   newUserMenuAccessSlot.replaceChildren(
-    createMenuAccessFieldset({ role: "editor", permissions, menuIds, menuPermissions, workspaceOwner: getWorkspaceOwner() })
+    createMenuAccessFieldset({ role: selectedRole, permissions, menuIds, menuPermissions, workspaceOwner: getWorkspaceOwner() })
   );
+  renderUserSearchResults();
 }
 
 function setCreateMethod(method) {
@@ -9314,8 +9464,83 @@ function setCreateMethod(method) {
   userMessage.textContent = "";
 }
 
+function getUserSearchMatches(query, manager = getActiveUser()) {
+  const normalizedQuery = String(query || "").trim().toLowerCase();
+  if (!normalizedQuery || !manager) return [];
+
+  return getVisibleUsers()
+    .filter((user) => user.username !== manager.username && user.role !== "admin" && user.role !== "owner")
+    .filter((user) => {
+      const haystack = `${user.username} ${user.email || ""} ${getRoleLabel(user.role)}`.toLowerCase();
+      return haystack.includes(normalizedQuery);
+    })
+    .slice(0, 6);
+}
+
+function fillUserInviteFromSearch(user) {
+  if (!user) return;
+
+  newUsername.value = user.username;
+  if (newEmail) newEmail.value = user.email || "";
+  renderRoleSelectOptions(newRole, user.role);
+  const selectedRole = normalizeAssignableRole(newRole?.value, getActiveUser(), user.role);
+  newUserPermissionsSlot?.replaceChildren();
+  if (newUserPermissionsSlot) newUserPermissionsSlot.hidden = true;
+  newUserMenuAccessSlot?.replaceChildren(
+    createMenuAccessFieldset({
+      ...user,
+      role: selectedRole,
+      workspaceOwner: user.workspaceOwner || getWorkspaceOwner()
+    })
+  );
+  renderUserSearchResults();
+  userMessage.textContent = `${user.username} loaded. Choose menu access, then save privileges.`;
+}
+
+function renderUserSearchResults() {
+  if (!userSearchResults || !userSearchInput) return;
+
+  userSearchResults.replaceChildren();
+  const query = userSearchInput.value.trim();
+  if (!query) return;
+
+  const manager = getActiveUser();
+  const matches = getUserSearchMatches(query, manager);
+  if (!matches.length) {
+    const empty = document.createElement("p");
+    empty.className = "user-search-empty";
+    empty.textContent = "No existing users found. Finish the form to invite a new user.";
+    userSearchResults.append(empty);
+    return;
+  }
+
+  matches.forEach((user) => {
+    const row = document.createElement("div");
+    row.className = "user-search-result";
+
+    const copy = document.createElement("span");
+    const name = document.createElement("strong");
+    const meta = document.createElement("small");
+    name.textContent = user.username;
+    meta.textContent = `${user.email || "No email"} - ${getPrivilegeLabel(user)}`;
+    copy.append(name, meta);
+
+    const useButton = document.createElement("button");
+    useButton.className = "small-success";
+    useButton.type = "button";
+    useButton.textContent = "Use";
+    const canUseUser = canManageUserAccount(user, manager) || canAttachExistingUserToWorkspace(user, manager);
+    useButton.disabled = !canUseUser;
+    useButton.title = canUseUser ? "Load this user into the invite form." : "This user belongs to another workspace.";
+    useButton.addEventListener("click", () => fillUserInviteFromSearch(user));
+
+    row.append(copy, useButton);
+    userSearchResults.append(row);
+  });
+}
+
 function openDesignDialog() {
-  if (!isAdmin()) return;
+  if (!canCustomizeActiveMenu()) return;
   syncDesignForm();
   designDialog.showModal();
 }
@@ -9327,7 +9552,7 @@ function closeDesignDialog() {
 
 function saveDesign(event) {
   event.preventDefault();
-  if (!isAdmin()) return;
+  if (!canCustomizeActiveMenu()) return;
 
   const activeMenu = getActiveRestaurantMenu();
   const previousDesign = normalizeDesignSettings(designSettings);
@@ -9368,7 +9593,7 @@ function saveDesign(event) {
 }
 
 function resetDesign() {
-  if (!isAdmin()) return;
+  if (!canCustomizeActiveMenu()) return;
   designSettings = normalizeDesignSettings(defaultDesign);
   addActiveMenuNotification({
     title: "Customization reset",
@@ -9791,7 +10016,7 @@ function canGenerateQuizPdf() {
 function canViewQuizStats() {
   const activeUser = getActiveUser();
   const activeMenu = getActiveRestaurantMenu();
-  return Boolean(activeUser && activeMenu && canUserAccessMenu(activeUser, activeMenu) && canEditAnyCategory());
+  return Boolean(activeUser && activeMenu && canUserAccessMenu(activeUser, activeMenu) && canRoleUseTrainingAdmin(activeUser.role));
 }
 
 function openQuizStats() {
@@ -10987,19 +11212,19 @@ function renderAdminState() {
   categoryManagerButton.hidden = !canManageCategories();
   shareMenuButton.hidden = !canShareActiveMenu();
   manageUsersButton.hidden = !activeUser;
-  designButton.hidden = !isAdmin();
-  editHeroButton.hidden = !isAdmin();
+  designButton.hidden = !canCustomizeActiveMenu();
+  editHeroButton.hidden = !canCustomizeActiveMenu();
   loginMessage.textContent = "";
   setupMessage.textContent = "";
   if (invitedUser) {
     inviteIntro.textContent = `Create a password for ${invitedUser.username}`;
   }
   adminStatus.textContent = activeUser
-    ? `Signed in as ${activeUser.username}${isAdmin() ? " (admin)" : ""}`
+    ? `Signed in as ${activeUser.username} (${getRoleLabel(activeUser.role)})`
     : "Signed out";
   menusUserStatus.hidden = !activeUser;
   menusUserStatus.textContent = activeUser
-    ? `Logged in: ${activeUser.username}${isAdmin() ? " (admin)" : ""}`
+    ? `Logged in: ${activeUser.username} (${getRoleLabel(activeUser.role)})`
     : "Signed out";
 
   editModeButton.textContent = state.editing ? "Done" : "Edit menu";
@@ -11363,6 +11588,7 @@ function activateWorkspaceForCurrentUser() {
   remoteRequests = loadRemoteRequests(getActiveUser());
   resetMenuViewForCurrentUser();
   connectCloudWorkspaceForCurrentUser();
+  renderAdminState();
 }
 
 function resetMenuViewForCurrentUser() {
@@ -11593,7 +11819,23 @@ function renderUserList() {
     const details = document.createElement("form");
     details.className = "user-edit-panel";
     details.hidden = true;
-    details.append(createEmailLabel(user), createPasswordLabel(user), createMenuAccessFieldset(user));
+    const roleLabel = createRoleLabel(user);
+    let menuAccessFieldset = createMenuAccessFieldset(user);
+    const roleSelect = roleLabel.querySelector("select");
+    roleSelect?.addEventListener("change", () => {
+      const nextRole = normalizeAssignableRole(roleSelect.value, getActiveUser(), user.role);
+      const menuIds = getSelectedManageableMenuIds(details);
+      const menuPermissions = getSelectedManageableMenuPermissions(details);
+      const replacement = createMenuAccessFieldset({
+        ...user,
+        role: nextRole,
+        menuIds,
+        menuPermissions
+      });
+      menuAccessFieldset.replaceWith(replacement);
+      menuAccessFieldset = replacement;
+    });
+    details.append(createEmailLabel(user), createPasswordLabel(user), roleLabel, menuAccessFieldset);
 
     if (user.role !== "admin") {
       const actions = document.createElement("div");
@@ -11647,16 +11889,23 @@ function sortUsersByPrivileges(a, b) {
 }
 
 function getPrivilegeRank(user) {
-  if (user.role === "admin") return categories.length + 1;
-  if (user.role === "owner") return categories.length;
-  return getUserEditableCategoryTotal(user);
+  return getRoleDefinition(user.role).rank + getUserEditableCategoryTotal(user) / 100;
 }
 
 function getPrivilegeLabel(user) {
-  if (user.role === "admin") return "All sections";
-  if (user.role === "owner") return "Own menus";
+  if (user.role === "admin") return "Platform Admin - all workspaces";
+  if (user.role === "owner") return "Restaurant Owner - own workspace";
+
   const editableCount = getUserEditableCategoryTotal(user);
-  return `${getMenuAccessLabel(user)} - ${editableCount ? `${editableCount} editable section${editableCount === 1 ? "" : "s"}` : "view only"}`;
+  const roleLabel = getRoleLabel(user.role);
+  const permissionText = canRoleReceiveCategoryPermissions(user.role)
+    ? editableCount
+      ? `${editableCount} editable section${editableCount === 1 ? "" : "s"}`
+      : "view only"
+    : user.role === "trainer"
+      ? "training access"
+      : "view only";
+  return `${roleLabel} - ${getMenuAccessLabel(user)} - ${permissionText}`;
 }
 
 function getUserEditableCategoryTotal(user) {
@@ -11722,6 +11971,51 @@ function createEmailLabel(user) {
   return label;
 }
 
+function renderRoleSelectOptions(select, selectedRole, manager = getActiveUser()) {
+  if (!select) return;
+
+  const assignableRoles = getAssignableRolesForManager(manager);
+  const hasSelectedRole = Boolean(String(selectedRole || "").trim());
+  const currentRole = hasSelectedRole ? normalizeRole(selectedRole, "viewer") : assignableRoles[0] || "viewer";
+  const roleOptions = assignableRoles.includes(currentRole)
+    ? assignableRoles
+    : currentRole
+      ? [currentRole, ...assignableRoles]
+      : assignableRoles;
+  select.replaceChildren();
+
+  roleOptions.forEach((role) => {
+    const option = document.createElement("option");
+    option.value = role;
+    option.textContent = getRoleLabel(role);
+    select.append(option);
+  });
+
+  select.value = roleOptions.includes(currentRole)
+    ? currentRole
+    : normalizeAssignableRole(currentRole, manager);
+  select.disabled = !assignableRoles.includes(select.value);
+}
+
+function createRoleLabel(user) {
+  const label = document.createElement("label");
+  label.textContent = "Role";
+
+  const select = document.createElement("select");
+  select.name = "role";
+  renderRoleSelectOptions(select, user.role);
+  label.append(select);
+
+  const note = document.createElement("small");
+  note.className = "role-hint";
+  note.textContent = getRoleDefinition(user.role).summary;
+  select.addEventListener("change", () => {
+    note.textContent = getRoleDefinition(select.value).summary;
+  });
+  label.append(note);
+  return label;
+}
+
 function createAccessAccordion(title, detail, content, { open = false } = {}) {
   const details = document.createElement("details");
   details.className = "permission-accordion";
@@ -11777,11 +12071,24 @@ function createPermissionFieldset(user, options = {}) {
 }
 
 function getInitialMenuPermissionSelection(user, menuId) {
+  if (!canRoleReceiveCategoryPermissions(user?.role)) return [];
+
   const menuPermissions = getUserMenuPermissions(user, menuId);
   if (menuPermissions) return menuPermissions;
+  if (user?.role === "manager") return [...categories];
   return Array.isArray(user?.permissions)
     ? getUniqueCategoryValues(user.permissions.map(normalizeCategoryValue)).filter((permission) => categories.includes(permission))
     : [];
+}
+
+function createViewOnlyMenuAccessNote(user) {
+  const note = document.createElement("p");
+  note.className = "permission-note";
+  note.textContent =
+    user.role === "trainer"
+      ? "Trainers can view the menu, use flash cards, print quizzes, and review quiz stats."
+      : "Viewers can open this menu and use the study tools, but cannot edit menu content.";
+  return note;
 }
 
 function createMenuPermissionBranch(menu, selectedPermissions = [], { disabled = false, allowedCategories = categories } = {}) {
@@ -11810,12 +12117,12 @@ function createMenuPermissionBranch(menu, selectedPermissions = [], { disabled =
   tools.className = "menu-permission-tools";
 
   const selectAllButton = document.createElement("button");
-  selectAllButton.className = "small-toggle";
+  selectAllButton.className = "small-text-action";
   selectAllButton.type = "button";
   selectAllButton.textContent = "Select all";
 
   const clearButton = document.createElement("button");
-  clearButton.className = "small-toggle";
+  clearButton.className = "small-text-action";
   clearButton.type = "button";
   clearButton.textContent = "Clear";
 
@@ -11921,7 +12228,9 @@ function createMenuAccessFieldset(user, options = {}) {
         ? options.menuPermissions[menu.id]
         : getInitialMenuPermissionSelection(user, menu.id);
     const allowedCategories = getEditableCategoriesForMenu(getActiveUser(), menu);
-    const permissionBranch = createMenuPermissionBranch(menu, permissions, { disabled: !input.checked, allowedCategories });
+    const permissionBranch = canRoleReceiveCategoryPermissions(user.role)
+      ? createMenuPermissionBranch(menu, permissions, { disabled: !input.checked, allowedCategories })
+      : createViewOnlyMenuAccessNote(user);
     const updateBranchState = () => {
       const isEnabled = input.checked;
       branch.classList.toggle("is-disabled", !isEnabled);
@@ -11931,7 +12240,7 @@ function createMenuAccessFieldset(user, options = {}) {
       permissionBranch.querySelectorAll("button").forEach((button) => {
         button.disabled = !isEnabled;
       });
-      if (isEnabled) permissionBranch.open = true;
+      if (isEnabled && "open" in permissionBranch) permissionBranch.open = true;
     };
 
     input.addEventListener("change", updateBranchState);
@@ -11948,7 +12257,7 @@ function getMenuAccessLabel(user) {
   if (user.role === "owner") return "Own menu workspace";
 
   const assignedMenuIds = getAssignedMenuIds(user);
-  if (assignedMenuIds === null) return "All admin menus";
+  if (assignedMenuIds === null) return "All workspace menus";
   if (!assignedMenuIds.length) return "No menus selected";
 
   const visibleCount = assignedMenuIds.filter((menuId) => restaurantMenus.some((menu) => menu.id === menuId)).length;
@@ -12021,6 +12330,24 @@ function getSelectedManageableMenuPermissions(container) {
   );
 }
 
+function applyRoleMenuPermissionDefaults(role, menuIds = [], menuPermissions = {}, manager = getActiveUser()) {
+  if (!canRoleReceiveCategoryPermissions(role)) return {};
+
+  const normalizedMenuPermissions = normalizeMenuPermissions(menuPermissions);
+  if (role !== "manager") return normalizedMenuPermissions;
+
+  const allowedCategoriesByMenu = getScopedCategoryMapForUserManager(manager);
+  return normalizeMenuPermissions(
+    Object.fromEntries(
+      menuIds.map((menuId) => {
+        const selectedPermissions = normalizedMenuPermissions[menuId] || [];
+        const allowedCategories = [...(allowedCategoriesByMenu.get(menuId) || new Set(categories))];
+        return [menuId, selectedPermissions.length ? selectedPermissions : allowedCategories];
+      })
+    )
+  );
+}
+
 function getWorkspaceOwnerForMenuSelection(menuIds = [], manager = getActiveUser(), fallbackUser = null) {
   const selectedMenuIds = new Set(menuIds);
   const selectedOwners = uniqueValues(
@@ -12035,7 +12362,7 @@ function getWorkspaceOwnerForMenuSelection(menuIds = [], manager = getActiveUser
 }
 
 function mergeScopedMenuIdsForUserManager(existingUser, selectedMenuIds, manager = getActiveUser()) {
-  if (!existingUser || manager?.role !== "editor") return selectedMenuIds;
+  if (!existingUser || !["manager", "editor"].includes(manager?.role)) return selectedMenuIds;
 
   const { allowedMenuIds } = getScopedMenuIdsForUserManager();
   const existingMenuIds = getAssignedMenuIds(existingUser) || [];
@@ -12046,7 +12373,7 @@ function mergeScopedMenuIdsForUserManager(existingUser, selectedMenuIds, manager
 }
 
 function mergeScopedMenuPermissionsForUserManager(existingUser, selectedMenuPermissions, manager = getActiveUser()) {
-  if (!existingUser || manager?.role !== "editor") return selectedMenuPermissions;
+  if (!existingUser || !["manager", "editor"].includes(manager?.role)) return selectedMenuPermissions;
 
   const { allowedMenuIds } = getScopedMenuIdsForUserManager();
   const preservedEntries = Object.entries(normalizeMenuPermissions(existingUser.menuPermissions)).filter(
@@ -12058,6 +12385,23 @@ function mergeScopedMenuPermissionsForUserManager(existingUser, selectedMenuPerm
   });
 }
 
+function getManagerWorkspaceOwner(manager = getActiveUser()) {
+  if (!manager) return primaryAdminUsername;
+  return manager.role === "owner" ? manager.username : getUserWorkspaceOwner(manager);
+}
+
+function canAttachExistingUserToWorkspace(user, manager = getActiveUser()) {
+  if (!manager || !user || isDeletedUser(user) || user.username === manager.username || user.role === "admin") return false;
+  if (!getAssignableRolesForManager(manager).includes(user.role)) return false;
+  if (manager.role === "admin") return true;
+
+  const managerWorkspaceOwner = getManagerWorkspaceOwner(manager);
+  const userWorkspaceOwner = getUserWorkspaceOwner(user);
+  const userMenuIds = getAssignedMenuIds(user);
+  const hasMenuPermissions = hasUserMenuPermissionEntries(user);
+  return userWorkspaceOwner === managerWorkspaceOwner || ((!userMenuIds || !userMenuIds.length) && !hasMenuPermissions);
+}
+
 function saveUser(event) {
   event.preventDefault();
   if (!canManageUsers()) return;
@@ -12066,21 +12410,38 @@ function saveUser(event) {
   const username = newUsername.value.trim();
   const email = newEmail.value.trim();
   const isInvite = createMethod.value === "invite";
+  const role = normalizeAssignableRole(newRole?.value, activeUser);
+  const requiresMenuAccess = isRestaurantWorkspaceRole(role);
   const menuIds = getSelectedManageableMenuIds(userForm);
-  const menuPermissions = getSelectedManageableMenuPermissions(userForm);
+  const selectedMenuPermissions = getSelectedManageableMenuPermissions(userForm);
   const assignableMenuCount = getAssignableMenusForUserManager().length;
   const existingIndex = users.findIndex((user) => user.username === username);
   const existingUser = existingIndex >= 0 ? users[existingIndex] : null;
   const finalMenuIds = mergeScopedMenuIdsForUserManager(existingUser, menuIds, activeUser);
-  const finalMenuPermissions = mergeScopedMenuPermissionsForUserManager(existingUser, menuPermissions, activeUser);
-  const permissions = Object.keys(finalMenuPermissions).length ? [] : getSelectedPermissions(userForm);
+  const roleMenuPermissions = applyRoleMenuPermissionDefaults(role, menuIds, selectedMenuPermissions, activeUser);
+  const finalMenuPermissions = mergeScopedMenuPermissionsForUserManager(existingUser, roleMenuPermissions, activeUser);
+  const permissions = canRoleReceiveCategoryPermissions(role) && Object.keys(finalMenuPermissions).length
+    ? []
+    : canRoleReceiveCategoryPermissions(role)
+      ? getSelectedPermissions(userForm)
+      : [];
 
-  if (!assignableMenuCount) {
+  if (!username) {
+    userMessage.textContent = "Enter a username.";
+    return;
+  }
+
+  if (!getAssignableRolesForManager(activeUser).includes(role)) {
+    userMessage.textContent = "Choose a role you can assign.";
+    return;
+  }
+
+  if (requiresMenuAccess && !assignableMenuCount) {
     userMessage.textContent = "Create a menu first, then connect users to it.";
     return;
   }
 
-  if (!menuIds.length) {
+  if (requiresMenuAccess && !menuIds.length) {
     userMessage.textContent = "Choose at least one menu this user can access.";
     return;
   }
@@ -12090,20 +12451,24 @@ function saveUser(event) {
     return;
   }
 
-  if (existingIndex >= 0 && !canManageUserAccount(users[existingIndex], activeUser)) {
+  if (existingIndex >= 0 && !canManageUserAccount(users[existingIndex], activeUser) && !canAttachExistingUserToWorkspace(users[existingIndex], activeUser)) {
     userMessage.textContent = "That username belongs to another workspace. Use a different username.";
     return;
   }
 
   const user = {
     username,
-    email: isInvite ? email : "",
+    email: isInvite ? email : existingUser?.email || "",
     password: isInvite ? "" : newPassword.value,
-    role: "editor",
-    permissions,
+    role,
+    permissions: role === "owner" ? [...categories] : permissions,
     menuPermissions: finalMenuPermissions,
-    menuIds: finalMenuIds,
-    workspaceOwner: getWorkspaceOwnerForMenuSelection(finalMenuIds, activeUser, existingUser),
+    menuIds: requiresMenuAccess ? finalMenuIds : null,
+    workspaceOwner: role === "owner"
+      ? username
+      : requiresMenuAccess
+        ? getWorkspaceOwnerForMenuSelection(finalMenuIds, activeUser, existingUser)
+        : getManagerWorkspaceOwner(activeUser),
     status: isInvite ? "pending" : "active",
     createdAt: existingIndex >= 0 ? users[existingIndex].createdAt || "" : new Date().toISOString(),
     updatedAt: new Date().toISOString()
@@ -12123,11 +12488,12 @@ function saveUser(event) {
   saveUsers();
   userForm.reset();
   renderNewUserAccessControls({ reset: true });
+  renderUserSearchResults();
   if (isInvite) {
     sendInviteEmail(user);
-    userMessage.textContent = "Invite created. Your email app should open.";
+    userMessage.textContent = `${getRoleLabel(role)} invite created. Your email app should open.`;
   } else {
-    userMessage.textContent = "User created.";
+    userMessage.textContent = `${getRoleLabel(role)} user created.`;
   }
   setCreateMethod(createMethod.value);
   renderUserList();
@@ -12137,7 +12503,7 @@ function sendInviteEmail(user) {
   const inviteUrl = `${window.location.origin}${window.location.pathname}?invite=${encodeURIComponent(user.username)}`;
   const subject = encodeURIComponent("Create your Menu Matrix password");
   const body = encodeURIComponent(
-    `Hi ${user.username},\n\nYou've been invited to edit Menu Matrix sections: ${getPrivilegeLabel(user)}.\n\nCreate your password here:\n${inviteUrl}\n\nUsername: ${user.username}`
+    `Hi ${user.username},\n\nYou've been invited to Menu Matrix as ${getRoleLabel(user.role)}.\n\nAccess: ${getPrivilegeLabel(user)}\n\nCreate your password here:\n${inviteUrl}\n\nUsername: ${user.username}`
   );
   window.location.href = `mailto:${encodeURIComponent(user.email)}?subject=${subject}&body=${body}`;
 }
@@ -12193,19 +12559,36 @@ function updateUser(event, username) {
   if (userIndex < 0 || users[userIndex].role === "admin" || !canManageUserAccount(users[userIndex])) return;
 
   const form = event.currentTarget;
+  const activeUser = getActiveUser();
+  const requestedRole = normalizeRole(form.elements.role?.value || users[userIndex].role, users[userIndex].role);
+  const canKeepRestrictedRole = requestedRole === users[userIndex].role && users[userIndex].role === "owner" && activeUser?.role === "admin";
+  const role = canKeepRestrictedRole
+    ? requestedRole
+    : normalizeAssignableRole(requestedRole, activeUser, users[userIndex].role);
+  const requiresMenuAccess = isRestaurantWorkspaceRole(role);
   const menuIds = getSelectedManageableMenuIds(form);
-  const menuPermissions = getSelectedManageableMenuPermissions(form);
+  const selectedMenuPermissions = getSelectedManageableMenuPermissions(form);
   const finalMenuIds = mergeScopedMenuIdsForUserManager(users[userIndex], menuIds);
-  const finalMenuPermissions = mergeScopedMenuPermissionsForUserManager(users[userIndex], menuPermissions);
-  const permissions = Object.keys(finalMenuPermissions).length ? [] : getSelectedPermissions(form);
+  const roleMenuPermissions = applyRoleMenuPermissionDefaults(role, menuIds, selectedMenuPermissions, activeUser);
+  const finalMenuPermissions = mergeScopedMenuPermissionsForUserManager(users[userIndex], roleMenuPermissions);
+  const permissions = canRoleReceiveCategoryPermissions(role) && Object.keys(finalMenuPermissions).length
+    ? []
+    : canRoleReceiveCategoryPermissions(role)
+      ? getSelectedPermissions(form)
+      : [];
   const assignableMenuCount = getAssignableMenusForUserManager().length;
 
-  if (users[userIndex].role === "editor" && !assignableMenuCount) {
+  if (!getAssignableRolesForManager(activeUser).includes(role) && !canKeepRestrictedRole) {
+    userMessage.textContent = "Choose a role you can assign.";
+    return;
+  }
+
+  if (requiresMenuAccess && !assignableMenuCount) {
     userMessage.textContent = "Create a menu first, then connect users to it.";
     return;
   }
 
-  if (users[userIndex].role === "editor" && !menuIds.length) {
+  if (requiresMenuAccess && !menuIds.length) {
     userMessage.textContent = "Choose at least one menu this user can access.";
     return;
   }
@@ -12213,21 +12596,22 @@ function updateUser(event, username) {
   const updatedUser = {
     ...users[userIndex],
     email: form.elements.email.value,
-    password: form.elements.password.value,
-    permissions,
+    password: role === "owner" ? "" : form.elements.password.value,
+    role,
+    permissions: role === "owner" ? [...categories] : permissions,
     menuPermissions: finalMenuPermissions,
-    workspaceOwner:
-      users[userIndex].role === "editor"
-        ? getWorkspaceOwnerForMenuSelection(finalMenuIds, getActiveUser(), users[userIndex])
-        : users[userIndex].workspaceOwner,
+    workspaceOwner: role === "owner"
+      ? users[userIndex].username
+      : requiresMenuAccess
+        ? getWorkspaceOwnerForMenuSelection(finalMenuIds, activeUser, users[userIndex])
+        : getManagerWorkspaceOwner(activeUser),
     updatedAt: new Date().toISOString()
   };
-  if (users[userIndex].role === "editor") updatedUser.menuIds = finalMenuIds;
-  if (users[userIndex].role === "owner") updatedUser.menuIds = null;
+  updatedUser.menuIds = requiresMenuAccess ? finalMenuIds : null;
   users[userIndex] = updatedUser;
 
   saveUsers();
-  userMessage.textContent = "User updated.";
+  userMessage.textContent = `${updatedUser.username} updated as ${getRoleLabel(updatedUser.role)}.`;
   renderUserList();
 }
 
@@ -12340,6 +12724,7 @@ function addCategory(event) {
     return;
   }
 
+  const previousCategories = [...categories];
   categories = getUniqueCategories([...categories, category]);
   restaurantMenus = restaurantMenus.map((menu) => ({
     ...menu,
@@ -12351,10 +12736,25 @@ function addCategory(event) {
     type: "category-add"
   });
   users = users.map((user) => {
-    if (user.role !== "admin" && user.role !== "owner") return user;
+    if (user.role === "admin" || user.role === "owner") {
+      return {
+        ...user,
+        permissions: getUniqueCategories([...(user.permissions || []), category])
+      };
+    }
+    if (!canRoleReceiveCategoryPermissions(user.role)) return user;
+
+    const menuPermissions = normalizeMenuPermissions(user.menuPermissions);
+    const nextMenuPermissions = Object.fromEntries(
+      Object.entries(menuPermissions).map(([menuId, permissions]) => {
+        const hadFullCategoryAccess =
+          previousCategories.length > 0 && previousCategories.every((previousCategory) => permissions.includes(previousCategory));
+        return [menuId, hadFullCategoryAccess ? getUniqueCategories([...permissions, category]) : permissions];
+      })
+    );
     return {
       ...user,
-      permissions: getUniqueCategories([...(user.permissions || []), category])
+      menuPermissions: normalizeMenuPermissions(nextMenuPermissions)
     };
   });
 
@@ -13155,7 +13555,7 @@ async function updateItemImageFromFile(event) {
 
 async function updateHeroImageFromFile(event) {
   const file = event.target.files?.[0];
-  if (!file || !isAdmin()) return;
+  if (!file || !canCustomizeActiveMenu()) return;
   try {
     heroImageUrl.value = await prepareUploadedImage(file, {
       maxWidth: 1100,
@@ -13218,7 +13618,7 @@ function updateMenuAnimationIntensityLabel(source = menuAnimationIntensity) {
 }
 
 function saveDashboardMenuAnimationIntensity() {
-  if (!isAdmin() || !dashboardMenuAnimationIntensity) return;
+  if (!canCustomizeActiveMenu() || !dashboardMenuAnimationIntensity) return;
   const previousIntensity = designSettings.menuAnimationIntensity;
   const intensity = updateMenuAnimationIntensityLabel(dashboardMenuAnimationIntensity);
   designSettings = normalizeDesignSettings({
@@ -13254,7 +13654,7 @@ function previewFrontMediaFromFields() {
 
 async function updateFrontMediaFromFile(event) {
   const file = event.target.files?.[0];
-  if (!file || !isAdmin()) return;
+  if (!file || !canCustomizeActiveMenu()) return;
 
   const isImage = file.type.startsWith("image/");
   const isVideo = file.type.startsWith("video/");
@@ -13610,6 +14010,8 @@ createUserToggle.addEventListener("click", toggleCreateUserPanel);
 methodTabs.forEach((tab) => {
   tab.addEventListener("click", () => setCreateMethod(tab.dataset.method));
 });
+newRole?.addEventListener("change", () => renderNewUserAccessControls());
+userSearchInput?.addEventListener("input", renderUserSearchResults);
 dashboardTabs.forEach((tab) => {
   tab.addEventListener("click", () => showDashboardTab(tab.dataset.dashboardTab));
 });

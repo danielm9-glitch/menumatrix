@@ -1573,6 +1573,60 @@ h1 {
   display: grid;
 }
 
+.role-hint {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+  line-height: 1.35;
+  text-transform: none;
+}
+
+.user-search-results {
+  display: grid;
+  gap: 8px;
+}
+
+.user-search-result {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid rgba(25, 33, 29, 0.08);
+  border-radius: 8px;
+  padding: 9px;
+  background: color-mix(in srgb, var(--gold) 7%, var(--white));
+}
+
+.user-search-result span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.user-search-result strong,
+.user-search-result small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-search-result strong {
+  color: var(--ink);
+  font-size: 0.82rem;
+  font-weight: 950;
+}
+
+.user-search-result small,
+.user-search-empty {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.user-search-empty {
+  margin: 0;
+}
+
 .method-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1682,6 +1736,17 @@ h1 {
 
 .small-toggle.is-open {
   transform: rotate(180deg);
+}
+
+.small-text-action {
+  min-height: 30px;
+  border: 1px solid rgba(25, 33, 29, 0.1);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: #fffdfa;
+  color: var(--ink);
+  font-size: 0.72rem;
+  font-weight: 900;
 }
 
 .pdf-category-items {
@@ -2079,7 +2144,9 @@ h1 {
   text-transform: uppercase;
 }
 
-.user-edit-panel input {
+.user-edit-panel input,
+.user-edit-panel select,
+.user-form select {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 8px;

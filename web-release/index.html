@@ -6,7 +6,7 @@
     <title>Menu Matrix</title>
     <link rel="icon" type="image/svg+xml" href="assets/app-icon.svg" />
     <link rel="apple-touch-icon" href="assets/app-icon-launcher-preview.png" />
-    <link rel="stylesheet" href="styles.css?v=editor-user-tab-v38" />
+    <link rel="stylesheet" href="styles.css?v=role-hierarchy-v39" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -565,7 +565,7 @@
           <button id="createUserToggle" class="user-summary" type="button" aria-expanded="false">
             <div>
               <p class="kicker">Privileges</p>
-              <strong>Create user</strong>
+              <strong>Invite or connect user</strong>
             </div>
             <span class="expand-marker">+</span>
           </button>
@@ -588,6 +588,15 @@
                 Password
                 <input id="newPassword" type="password" autocomplete="new-password" />
               </label>
+              <label>
+                Role
+                <select id="newRole"></select>
+              </label>
+              <label>
+                Search existing users
+                <input id="userSearchInput" type="search" placeholder="Search name or email" autocomplete="off" />
+              </label>
+              <div id="userSearchResults" class="user-search-results" aria-live="polite"></div>
               <div id="newUserPermissionsSlot" class="access-control-slot" hidden></div>
               <div id="newUserMenuAccessSlot" class="access-control-slot"></div>
               <button id="createUserSubmit" class="save-button" type="submit">Send invite</button>
@@ -600,7 +609,7 @@
               <strong>Connected users</strong>
             </div>
             <div id="dashboardAuthSummary" class="dashboard-metric-grid"></div>
-            <p class="dashboard-note">Invited editor accounts can be attached to specific menus and category permissions. Self-registered owners still verify email through Firebase.</p>
+            <p class="dashboard-note">Team accounts can be attached to specific menus, role permissions, and category permissions. Self-registered owners still verify email through Firebase.</p>
           </div>
         </section>
 
@@ -1357,6 +1366,6 @@
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js?v=editor-user-tab-v38"></script>
+    <script src="app.js?v=role-hierarchy-v39"></script>
   </body>
 </html>
