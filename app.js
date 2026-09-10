@@ -11,6 +11,7 @@ const savedShareCodesStorageKey = "restaurant-menu-matrix-saved-share-codes";
 const remoteRequestsStorageKey = "restaurant-menu-matrix-remote-requests";
 const authFlowKey = "restaurant-menu-matrix-auth-flow";
 const featureAnnouncementStorageKey = "restaurant-menu-matrix-feature-announcement";
+const mott32CreditLine = "Special thanks to Carli Becker for compiling and organizing this menu matrix.";
 const currentAuthFlow = "login-first-menus";
 const currentFeatureAnnouncementVersion = "creator-team-access-v1";
 const firebaseMenuDocumentId = "main";
@@ -2382,6 +2383,7 @@ const shareMenuMessage = document.querySelector("#shareMenuMessage");
 const heroImage = document.querySelector("#heroImage");
 const editHeroButton = document.querySelector("#editHeroButton");
 const currentMenuTitle = document.querySelector("#currentMenuTitle");
+const currentMenuCredit = document.querySelector("#currentMenuCredit");
 const menuNotificationsButton = document.querySelector("#menuNotificationsButton");
 const menuNotificationBadge = document.querySelector("#menuNotificationBadge");
 const topAddItemButton = document.querySelector("#topAddItemButton");
@@ -2842,6 +2844,7 @@ function createDefaultRestaurantMenu() {
     restaurantName: "Mott 32 Las Vegas",
     owner: primaryAdminUsername,
     label: "Chinese menu training",
+    creditLine: mott32CreditLine,
     categories: [...categories],
     items: clearDefaultStockImagesForMenuItems(applyMott32HistoryFactsToItems(loadMenuItems())),
     designSettings: loadDesignSettings()
@@ -2974,6 +2977,7 @@ function normalizeRestaurantMenu(menu, index = 0) {
     restaurantName,
     owner: menu.owner || primaryAdminUsername,
     label: menu.label || (isDefaultMenu ? "Chinese menu training" : "Blank menu"),
+    creditLine: getMenuCreditLine({ ...menu, id, name }),
     shareCode: typeof menu.shareCode === "string" ? menu.shareCode : "",
     categories: getUniqueCategories(menu.categories || categories),
     items: normalizedItems,
@@ -2988,6 +2992,12 @@ function normalizeRestaurantMenu(menu, index = 0) {
 function isMott32Menu(menu) {
   const normalizedName = String(menu?.name || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
   return menu?.id === defaultRestaurantMenuId || normalizedName.includes("mott32");
+}
+
+function getMenuCreditLine(menu = {}) {
+  if (!isMott32Menu(menu)) return "";
+  const customCredit = typeof menu.creditLine === "string" ? menu.creditLine.trim() : "";
+  return customCredit || mott32CreditLine;
 }
 
 function shouldUseBuiltInMott32Hero(menu, heroImageValue) {
@@ -6348,6 +6358,7 @@ function sanitizeRestaurantMenuForStorage(menu, options = {}) {
     restaurantName: menu.restaurantName || "",
     owner: menu.owner || primaryAdminUsername,
     label: menu.label || "Menu training",
+    creditLine: getMenuCreditLine(menu),
     shareCode: typeof menu.shareCode === "string" ? menu.shareCode : "",
     categories: getUniqueCategories(menu.categories || categories),
     items: Array.isArray(menu.items) ? menu.items.map((item) => sanitizeMenuItemForCloud(item, options)) : [],
@@ -6780,7 +6791,12 @@ function renderActiveMenuHeader() {
   const canCustomizeMenu = canCustomizeActiveMenu();
   const isSharedView = state.screen === "shared";
   const isDemoView = isSharedView && state.demoMode;
+  const creditLine = getMenuCreditLine(activeMenu);
   currentMenuTitle.textContent = activeMenu?.name || "No menu selected";
+  if (currentMenuCredit) {
+    currentMenuCredit.textContent = creditLine;
+    currentMenuCredit.hidden = !creditLine;
+  }
   backToMenusButton.textContent = isDemoView ? "Exit demo" : isSharedView ? "Exit" : "Menus";
   drawerOpenButton.hidden = isSharedView || !getActiveUser();
   demoGuidePanel.hidden = !isDemoView;

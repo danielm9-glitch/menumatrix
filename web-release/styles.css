@@ -2294,6 +2294,15 @@ h1 {
   white-space: nowrap;
 }
 
+.menu-credit-line {
+  margin-top: 6px;
+  margin-bottom: 0;
+  color: color-mix(in srgb, var(--ink), transparent 28%);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .small-icon-action {
   display: grid;
   width: 36px;
