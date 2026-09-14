@@ -10911,11 +10911,11 @@ function getQuizNamePrefill(user = getActiveUser()) {
 function showFunnyNameWarning() {
   if (!funnyNameDialog) return;
   if (!funnyNameDialog.open) funnyNameDialog.showModal();
+  closeFunnyNameDialogButton?.focus();
 }
 
 function closeFunnyNameWarning() {
   if (funnyNameDialog?.open) funnyNameDialog.close();
-  quizTakerName?.focus();
 }
 
 function startQuizSession(event) {
@@ -10925,8 +10925,11 @@ function startQuizSession(event) {
   const activeMenu = getActiveRestaurantMenu();
   const nameValidation = updateQuizNameValidation({ showEmptyWarning: true });
   if (!nameValidation.valid) {
-    if (nameValidation.reason === "blocked") showFunnyNameWarning();
-    quizTakerName.focus();
+    if (nameValidation.reason === "blocked") {
+      showFunnyNameWarning();
+    } else {
+      quizTakerName.focus();
+    }
     return;
   }
   const takerName = nameValidation.name;

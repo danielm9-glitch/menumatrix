@@ -3465,6 +3465,7 @@ input[aria-invalid="true"] {
 
 .funny-name-dialog {
   width: min(calc(100% - 24px), 440px);
+  z-index: 9999;
 }
 
 .funny-name-form {
