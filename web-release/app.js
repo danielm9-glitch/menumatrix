@@ -10698,38 +10698,140 @@ function formatQuizTakerName(value = "") {
     .join(" ");
 }
 
+function getSimpleQuizName(value = "") {
+  return String(value).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function containsBlockedQuizName(simpleName, blockedPhrases = []) {
+  const compactName = simpleName.replace(/\s+/g, "");
+  return blockedPhrases.some((phrase) => {
+    const simplePhrase = getSimpleQuizName(phrase);
+    const compactPhrase = simplePhrase.replace(/\s+/g, "");
+    if (!simplePhrase) return false;
+    if (
+      simpleName === simplePhrase ||
+      simpleName.includes(` ${simplePhrase} `) ||
+      simpleName.startsWith(`${simplePhrase} `) ||
+      simpleName.endsWith(` ${simplePhrase}`)
+    ) {
+      return true;
+    }
+    return compactPhrase.length >= 6 && compactName.includes(compactPhrase);
+  });
+}
+
+function containsMamaJokeName(simpleName) {
+  const words = simpleName.split(/\s+/).filter(Boolean);
+  const setupWords = new Set(["joe", "jo", "yo", "your", "ur", "u", "ya", "yeo"]);
+  const targetWords = new Set(["mama", "momma", "mom", "mother", "mami", "mommy"]);
+  return words.some((word, index) => {
+    const nextWord = words[index + 1]?.replace(/s$/, "");
+    return setupWords.has(word) && targetWords.has(nextWord);
+  });
+}
+
 function validateQuizTakerName(value = "") {
   const name = cleanQuizTakerName(value);
-  const lowerName = name.toLowerCase();
-  const simpleName = lowerName.replace(/[^a-z0-9]+/g, " ").trim();
+  const simpleName = getSimpleQuizName(name);
   const nameParts = name.split(" ").filter(Boolean);
   const blockedPhrases = [
+    "joe mama",
+    "joe momma",
+    "joe mom",
     "yo mama",
     "yo momma",
     "your mama",
     "your mom",
     "ur mom",
+    "u mama",
+    "ya mama",
+    "mama joke",
     "deez nuts",
+    "dee z nuts",
     "ligma",
     "sugma",
+    "suckma",
+    "ben dover",
+    "ben d over",
+    "bend over",
+    "eileen dover",
+    "hugh jass",
+    "huge ass",
+    "phil mccracken",
+    "phil mc cracken",
+    "mike hunt",
+    "mike hawk",
+    "mike rotch",
+    "mike oxlong",
+    "mike ock",
+    "anita bath",
+    "anita mann",
+    "seymour butts",
+    "seymour butz",
+    "ivana tinkle",
+    "i p freely",
+    "ip freely",
+    "amanda hugginkiss",
+    "al coholic",
+    "maya buttreeks",
+    "drew p wiener",
+    "drew peacock",
+    "yuri nator",
+    "ollie tabooger",
+    "homer sexual",
+    "bea o problem",
+    "moe lester",
+    "dixie normous",
+    "dixie wrecked",
+    "willie stroker",
+    "tess tickles",
+    "justin herass",
+    "cam l toe",
+    "harry azcrac",
+    "barry mckockiner",
+    "gabe itch",
+    "stu pid",
+    "stu pedd",
+    "lou zar",
+    "pat myback",
+    "rick roll",
+    "rick astley",
     "test",
     "tester",
+    "testing",
     "guest",
     "anonymous",
+    "anon",
+    "fake name",
+    "fake person",
     "admin",
     "user",
+    "username",
+    "sample name",
     "none",
     "no name",
+    "first last",
+    "john doe",
+    "jane doe",
+    "john smith",
+    "jane smith",
     "asdf",
     "qwerty",
+    "abc def",
     "idiot",
+    "moron",
     "stupid",
     "dumb",
+    "dummy",
     "loser",
+    "bozo",
+    "clown",
     "trash",
+    "garbage",
     "sucks",
     "hate",
     "kill",
+    "die",
     "fuck",
     "shit",
     "bitch",
@@ -10754,7 +10856,7 @@ function validateQuizTakerName(value = "") {
     return { valid: false, name, message: "Use letters only. Do not use numbers, symbols, emails, or links." };
   }
 
-  if (blockedPhrases.some((phrase) => simpleName === phrase || simpleName.includes(` ${phrase} `) || simpleName.startsWith(`${phrase} `) || simpleName.endsWith(` ${phrase}`))) {
+  if (containsMamaJokeName(simpleName) || containsBlockedQuizName(simpleName, blockedPhrases)) {
     return { valid: false, name, message: "That does not look like a real name. Please enter your first and last name." };
   }
 
