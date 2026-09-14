@@ -2479,6 +2479,8 @@ const quizSetupPanel = document.querySelector("#quizSetupPanel");
 const quizSetupForm = document.querySelector("#quizSetupForm");
 const quizTakerName = document.querySelector("#quizTakerName");
 const quizNameWarning = document.querySelector("#quizNameWarning");
+const funnyNameDialog = document.querySelector("#funnyNameDialog");
+const closeFunnyNameDialogButton = document.querySelector("#closeFunnyNameDialogButton");
 const quizScorePanel = document.querySelector("#quizScorePanel");
 const quizCard = document.querySelector("#quizCard");
 const quizScore = document.querySelector("#quizScore");
@@ -10845,43 +10847,43 @@ function validateQuizTakerName(value = "") {
   ];
 
   if (!name) {
-    return { valid: false, name, message: "Enter your real first and last name before starting the quiz." };
+    return { valid: false, name, reason: "empty", message: "Enter your real first and last name before starting the quiz." };
   }
 
   if (name.length > 60) {
-    return { valid: false, name, message: "Use a shorter first and last name." };
+    return { valid: false, name, reason: "format", message: "Use a shorter first and last name." };
   }
 
   if (/[0-9@#_$%*+=<>/\\]|https?:|www\./i.test(name)) {
-    return { valid: false, name, message: "Use letters only. Do not use numbers, symbols, emails, or links." };
+    return { valid: false, name, reason: "format", message: "Use letters only. Do not use numbers, symbols, emails, or links." };
   }
 
   if (containsMamaJokeName(simpleName) || containsBlockedQuizName(simpleName, blockedPhrases)) {
-    return { valid: false, name, message: "That does not look like a real name. Please enter your first and last name." };
+    return { valid: false, name, reason: "blocked", message: "That does not look like a real name. Please enter your first and last name." };
   }
 
   if (nameParts.length < 2) {
-    return { valid: false, name, message: "Please enter both first and last name." };
+    return { valid: false, name, reason: "format", message: "Please enter both first and last name." };
   }
 
   if (nameParts.length > 5) {
-    return { valid: false, name, message: "Use your first and last name only." };
+    return { valid: false, name, reason: "format", message: "Use your first and last name only." };
   }
 
   const namePartPattern = /^[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'\u2019-]{1,}$/;
   if (!nameParts.every((part) => namePartPattern.test(part))) {
-    return { valid: false, name, message: "Names should use normal letters, hyphens, or apostrophes." };
+    return { valid: false, name, reason: "format", message: "Names should use normal letters, hyphens, or apostrophes." };
   }
 
   if (nameParts.some((part) => /(.)\1{3,}/i.test(part))) {
-    return { valid: false, name, message: "That does not look like a real name. Please enter your first and last name." };
+    return { valid: false, name, reason: "blocked", message: "That does not look like a real name. Please enter your first and last name." };
   }
 
   if (new Set(nameParts.map((part) => part.toLowerCase())).size === 1) {
-    return { valid: false, name, message: "First and last name cannot be the same." };
+    return { valid: false, name, reason: "format", message: "First and last name cannot be the same." };
   }
 
-  return { valid: true, name: formatQuizTakerName(name), message: "" };
+  return { valid: true, name: formatQuizTakerName(name), reason: "", message: "" };
 }
 
 function setQuizNameWarning(message = "") {
@@ -10906,6 +10908,16 @@ function getQuizNamePrefill(user = getActiveUser()) {
   return validCandidate ? formatQuizTakerName(validCandidate) : "";
 }
 
+function showFunnyNameWarning() {
+  if (!funnyNameDialog) return;
+  if (!funnyNameDialog.open) funnyNameDialog.showModal();
+}
+
+function closeFunnyNameWarning() {
+  if (funnyNameDialog?.open) funnyNameDialog.close();
+  quizTakerName?.focus();
+}
+
 function startQuizSession(event) {
   event.preventDefault();
   if (!canStudyActiveMenu()) return;
@@ -10913,6 +10925,7 @@ function startQuizSession(event) {
   const activeMenu = getActiveRestaurantMenu();
   const nameValidation = updateQuizNameValidation({ showEmptyWarning: true });
   if (!nameValidation.valid) {
+    if (nameValidation.reason === "blocked") showFunnyNameWarning();
     quizTakerName.focus();
     return;
   }
@@ -14252,6 +14265,8 @@ quickQuizButton.addEventListener("click", openQuizPage);
 backFromQuizButton.addEventListener("click", closeQuizPage);
 quizSetupForm.addEventListener("submit", startQuizSession);
 quizTakerName?.addEventListener("input", () => updateQuizNameValidation());
+closeFunnyNameDialogButton?.addEventListener("click", closeFunnyNameWarning);
+funnyNameDialog?.addEventListener("close", () => quizTakerName?.focus());
 quizNewQuestionButton.addEventListener("click", nextQuizQuestion);
 quizCheckButton.addEventListener("click", checkQuizAnswer);
 quizResetButton.addEventListener("click", resetQuizScore);

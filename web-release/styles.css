@@ -3463,6 +3463,32 @@ input[aria-invalid="true"] {
   gap: 14px;
 }
 
+.funny-name-dialog {
+  width: min(calc(100% - 24px), 440px);
+}
+
+.funny-name-form {
+  gap: 14px;
+  align-items: stretch;
+  text-align: center;
+}
+
+.funny-name-gif {
+  width: 100%;
+  max-height: min(46vh, 360px);
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.funny-name-form h2 {
+  margin: 4px 0 0;
+  color: var(--tomato);
+  font-size: clamp(1.65rem, 8vw, 2.8rem);
+  font-weight: 950;
+  line-height: 0.95;
+  text-align: center;
+}
+
 .feature-announcement-list {
   display: grid;
   gap: 9px;

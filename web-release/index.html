@@ -6,7 +6,7 @@
     <title>Menu Matrix</title>
     <link rel="icon" type="image/svg+xml" href="assets/app-icon.svg" />
     <link rel="apple-touch-icon" href="assets/app-icon-launcher-preview.png" />
-    <link rel="stylesheet" href="styles.css?v=quiz-name-filter-v42" />
+    <link rel="stylesheet" href="styles.css?v=funny-name-gif-v43" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -372,6 +372,18 @@
         <button id="quizStartOverButton" class="save-button" type="button">Start another quiz</button>
       </section>
     </main>
+
+    <dialog id="funnyNameDialog" class="item-dialog funny-name-dialog" aria-labelledby="funnyNameTitle">
+      <form method="dialog" class="item-form funny-name-form">
+        <img
+          class="funny-name-gif"
+          src="https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExaWx3dXBpb3J3emJ0Z2tqczdjcjVycGtwb2dveWl2aWp5NmM4NDVxeCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/cFgb5p5e1My3K/giphy.gif"
+          alt="Not today"
+        />
+        <h2 id="funnyNameTitle">NOT TODAY USE YOUR REAL NAME</h2>
+        <button id="closeFunnyNameDialogButton" class="save-button" type="submit">Use real name</button>
+      </form>
+    </dialog>
 
     <dialog id="quizPdfDialog" class="item-dialog" aria-labelledby="quizPdfDialogTitle">
       <form id="quizPdfForm" method="dialog" class="item-form">
@@ -1368,6 +1380,6 @@
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js?v=quiz-name-filter-v42"></script>
+    <script src="app.js?v=funny-name-gif-v43"></script>
   </body>
 </html>
