@@ -2478,6 +2478,7 @@ const backFromQuizButton = document.querySelector("#backFromQuizButton");
 const quizSetupPanel = document.querySelector("#quizSetupPanel");
 const quizSetupForm = document.querySelector("#quizSetupForm");
 const quizTakerName = document.querySelector("#quizTakerName");
+const quizNameWarning = document.querySelector("#quizNameWarning");
 const quizScorePanel = document.querySelector("#quizScorePanel");
 const quizCard = document.querySelector("#quizCard");
 const quizScore = document.querySelector("#quizScore");
@@ -10659,7 +10660,8 @@ function openQuizPage() {
     total: 0
   };
   quizSetupForm?.reset();
-  if (quizTakerName && activeUser?.username) quizTakerName.value = activeUser.username;
+  if (quizTakerName) quizTakerName.value = getQuizNamePrefill(activeUser);
+  setQuizNameWarning("");
   showScreen("quiz");
   renderQuiz();
 }
@@ -10676,16 +10678,144 @@ function getSelectedQuizQuestionMode() {
   return normalizeQuizQuestionMode(getSelectedRadioValue(quizSetupForm, "quizQuestionMode", "all"));
 }
 
+function cleanQuizTakerName(value = "") {
+  return String(value).trim().replace(/\s+/g, " ");
+}
+
+function formatQuizTakerName(value = "") {
+  return cleanQuizTakerName(value)
+    .split(" ")
+    .map((part) =>
+      part
+        .split(/([-'\u2019])/)
+        .map((piece) =>
+          /^[-'\u2019]$/.test(piece)
+            ? piece
+            : piece.charAt(0).toUpperCase() + piece.slice(1).toLowerCase()
+        )
+        .join("")
+    )
+    .join(" ");
+}
+
+function validateQuizTakerName(value = "") {
+  const name = cleanQuizTakerName(value);
+  const lowerName = name.toLowerCase();
+  const simpleName = lowerName.replace(/[^a-z0-9]+/g, " ").trim();
+  const nameParts = name.split(" ").filter(Boolean);
+  const blockedPhrases = [
+    "yo mama",
+    "yo momma",
+    "your mama",
+    "your mom",
+    "ur mom",
+    "deez nuts",
+    "ligma",
+    "sugma",
+    "test",
+    "tester",
+    "guest",
+    "anonymous",
+    "admin",
+    "user",
+    "none",
+    "no name",
+    "asdf",
+    "qwerty",
+    "idiot",
+    "stupid",
+    "dumb",
+    "loser",
+    "trash",
+    "sucks",
+    "hate",
+    "kill",
+    "fuck",
+    "shit",
+    "bitch",
+    "asshole",
+    "dick",
+    "pussy",
+    "cunt",
+    "whore",
+    "slut",
+    "bastard"
+  ];
+
+  if (!name) {
+    return { valid: false, name, message: "Enter your real first and last name before starting the quiz." };
+  }
+
+  if (name.length > 60) {
+    return { valid: false, name, message: "Use a shorter first and last name." };
+  }
+
+  if (/[0-9@#_$%*+=<>/\\]|https?:|www\./i.test(name)) {
+    return { valid: false, name, message: "Use letters only. Do not use numbers, symbols, emails, or links." };
+  }
+
+  if (blockedPhrases.some((phrase) => simpleName === phrase || simpleName.includes(` ${phrase} `) || simpleName.startsWith(`${phrase} `) || simpleName.endsWith(` ${phrase}`))) {
+    return { valid: false, name, message: "That does not look like a real name. Please enter your first and last name." };
+  }
+
+  if (nameParts.length < 2) {
+    return { valid: false, name, message: "Please enter both first and last name." };
+  }
+
+  if (nameParts.length > 5) {
+    return { valid: false, name, message: "Use your first and last name only." };
+  }
+
+  const namePartPattern = /^[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'\u2019-]{1,}$/;
+  if (!nameParts.every((part) => namePartPattern.test(part))) {
+    return { valid: false, name, message: "Names should use normal letters, hyphens, or apostrophes." };
+  }
+
+  if (nameParts.some((part) => /(.)\1{3,}/i.test(part))) {
+    return { valid: false, name, message: "That does not look like a real name. Please enter your first and last name." };
+  }
+
+  if (new Set(nameParts.map((part) => part.toLowerCase())).size === 1) {
+    return { valid: false, name, message: "First and last name cannot be the same." };
+  }
+
+  return { valid: true, name: formatQuizTakerName(name), message: "" };
+}
+
+function setQuizNameWarning(message = "") {
+  if (quizNameWarning) quizNameWarning.textContent = message;
+  if (quizTakerName) {
+    quizTakerName.setAttribute("aria-invalid", message ? "true" : "false");
+    quizTakerName.setCustomValidity(message);
+  }
+}
+
+function updateQuizNameValidation({ showEmptyWarning = false } = {}) {
+  if (!quizTakerName) return { valid: false, name: "", message: "" };
+  const validation = validateQuizTakerName(quizTakerName.value);
+  const shouldShowMessage = validation.message && (showEmptyWarning || cleanQuizTakerName(quizTakerName.value));
+  setQuizNameWarning(shouldShowMessage ? validation.message : "");
+  return validation;
+}
+
+function getQuizNamePrefill(user = getActiveUser()) {
+  const candidates = [user?.fullName, user?.name, user?.displayName, user?.username];
+  const validCandidate = candidates.find((candidate) => validateQuizTakerName(candidate).valid);
+  return validCandidate ? formatQuizTakerName(validCandidate) : "";
+}
+
 function startQuizSession(event) {
   event.preventDefault();
   if (!canStudyActiveMenu()) return;
 
   const activeMenu = getActiveRestaurantMenu();
-  const takerName = quizTakerName.value.trim();
-  if (!takerName) {
+  const nameValidation = updateQuizNameValidation({ showEmptyWarning: true });
+  if (!nameValidation.valid) {
     quizTakerName.focus();
     return;
   }
+  const takerName = nameValidation.name;
+  quizTakerName.value = takerName;
 
   const questionLimit = getSelectedQuizQuestionCount();
   const questionMode = getSelectedQuizQuestionMode();
@@ -11050,8 +11180,9 @@ function resetQuizScore() {
   };
   quizSetupForm?.reset();
   const activeUser = getActiveUser();
-  if (quizTakerName && activeUser?.username) quizTakerName.value = activeUser.username;
+  if (quizTakerName) quizTakerName.value = getQuizNamePrefill(activeUser);
   setQuizFeedback("");
+  setQuizNameWarning("");
   renderQuiz();
 }
 
@@ -14018,6 +14149,7 @@ flashcardFlipButton.addEventListener("click", flipFlashcard);
 quickQuizButton.addEventListener("click", openQuizPage);
 backFromQuizButton.addEventListener("click", closeQuizPage);
 quizSetupForm.addEventListener("submit", startQuizSession);
+quizTakerName?.addEventListener("input", () => updateQuizNameValidation());
 quizNewQuestionButton.addEventListener("click", nextQuizQuestion);
 quizCheckButton.addEventListener("click", checkQuizAnswer);
 quizResetButton.addEventListener("click", resetQuizScore);

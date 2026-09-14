@@ -894,6 +894,15 @@ h1 {
   font-weight: 800;
 }
 
+.quiz-name-warning {
+  margin-top: -10px;
+}
+
+input[aria-invalid="true"] {
+  border-color: var(--tomato);
+  box-shadow: 0 0 0 3px rgba(179, 78, 62, 0.15);
+}
+
 .scan-hint {
   margin: -4px 0 0;
   color: var(--muted);

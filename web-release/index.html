@@ -6,7 +6,7 @@
     <title>Menu Matrix</title>
     <link rel="icon" type="image/svg+xml" href="assets/app-icon.svg" />
     <link rel="apple-touch-icon" href="assets/app-icon-launcher-preview.png" />
-    <link rel="stylesheet" href="styles.css?v=mott32-credit-v40" />
+    <link rel="stylesheet" href="styles.css?v=quiz-name-check-v41" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -323,9 +323,10 @@
         </div>
         <form id="quizSetupForm" class="user-form">
           <label>
-            Your name
-            <input id="quizTakerName" autocomplete="name" placeholder="Enter your name" required />
+            First and last name
+            <input id="quizTakerName" autocomplete="name" placeholder="First Last" minlength="5" aria-describedby="quizNameWarning" required />
           </label>
+          <p id="quizNameWarning" class="login-message quiz-name-warning" role="status"></p>
           <fieldset class="quiz-count-options">
             <legend>Questions</legend>
             <label><input type="radio" name="quizQuestionCount" value="5" checked /> 5</label>
@@ -1367,6 +1368,6 @@
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js?v=mott32-credit-v40"></script>
+    <script src="app.js?v=quiz-name-check-v41"></script>
   </body>
 </html>
