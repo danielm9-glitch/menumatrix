@@ -3455,6 +3455,13 @@ input[aria-invalid="true"] {
   background: rgba(25, 33, 29, 0.42);
 }
 
+.recycle-bin-list { display: grid; gap: 12px; }
+.recycle-bin-row { display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+.recycle-bin-row > div { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.recycle-bin-row strong, .recycle-bin-row small { display: block; }
+.recycle-bin-row small { margin-top: 4px; color: var(--muted); }
+.recycle-bin-row button { flex-shrink: 0; }
+
 .notification-dialog .item-form {
   gap: 14px;
 }

@@ -2219,6 +2219,10 @@ const loginMessage = document.querySelector("#loginMessage");
 const adminStatus = document.querySelector("#adminStatus");
 const editModeButton = document.querySelector("#editModeButton");
 const quickMenuActions = document.querySelector("#quickMenuActions");
+const recentlyDeletedButton = document.querySelector("#recentlyDeletedButton");
+const recentlyDeletedDialog = document.querySelector("#recentlyDeletedDialog");
+const recentlyDeletedList = document.querySelector("#recentlyDeletedList");
+const recentlyDeletedMessage = document.querySelector("#recentlyDeletedMessage");
 const quickEditModeButton = document.querySelector("#quickEditModeButton");
 const quickCustomizationButton = document.querySelector("#quickCustomizationButton");
 const quickScanMenuButton = document.querySelector("#quickScanMenuButton");
@@ -2984,12 +2988,33 @@ function normalizeRestaurantMenu(menu, index = 0) {
     shareCode: typeof menu.shareCode === "string" ? menu.shareCode : "",
     categories: getUniqueCategories(menu.categories || categories),
     items: normalizedItems,
+    deletedItems: normalizeDeletedItems(menu.deletedItems),
     stats: normalizeMenuStats(menu.stats),
     quizResults: normalizeQuizResults(menu.quizResults),
     notifications: normalizeMenuNotifications(menu.notifications || menu.changeLog || menu.activity),
     updatedAt: typeof menu.updatedAt === "string" ? menu.updatedAt : "",
     designSettings: normalizedDesign
   };
+}
+
+function normalizeDeletedItems(entries = []) {
+  if (!Array.isArray(entries)) return [];
+  return entries.filter((entry) => entry?.item?.id && getTimestampMs(entry.deletedAt))
+    .map((entry) => ({
+      item: normalizeMenuItem(entry.item),
+      deletedAt: entry.deletedAt,
+      restoredAt: typeof entry.restoredAt === "string" ? entry.restoredAt : ""
+    }));
+}
+
+function mergeDeletedItems(...lists) {
+  const entries = new Map();
+  lists.flatMap((list) => normalizeDeletedItems(list)).forEach((entry) => {
+    const previous = entries.get(entry.item.id);
+    const time = (value) => Math.max(getTimestampMs(value.deletedAt), getTimestampMs(value.restoredAt));
+    if (!previous || time(entry) >= time(previous)) entries.set(entry.item.id, entry);
+  });
+  return [...entries.values()];
 }
 
 function isMott32Menu(menu) {
@@ -6190,11 +6215,18 @@ function mergeCloudMenusWithLocal(cloudMenus = [], workspaceOwner = primaryAdmin
     if (!localMenu) return cloudMenu;
 
     const mergedItems = mergeCloudItemsWithLocal(cloudMenu.items, localMenu.items || []);
+    const deletedItems = mergeDeletedItems(cloudMenu.deletedItems, localMenu.deletedItems);
+    if (JSON.stringify(deletedItems) !== JSON.stringify(cloudMenu.deletedItems)) hasLocalPreserves = true;
+    const deletedById = new Map(deletedItems.filter((entry) => !entry.restoredAt).map((entry) => [entry.item.id, entry]));
     if (mergedItems.hasLocalPreserves) hasLocalPreserves = true;
 
     return {
       ...cloudMenu,
-      items: mergedItems.items,
+      items: mergedItems.items.filter((item) => {
+        const deleted = deletedById.get(item.id);
+        return !deleted || getMenuItemUpdatedAtMs(item) > getTimestampMs(deleted.deletedAt);
+      }),
+      deletedItems,
       notifications: mergeMenuNotifications(cloudMenu.notifications, localMenu.notifications),
       updatedAt: getLatestTimestampString(cloudMenu.updatedAt, localMenu.updatedAt)
     };
@@ -6365,6 +6397,9 @@ function sanitizeRestaurantMenuForStorage(menu, options = {}) {
     shareCode: typeof menu.shareCode === "string" ? menu.shareCode : "",
     categories: getUniqueCategories(menu.categories || categories),
     items: Array.isArray(menu.items) ? menu.items.map((item) => sanitizeMenuItemForCloud(item, options)) : [],
+    deletedItems: normalizeDeletedItems(menu.deletedItems).map((entry) => ({
+      ...entry, item: sanitizeMenuItemForCloud(entry.item, options)
+    })),
     stats: normalizeMenuStats(menu.stats),
     quizResults: normalizeQuizResults(menu.quizResults),
     notifications: normalizeMenuNotifications(menu.notifications),
@@ -6804,6 +6839,7 @@ function renderActiveMenuHeader() {
   drawerOpenButton.hidden = isSharedView || !getActiveUser();
   demoGuidePanel.hidden = !isDemoView;
   topAddItemButton.hidden = !canEditMenu;
+  recentlyDeletedButton.hidden = !canEditMenu || !getActiveUser() || Boolean(state.sharedMenu);
   renameMenuButton.hidden = !state.editing || !canEditMenu;
   quickEditModeButton.textContent = state.editing ? "Done editing" : "Edit menu";
   quickEditModeButton.classList.toggle("is-active", state.editing);
@@ -14154,7 +14190,12 @@ function toggleIngredient(ingredient) {
 function deleteMenuItemById(id) {
   const item = menuItems.find((menuItem) => menuItem.id === id);
   if (!item || !canEditCategory(item.category) || state.sharedMenu) return false;
+  if (!window.confirm(`Move ${item.name} to Recently deleted? You can restore it later.`)) return false;
   const menuScrollSnapshot = captureMenuScrollSnapshot(id);
+  const menu = getActiveRestaurantMenu();
+  menu.deletedItems = mergeDeletedItems(menu.deletedItems, [{
+    item: { ...item }, deletedAt: new Date().toISOString(), restoredAt: ""
+  }]);
 
   markLocalItemDelete(id);
   addActiveMenuNotification({
@@ -14174,10 +14215,66 @@ function requestDeleteMenuItem(id) {
   const item = menuItems.find((menuItem) => menuItem.id === id);
   if (!item || !canEditCategory(item.category) || state.sharedMenu) return;
 
-  const confirmed = window.confirm(`Delete ${item.name}?`);
-  if (!confirmed) return;
-
   deleteMenuItemById(id);
+}
+
+function renderRecentlyDeleted() {
+  recentlyDeletedList.replaceChildren();
+  const entries = normalizeDeletedItems(getActiveRestaurantMenu()?.deletedItems)
+    .filter((entry) => !entry.restoredAt && canEditCategory(entry.item.category))
+    .sort((a, b) => getTimestampMs(b.deletedAt) - getTimestampMs(a.deletedAt));
+  if (!entries.length) {
+    const empty = document.createElement("p");
+    empty.textContent = "No recently deleted items.";
+    recentlyDeletedList.append(empty);
+  }
+  entries.forEach((entry) => {
+    const row = document.createElement("div");
+    row.className = "recycle-bin-row";
+    const copy = document.createElement("div");
+    const name = document.createElement("strong");
+    name.textContent = entry.item.name;
+    const date = document.createElement("small");
+    date.textContent = `${getCategoryLabel(entry.item.category)} - ${new Date(entry.deletedAt).toLocaleString()}`;
+    copy.append(name, date);
+    const restore = document.createElement("button");
+    restore.className = "action-button";
+    restore.type = "button";
+    restore.textContent = "Restore";
+    restore.addEventListener("click", () => restoreDeletedItem(entry.item.id));
+    row.append(copy, restore);
+    recentlyDeletedList.append(row);
+  });
+}
+
+function openRecentlyDeleted() {
+  if (!getActiveUser() || state.sharedMenu || !canEditAnyCategory()) return;
+  recentlyDeletedMessage.textContent = "";
+  renderRecentlyDeleted();
+  recentlyDeletedDialog.showModal();
+}
+
+function restoreDeletedItem(id) {
+  if (!getActiveUser() || state.sharedMenu) return;
+  const menu = getActiveRestaurantMenu();
+  const entry = menu?.deletedItems?.find((candidate) => candidate.item.id === id && !candidate.restoredAt);
+  if (!entry || !canEditCategory(entry.item.category)) return;
+  if (menuItems.some((item) => item.id === id)) {
+    recentlyDeletedMessage.textContent = "This item is already on the menu.";
+    return;
+  }
+  const snapshot = captureMenuScrollSnapshot();
+  const item = normalizeMenuItem({ ...entry.item, updatedAt: new Date().toISOString() });
+  entry.restoredAt = item.updatedAt;
+  markLocalItemEdit(item);
+  menuItems.push(item);
+  addActiveMenuNotification({ title: "Menu item restored", detail: `${item.name} was restored from Recently deleted.`, type: "item-restore" });
+  saveMenuItems();
+  renderAllergyChips();
+  renderIngredientChips();
+  renderMenu({ scrollSnapshot: snapshot });
+  renderRecentlyDeleted();
+  recentlyDeletedMessage.textContent = `${item.name} restored.`;
 }
 
 function deleteItem() {
@@ -14189,6 +14286,8 @@ searchInput.addEventListener("input", (event) => {
   state.query = event.target.value;
   renderMenu({ preserveScroll: true });
 });
+
+recentlyDeletedButton.addEventListener("click", openRecentlyDeleted);
 
 editModeButton.addEventListener("click", () => {
   setEditMode(!state.editing);

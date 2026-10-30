@@ -6,7 +6,7 @@
     <title>Menu Matrix</title>
     <link rel="icon" type="image/svg+xml" href="assets/app-icon.svg" />
     <link rel="apple-touch-icon" href="assets/app-icon-launcher-preview.png" />
-    <link rel="stylesheet" href="styles.css?v=funny-name-dialog-v44" />
+    <link rel="stylesheet" href="styles.css?v=recycle-bin-v45" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -220,6 +220,7 @@
 
         <section id="quickMenuActions" class="quick-menu-actions" aria-label="Menu actions">
           <button id="quickEditModeButton" class="quick-action-button" type="button" hidden>Edit menu</button>
+          <button id="recentlyDeletedButton" class="quick-action-button" type="button" hidden>Recently deleted</button>
           <button id="quickCustomizationButton" class="quick-action-button" type="button" hidden>Customization</button>
           <button id="quickScanMenuButton" class="quick-action-button" type="button" hidden>Scan menu photo</button>
           <button id="quickImportPdfButton" class="quick-action-button" type="button" hidden>Import PDF</button>
@@ -372,6 +373,17 @@
         <button id="quizStartOverButton" class="save-button" type="button">Start another quiz</button>
       </section>
     </main>
+
+    <dialog id="recentlyDeletedDialog" class="item-dialog" aria-labelledby="recentlyDeletedTitle">
+      <div class="item-form">
+        <div class="dialog-head">
+          <h2 id="recentlyDeletedTitle">Recently deleted</h2>
+          <form method="dialog"><button class="icon-button" aria-label="Close recently deleted">x</button></form>
+        </div>
+        <div id="recentlyDeletedList" class="recycle-bin-list"></div>
+        <p id="recentlyDeletedMessage" class="login-message" role="status"></p>
+      </div>
+    </dialog>
 
     <dialog id="funnyNameDialog" class="item-dialog funny-name-dialog" aria-labelledby="funnyNameTitle">
       <form method="dialog" class="item-form funny-name-form">
@@ -1380,6 +1392,6 @@
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js?v=funny-name-dialog-v44"></script>
+    <script src="app.js?v=recycle-bin-v45"></script>
   </body>
 </html>
