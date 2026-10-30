@@ -44,9 +44,10 @@ automatically verify ownership or guarantee indexing or rankings.
 - `assets/website/menu-desktop.jpg`: screenshot of the actual public demo menu.
 - `assets/website/quiz-phone.jpg`: screenshot of demo quiz setup.
 - `assets/website/flashcards-phone.jpg`: screenshot of demo flashcards.
-- `assets/website/kitchen.jpg`: generated kitchen hero, optimized as JPEG.
+- `assets/website/hero-photo.webp`: user-supplied black-and-white photo, used as the current homepage hero. The original is preserved; a 1px CSS blur and responsive cropping are applied at display time.
+- `assets/website/kitchen.jpg`: previous generated kitchen hero, retained but no longer displayed.
 
-The kitchen image was generated using the built-in image generation tool.
+The previous kitchen image was generated using the built-in image generation tool.
 It is illustrative, not a photograph of a customer restaurant.
 
 Final generation prompt:
