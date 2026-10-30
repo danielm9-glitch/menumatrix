@@ -7,9 +7,10 @@
     "cap:add:android": "cap add android",
     "cap:sync": "cap sync android",
     "cap:open": "cap open android",
-    "firebase:deploy": "firebase deploy --only hosting,firestore:rules",
-    "firebase:deploy:all": "firebase deploy --only hosting,firestore:rules,storage",
-    "firebase:deploy:hosting": "firebase deploy --only hosting"
+    "site:build": "node scripts/prepare-site.js",
+    "firebase:deploy": "npm run site:build && firebase deploy --only hosting,firestore:rules",
+    "firebase:deploy:all": "npm run site:build && firebase deploy --only hosting,firestore:rules,storage",
+    "firebase:deploy:hosting": "npm run site:build && firebase deploy --only hosting"
   },
   "keywords": [],
   "author": "",

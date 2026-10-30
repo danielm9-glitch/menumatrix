@@ -14505,3 +14505,10 @@ if (getActiveUser()) {
   renderMenu();
 }
 initializeCloudSync();
+
+const entryAction = new URLSearchParams(window.location.search).get("action");
+if (!getActiveUser() && !getInviteUsername()) {
+  if (entryAction === "demo") openDemoMenu();
+  if (entryAction === "register") openRegisterPage();
+  if (entryAction === "code") toggleCodeLoginPanel();
+}

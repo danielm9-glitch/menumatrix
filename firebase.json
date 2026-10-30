@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "public": "web-release",
+    "public": "site-release",
     "cleanUrls": true,
     "ignore": [
       "firebase.json",
@@ -20,8 +20,8 @@
     ],
     "rewrites": [
       {
-        "source": "**",
-        "destination": "/index.html"
+        "source": "/app",
+        "destination": "/app.html"
       }
     ]
   },
