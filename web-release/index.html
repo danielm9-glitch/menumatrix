@@ -7,7 +7,7 @@
     <meta name="robots" content="noindex, follow" />
     <link rel="icon" type="image/svg+xml" href="assets/app-icon.svg" />
     <link rel="apple-touch-icon" href="assets/app-icon-launcher-preview.png" />
-    <link rel="stylesheet" href="styles.css?v=public-site-v46" />
+    <link rel="stylesheet" href="styles.css?v=arrange-items-v47" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -220,7 +220,14 @@
         </section>
 
         <section id="quickMenuActions" class="quick-menu-actions" aria-label="Menu actions">
-          <button id="quickEditModeButton" class="quick-action-button" type="button" hidden>Edit menu</button>
+          <div class="edit-menu-control">
+            <button id="quickEditModeButton" class="quick-action-button" type="button" aria-expanded="false" aria-controls="editMenuDropdown" hidden>Edit menu &#9662;</button>
+            <div id="editMenuDropdown" class="edit-menu-dropdown" hidden>
+              <button id="dropdownAddItemButton" type="button">Add item</button>
+              <button id="arrangeItemsButton" type="button">Arrange items</button>
+              <button id="doneEditingButton" type="button">Done editing</button>
+            </div>
+          </div>
           <button id="recentlyDeletedButton" class="quick-action-button" type="button" hidden>Recently deleted</button>
           <button id="quickCustomizationButton" class="quick-action-button" type="button" hidden>Customization</button>
           <button id="quickScanMenuButton" class="quick-action-button" type="button" hidden>Scan menu photo</button>
@@ -375,6 +382,16 @@
       </section>
     </main>
 
+    <dialog id="arrangeItemsDialog" class="item-dialog arrange-dialog" aria-labelledby="arrangeItemsTitle">
+      <form id="arrangeItemsForm" class="arrange-form">
+        <div class="dialog-head"><div><p class="kicker">Menu order</p><h2 id="arrangeItemsTitle">Arrange items</h2></div><button id="closeArrangeItemsButton" class="icon-button" type="button" aria-label="Cancel arrangement">x</button></div>
+        <div class="arrange-toolbar"><label>Category<select id="arrangeCategorySelect"><option value="all">All categories</option></select></label><button id="resetArrangeItemsButton" class="action-button" type="button">Reset changes</button></div>
+        <ol id="arrangeItemsList" class="arrange-items-list" aria-label="Menu item order"></ol>
+        <p id="arrangeItemsMessage" class="login-message" role="status" aria-live="polite"></p>
+        <div class="arrange-footer"><span id="arrangeItemsCount"></span><div><button id="cancelArrangeItemsButton" class="action-button" type="button">Cancel</button><button id="saveArrangeItemsButton" class="save-button" type="submit">Save order</button></div></div>
+      </form>
+    </dialog>
+
     <dialog id="recentlyDeletedDialog" class="item-dialog" aria-labelledby="recentlyDeletedTitle">
       <div class="item-form">
         <div class="dialog-head">
@@ -454,6 +471,7 @@
       <section id="adminControls" class="admin-controls" hidden>
         <p id="adminStatus" class="admin-status">Signed in</p>
         <button id="editModeButton" class="action-button" type="button">Edit menu</button>
+        <button id="drawerArrangeItemsButton" class="action-button" type="button" hidden>Arrange items</button>
         <button id="addItemButton" class="action-button add-button" type="button" hidden>Add item</button>
         <button id="deleteMenuButton" class="danger-button delete-menu-button" type="button" hidden>Delete Menu</button>
         <button id="scanMenuButton" class="action-button" type="button" hidden>Scan menu photo</button>
@@ -1393,6 +1411,7 @@
     <script src="firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="app.js?v=public-site-v46"></script>
+    <script src="assets/vendor/Sortable.min.js"></script>
+    <script src="app.js?v=arrange-items-v47"></script>
   </body>
 </html>

@@ -13,7 +13,7 @@ const authFlowKey = "restaurant-menu-matrix-auth-flow";
 const featureAnnouncementStorageKey = "restaurant-menu-matrix-feature-announcement";
 const mott32CreditLine = "Special thanks to Carli Becker for compiling and organizing this menu matrix.";
 const currentAuthFlow = "login-first-menus";
-const currentFeatureAnnouncementVersion = "creator-team-access-v1";
+const currentFeatureAnnouncementVersion = "arrange-items-v47";
 const firebaseMenuDocumentId = "main";
 const primaryAdminUsername = "admin";
 const cloudOcrEndpoint = window.MENU_MATRIX_OCR_ENDPOINT || "";
@@ -2070,6 +2070,11 @@ const flashcardModes = ["mixed", "allergies", "ingredients"];
 const quizQuestionModes = ["all", "ingredients", "allergies"];
 const featureAnnouncementItems = [
   {
+    title: "Arrange menu items",
+    detail: "Editors can now open Edit menu, choose Arrange items, and save a custom order with drag-and-drop or move controls.",
+    audiences: ["user"]
+  },
+  {
     title: "Creator user access",
     detail: "Restaurant owners and menu editors can now invite users, attach them to menus, and choose which categories they can modify.",
     audiences: ["user"]
@@ -2219,6 +2224,16 @@ const loginMessage = document.querySelector("#loginMessage");
 const adminStatus = document.querySelector("#adminStatus");
 const editModeButton = document.querySelector("#editModeButton");
 const quickMenuActions = document.querySelector("#quickMenuActions");
+const editMenuDropdown = document.querySelector("#editMenuDropdown");
+const arrangeItemsDialog = document.querySelector("#arrangeItemsDialog");
+const arrangeItemsForm = document.querySelector("#arrangeItemsForm");
+const arrangeItemsList = document.querySelector("#arrangeItemsList");
+const arrangeCategorySelect = document.querySelector("#arrangeCategorySelect");
+const arrangeItemsMessage = document.querySelector("#arrangeItemsMessage");
+const arrangeItemsCount = document.querySelector("#arrangeItemsCount");
+const saveArrangeItemsButton = document.querySelector("#saveArrangeItemsButton");
+let arrangeSession = null;
+let arrangeSortable = null;
 const recentlyDeletedButton = document.querySelector("#recentlyDeletedButton");
 const recentlyDeletedDialog = document.querySelector("#recentlyDeletedDialog");
 const recentlyDeletedList = document.querySelector("#recentlyDeletedList");
@@ -2987,7 +3002,9 @@ function normalizeRestaurantMenu(menu, index = 0) {
     creditLine: getMenuCreditLine({ ...menu, id, name }),
     shareCode: typeof menu.shareCode === "string" ? menu.shareCode : "",
     categories: getUniqueCategories(menu.categories || categories),
-    items: normalizedItems,
+    items: applyMenuItemOrder(normalizedItems, menu.itemOrder),
+    itemOrder: normalizeMenuItemOrder(menu.itemOrder),
+    orderUpdatedAt: typeof menu.orderUpdatedAt === "string" ? menu.orderUpdatedAt : "",
     deletedItems: normalizeDeletedItems(menu.deletedItems),
     stats: normalizeMenuStats(menu.stats),
     quizResults: normalizeQuizResults(menu.quizResults),
@@ -2995,6 +3012,23 @@ function normalizeRestaurantMenu(menu, index = 0) {
     updatedAt: typeof menu.updatedAt === "string" ? menu.updatedAt : "",
     designSettings: normalizedDesign
   };
+}
+
+function normalizeMenuItemOrder(ids = []) {
+  return Array.isArray(ids) ? [...new Set(ids.filter((id) => typeof id === "string" && id))] : [];
+}
+
+function applyMenuItemOrder(items = [], ids = []) {
+  const positions = new Map(normalizeMenuItemOrder(ids).map((id, index) => [id, index]));
+  return [...items].sort((a, b) => (positions.get(a.id) ?? positions.size) - (positions.get(b.id) ?? positions.size));
+}
+
+function replaceEditableOrderSlots(ids, orderedIds, editableIds) {
+  const editable = new Set(editableIds);
+  const replacement = normalizeMenuItemOrder(orderedIds).filter((id) => editable.has(id));
+  if (replacement.length !== editable.size || replacement.some((id) => !ids.includes(id))) return [...ids];
+  let index = 0;
+  return ids.map((id) => editable.has(id) ? replacement[index++] : id);
 }
 
 function normalizeDeletedItems(entries = []) {
@@ -6216,16 +6250,20 @@ function mergeCloudMenusWithLocal(cloudMenus = [], workspaceOwner = primaryAdmin
 
     const mergedItems = mergeCloudItemsWithLocal(cloudMenu.items, localMenu.items || []);
     const deletedItems = mergeDeletedItems(cloudMenu.deletedItems, localMenu.deletedItems);
+    const orderSource = getTimestampMs(localMenu.orderUpdatedAt) > getTimestampMs(cloudMenu.orderUpdatedAt) ? localMenu : cloudMenu;
+    if (orderSource === localMenu) hasLocalPreserves = true;
     if (JSON.stringify(deletedItems) !== JSON.stringify(cloudMenu.deletedItems)) hasLocalPreserves = true;
     const deletedById = new Map(deletedItems.filter((entry) => !entry.restoredAt).map((entry) => [entry.item.id, entry]));
     if (mergedItems.hasLocalPreserves) hasLocalPreserves = true;
 
     return {
       ...cloudMenu,
-      items: mergedItems.items.filter((item) => {
+      items: applyMenuItemOrder(mergedItems.items.filter((item) => {
         const deleted = deletedById.get(item.id);
         return !deleted || getMenuItemUpdatedAtMs(item) > getTimestampMs(deleted.deletedAt);
-      }),
+      }), orderSource.itemOrder),
+      itemOrder: normalizeMenuItemOrder(orderSource.itemOrder),
+      orderUpdatedAt: orderSource.orderUpdatedAt || "",
       deletedItems,
       notifications: mergeMenuNotifications(cloudMenu.notifications, localMenu.notifications),
       updatedAt: getLatestTimestampString(cloudMenu.updatedAt, localMenu.updatedAt)
@@ -6397,6 +6435,8 @@ function sanitizeRestaurantMenuForStorage(menu, options = {}) {
     shareCode: typeof menu.shareCode === "string" ? menu.shareCode : "",
     categories: getUniqueCategories(menu.categories || categories),
     items: Array.isArray(menu.items) ? menu.items.map((item) => sanitizeMenuItemForCloud(item, options)) : [],
+    itemOrder: normalizeMenuItemOrder(menu.itemOrder),
+    orderUpdatedAt: typeof menu.orderUpdatedAt === "string" ? menu.orderUpdatedAt : "",
     deletedItems: normalizeDeletedItems(menu.deletedItems).map((entry) => ({
       ...entry, item: sanitizeMenuItemForCloud(entry.item, options)
     })),
@@ -6841,9 +6881,12 @@ function renderActiveMenuHeader() {
   topAddItemButton.hidden = !canEditMenu;
   recentlyDeletedButton.hidden = !canEditMenu || !getActiveUser() || Boolean(state.sharedMenu);
   renameMenuButton.hidden = !state.editing || !canEditMenu;
-  quickEditModeButton.textContent = state.editing ? "Done editing" : "Edit menu";
+  quickEditModeButton.textContent = "Edit menu \u25be";
   quickEditModeButton.classList.toggle("is-active", state.editing);
   quickEditModeButton.hidden = !canEditMenu;
+  quickEditModeButton.closest(".edit-menu-control").hidden = !canEditMenu;
+  document.querySelector("#drawerArrangeItemsButton").hidden = !state.editing || !canEditMenu;
+  if (!canEditMenu || !state.editing) closeEditMenuDropdown();
   quickCustomizationButton.hidden = !canCustomizeMenu;
   quickScanMenuButton.hidden = !canEditMenu;
   quickImportPdfButton.hidden = !canEditMenu;
@@ -7992,6 +8035,174 @@ function toggleAllergy(allergen) {
 
   renderAllergyChips();
   renderMenu({ preserveScroll: true });
+}
+
+function closeEditMenuDropdown() {
+  editMenuDropdown.hidden = true;
+  quickEditModeButton.setAttribute("aria-expanded", "false");
+}
+
+function toggleEditMenuDropdown() {
+  if (!canEditAnyCategory() || state.sharedMenu) return;
+  const wasOpen = !editMenuDropdown.hidden;
+  if (!state.editing) setEditMode(true);
+  editMenuDropdown.hidden = wasOpen;
+  quickEditModeButton.setAttribute("aria-expanded", String(!wasOpen));
+}
+
+function openArrangeItems() {
+  if (!getActiveUser() || !canEditAnyCategory() || state.sharedMenu) return;
+  closeEditMenuDropdown();
+  closeDrawer();
+  const menu = getActiveRestaurantMenu();
+  if (!menu) return;
+  const ids = menuItems.map((item) => item.id);
+  arrangeSession = { menuId: menu.id, originalIds: [...ids], draftIds: [...ids] };
+  arrangeCategorySelect.replaceChildren(new Option("All categories", "all"));
+  getUniqueCategories(menuItems.map((item) => item.category)).forEach((category) => {
+    arrangeCategorySelect.append(new Option(getCategoryLabel(category), category));
+  });
+  arrangeItemsMessage.textContent = "";
+  renderArrangeItems();
+  arrangeItemsDialog.showModal();
+}
+
+function getArrangeVisibleItems() {
+  if (!arrangeSession) return [];
+  const itemsById = new Map(menuItems.map((item) => [item.id, item]));
+  const category = arrangeCategorySelect.value;
+  return arrangeSession.draftIds.map((id) => itemsById.get(id)).filter((item) => item && (category === "all" || item.category === category));
+}
+
+function updateArrangeDraft(orderedIds) {
+  if (!arrangeSession) return;
+  const editableIds = getArrangeVisibleItems().filter((item) => canEditCategory(item.category)).map((item) => item.id);
+  arrangeSession.draftIds = replaceEditableOrderSlots(arrangeSession.draftIds, orderedIds, editableIds);
+  arrangeItemsMessage.textContent = "";
+}
+
+function moveArrangeItem(id, direction) {
+  const ids = getArrangeVisibleItems().filter((item) => canEditCategory(item.category)).map((item) => item.id);
+  const from = ids.indexOf(id);
+  const to = direction === "first" ? 0 : direction === "last" ? ids.length - 1 : from + direction;
+  if (from < 0 || to < 0 || to >= ids.length || from === to) return;
+  ids.splice(to, 0, ids.splice(from, 1)[0]);
+  updateArrangeDraft(ids);
+  renderArrangeItems(id);
+}
+
+function renderArrangeItems(focusId = "") {
+  if (!arrangeSession) return;
+  const scrollTop = arrangeItemsList.scrollTop;
+  arrangeSortable?.destroy();
+  arrangeSortable = null;
+  arrangeItemsList.replaceChildren();
+  const visible = getArrangeVisibleItems();
+  const editable = visible.filter((item) => canEditCategory(item.category));
+  const editableIds = editable.map((item) => item.id);
+  visible.forEach((item) => {
+    const canMove = canEditCategory(item.category);
+    const row = document.createElement("li");
+    row.className = `arrange-row${canMove ? "" : " is-locked"}`;
+    row.dataset.id = item.id;
+    const grip = document.createElement("button");
+    grip.type = "button";
+    grip.className = "arrange-grip";
+    grip.innerHTML = "&#8942;&#8942;";
+    grip.disabled = !canMove;
+    grip.title = `Move ${item.name}`;
+    grip.setAttribute("aria-label", `Move ${item.name}`);
+    grip.addEventListener("keydown", (event) => {
+      const direction = { ArrowUp: -1, ArrowDown: 1, Home: "first", End: "last" }[event.key];
+      if (direction === undefined) return;
+      event.preventDefault();
+      moveArrangeItem(item.id, direction);
+    });
+    const number = document.createElement("span");
+    number.className = "arrange-index";
+    number.textContent = String(arrangeSession.draftIds.indexOf(item.id) + 1);
+    const copy = document.createElement("div");
+    copy.className = "arrange-item-copy";
+    const name = document.createElement("strong");
+    name.textContent = item.name;
+    const category = document.createElement("small");
+    category.textContent = getCategoryLabel(item.category) + (canMove ? "" : " - View only");
+    copy.append(name, category);
+    const actions = document.createElement("div");
+    actions.className = "arrange-row-actions";
+    [-1, 1].forEach((direction) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "arrange-move-button";
+      button.innerHTML = direction < 0 ? "&#8593;" : "&#8595;";
+      const label = `Move ${item.name} ${direction < 0 ? "up" : "down"}`;
+      button.title = label;
+      button.setAttribute("aria-label", label);
+      const index = editableIds.indexOf(item.id);
+      button.disabled = !canMove || index + direction < 0 || index + direction >= editableIds.length;
+      button.addEventListener("click", () => moveArrangeItem(item.id, direction));
+      actions.append(button);
+    });
+    row.append(grip, number, copy, actions);
+    arrangeItemsList.append(row);
+  });
+  if (!visible.length) {
+    const empty = document.createElement("li");
+    empty.className = "empty-state";
+    empty.textContent = "No menu items.";
+    arrangeItemsList.append(empty);
+  }
+  if (window.Sortable && editable.length > 1) {
+    arrangeSortable = new window.Sortable(arrangeItemsList, {
+      handle: ".arrange-grip", draggable: ".arrange-row:not(.is-locked)",
+      animation: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 160,
+      ghostClass: "arrange-ghost", chosenClass: "arrange-chosen",
+      forceFallback: true, fallbackOnBody: false, fallbackTolerance: 4,
+      scrollSensitivity: 55, scrollSpeed: 8,
+      onEnd: (event) => {
+        const ids = [...arrangeItemsList.querySelectorAll(".arrange-row:not(.is-locked)")].map((row) => row.dataset.id);
+        updateArrangeDraft(ids);
+        const id = event.item.dataset.id;
+        queueMicrotask(() => renderArrangeItems(id));
+      }
+    });
+  }
+  arrangeItemsCount.textContent = `${visible.length} item${visible.length === 1 ? "" : "s"}`;
+  saveArrangeItemsButton.disabled = arrangeSession.originalIds.join("\n") === arrangeSession.draftIds.join("\n");
+  arrangeItemsList.scrollTop = scrollTop;
+  if (focusId) {
+    const row = [...arrangeItemsList.children].find((candidate) => candidate.dataset.id === focusId);
+    row?.querySelector(".arrange-grip")?.focus({ preventScroll: true });
+    row?.scrollIntoView({ block: "nearest" });
+  }
+}
+
+function saveArrangeItems(event) {
+  event.preventDefault();
+  if (!arrangeSession || !getActiveUser() || state.sharedMenu || !canEditAnyCategory()) return;
+  const menu = getActiveRestaurantMenu();
+  if (!menu || menu.id !== arrangeSession.menuId) {
+    arrangeItemsMessage.textContent = "The active menu changed. Cancel and reopen Arrange items.";
+    return;
+  }
+  const currentIds = menuItems.map((item) => item.id);
+  if (currentIds.join("\n") !== arrangeSession.originalIds.join("\n")) {
+    arrangeItemsMessage.textContent = "The menu changed while this window was open. Cancel and reopen to use the latest items.";
+    return;
+  }
+  if (menuItems.some((item, index) => !canEditCategory(item.category) && arrangeSession.draftIds[index] !== item.id)) {
+    arrangeItemsMessage.textContent = "Your editing permissions changed. Cancel and reopen Arrange items.";
+    return;
+  }
+  if (saveArrangeItemsButton.disabled) return;
+  const snapshot = captureMenuScrollSnapshot();
+  menu.itemOrder = [...arrangeSession.draftIds];
+  menu.orderUpdatedAt = new Date().toISOString();
+  menuItems = applyMenuItemOrder(menuItems, menu.itemOrder);
+  addActiveMenuNotification({ title: "Menu order updated", detail: "The display order of menu items was updated.", type: "item-order" });
+  saveMenuItems();
+  arrangeItemsDialog.close();
+  renderMenu({ scrollSnapshot: snapshot });
 }
 
 function setEditMode(isEditing) {
@@ -14293,8 +14504,29 @@ editModeButton.addEventListener("click", () => {
   setEditMode(!state.editing);
 });
 quickEditModeButton.addEventListener("click", () => {
-  setEditMode(!state.editing);
+  toggleEditMenuDropdown();
 });
+document.querySelector("#arrangeItemsButton").addEventListener("click", openArrangeItems);
+document.querySelector("#drawerArrangeItemsButton").addEventListener("click", openArrangeItems);
+document.querySelector("#dropdownAddItemButton").addEventListener("click", () => { closeEditMenuDropdown(); openItemDialog(); });
+document.querySelector("#doneEditingButton").addEventListener("click", () => setEditMode(false));
+document.querySelectorAll("#closeArrangeItemsButton, #cancelArrangeItemsButton").forEach((button) => button.addEventListener("click", () => arrangeItemsDialog.close()));
+document.querySelector("#resetArrangeItemsButton").addEventListener("click", () => {
+  if (!arrangeSession) return;
+  arrangeSession.draftIds = [...arrangeSession.originalIds];
+  arrangeItemsMessage.textContent = "";
+  renderArrangeItems();
+});
+arrangeCategorySelect.addEventListener("change", () => renderArrangeItems());
+arrangeItemsForm.addEventListener("submit", saveArrangeItems);
+arrangeItemsDialog.addEventListener("close", () => {
+  if (arrangeItemsDialog.open) return;
+  arrangeSortable?.destroy();
+  arrangeSortable = null;
+  arrangeSession = null;
+});
+document.addEventListener("click", (event) => { if (!event.target.closest(".edit-menu-control")) closeEditMenuDropdown(); });
+document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeEditMenuDropdown(); });
 quickCustomizationButton.addEventListener("click", openDesignDialog);
 
 addItemButton.addEventListener("click", () => {
