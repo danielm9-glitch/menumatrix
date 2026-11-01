@@ -13,7 +13,7 @@ const authFlowKey = "restaurant-menu-matrix-auth-flow";
 const featureAnnouncementStorageKey = "restaurant-menu-matrix-feature-announcement";
 const mott32CreditLine = "Special thanks to Carli Becker for compiling and organizing this menu matrix.";
 const currentAuthFlow = "login-first-menus";
-const currentFeatureAnnouncementVersion = "arrange-items-v47";
+const currentFeatureAnnouncementVersion = "training-v48";
 const firebaseMenuDocumentId = "main";
 const primaryAdminUsername = "admin";
 const cloudOcrEndpoint = window.MENU_MATRIX_OCR_ENDPOINT || "";
@@ -2067,8 +2067,9 @@ const formatter = new Intl.NumberFormat("en-US", {
 });
 
 const flashcardModes = ["mixed", "allergies", "ingredients"];
-const quizQuestionModes = ["all", "ingredients", "allergies"];
+const quizQuestionModes = ["all", "ingredients", "allergies", "pairings"];
 const featureAnnouncementItems = [
+  { title: "Team training", detail: "Training now includes quiz reviews, personal progress, daily challenges, pre-shift briefings, and acknowledgements. Logged-in teams can also use assignments, leaderboards, badges, and manager rewards.", audiences: ["user", "viewer"] },
   {
     title: "Arrange menu items",
     detail: "Editors can now open Edit menu, choose Arrange items, and save a custom order with drag-and-drop or move controls.",
@@ -3008,6 +3009,7 @@ function normalizeRestaurantMenu(menu, index = 0) {
     deletedItems: normalizeDeletedItems(menu.deletedItems),
     stats: normalizeMenuStats(menu.stats),
     quizResults: normalizeQuizResults(menu.quizResults),
+    training: MenuTraining.normalize(menu.training),
     notifications: normalizeMenuNotifications(menu.notifications || menu.changeLog || menu.activity),
     updatedAt: typeof menu.updatedAt === "string" ? menu.updatedAt : "",
     designSettings: normalizedDesign
@@ -3142,7 +3144,16 @@ function normalizeQuizResult(result = {}) {
     score,
     total,
     percent: total ? Math.round((score / total) * 100) : 0,
-    source: String(result.source || "app")
+    source: String(result.source || "app"),
+    userKey: String(result.userKey || ""),
+    takerUsername: String(result.takerUsername || ""),
+    firebaseUid: String(result.firebaseUid || ""),
+    assignmentId: String(result.assignmentId || ""),
+    challengeDate: String(result.challengeDate || ""),
+    trainingKind: String(result.trainingKind || "practice"),
+    categoryFilter: String(result.categoryFilter || "all"),
+    topicScores: MenuTraining.topicScores(result.topicScores),
+    questions: MenuTraining.normalizeQuestions(result.questions)
   };
 }
 
@@ -3822,6 +3833,8 @@ function normalizeMenuItem(item) {
     category: categories.includes(category) ? category : categories[0] || "starters",
     details: item.details || defaultMatch?.details || "Dish history, origin notes, and fun facts can go here.",
     ingredients: normalizeIngredientList(item.ingredients || defaultMatch?.ingredients || []),
+    pairings: MenuTraining.pairings(item.pairings),
+    recommendation: String(item.recommendation || ""),
     image: images[0] || "",
     images,
     updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : ""
@@ -5285,6 +5298,7 @@ function getSharedMenuContentSignature({ code = "", menu = {}, categories: share
       shareCode: sanitizedMenu.shareCode,
       categories: sanitizedMenu.categories,
       designSettings: sanitizedMenu.designSettings,
+      training: sanitizedMenu.training,
       items: sanitizedMenu.items.map((item) => ({
         id: item.id,
         name: item.name,
@@ -5295,6 +5309,8 @@ function getSharedMenuContentSignature({ code = "", menu = {}, categories: share
         heat: item.heat,
         allergens: item.allergens,
         ingredients: item.ingredients,
+        pairings: item.pairings,
+        recommendation: item.recommendation,
         details: item.details,
         image: item.image,
         images: item.images,
@@ -5415,6 +5431,7 @@ function getShareQuizResults(data = {}) {
 }
 
 function createShareQuizResultsPayload(data = {}, nextResults = []) {
+  nextResults = nextResults.map(MenuTraining.compactResult);
   const sharedMenuData = data.menu && typeof data.menu === "object" ? data.menu : null;
   const payload = {
     quizResults: nextResults,
@@ -6251,6 +6268,8 @@ function mergeCloudMenusWithLocal(cloudMenus = [], workspaceOwner = primaryAdmin
     const mergedItems = mergeCloudItemsWithLocal(cloudMenu.items, localMenu.items || []);
     const deletedItems = mergeDeletedItems(cloudMenu.deletedItems, localMenu.deletedItems);
     const orderSource = getTimestampMs(localMenu.orderUpdatedAt) > getTimestampMs(cloudMenu.orderUpdatedAt) ? localMenu : cloudMenu;
+    const mergedTraining = MenuTraining.merge(cloudMenu.training, localMenu.training);
+    if (JSON.stringify(mergedTraining) !== JSON.stringify(cloudMenu.training)) hasLocalPreserves = true;
     if (orderSource === localMenu) hasLocalPreserves = true;
     if (JSON.stringify(deletedItems) !== JSON.stringify(cloudMenu.deletedItems)) hasLocalPreserves = true;
     const deletedById = new Map(deletedItems.filter((entry) => !entry.restoredAt).map((entry) => [entry.item.id, entry]));
@@ -6265,6 +6284,7 @@ function mergeCloudMenusWithLocal(cloudMenus = [], workspaceOwner = primaryAdmin
       itemOrder: normalizeMenuItemOrder(orderSource.itemOrder),
       orderUpdatedAt: orderSource.orderUpdatedAt || "",
       deletedItems,
+      training: mergedTraining,
       notifications: mergeMenuNotifications(cloudMenu.notifications, localMenu.notifications),
       updatedAt: getLatestTimestampString(cloudMenu.updatedAt, localMenu.updatedAt)
     };
@@ -6414,6 +6434,8 @@ function sanitizeMenuItemForCloud(item, { allowInlineImages = true } = {}) {
     heat: Number(item.heat) || 0,
     allergens: Array.isArray(item.allergens) ? item.allergens : [],
     ingredients: normalizeIngredientList(item.ingredients || []),
+    pairings: MenuTraining.pairings(item.pairings),
+    recommendation: String(item.recommendation || ""),
     details: item.details || "",
     image: images[0] || "",
     images,
@@ -6441,7 +6463,8 @@ function sanitizeRestaurantMenuForStorage(menu, options = {}) {
       ...entry, item: sanitizeMenuItemForCloud(entry.item, options)
     })),
     stats: normalizeMenuStats(menu.stats),
-    quizResults: normalizeQuizResults(menu.quizResults),
+    quizResults: normalizeQuizResults(menu.quizResults).map(MenuTraining.compactResult),
+    training: MenuTraining.normalize(menu.training),
     notifications: normalizeMenuNotifications(menu.notifications),
     updatedAt: typeof menu.updatedAt === "string" ? menu.updatedAt : "",
     designSettings: sanitizeDesignSettings(menu.designSettings || defaultDesign)
@@ -6895,6 +6918,7 @@ function renderActiveMenuHeader() {
   quickShareMenuButton.hidden = !canShareMenu;
   quickFlashcardButton.hidden = !canUseStudyTools;
   quickQuizButton.hidden = !canUseStudyTools;
+  document.querySelector("#trainingHubButton").hidden = !activeMenu || !(getActiveUser() || state.sharedMenu);
   renderActiveMenuNotificationButton(activeMenu);
   quickMenuActions.hidden =
     quickEditModeButton.hidden &&
@@ -6905,7 +6929,8 @@ function renderActiveMenuHeader() {
     quickCategoryButton.hidden &&
     quickShareMenuButton.hidden &&
     quickFlashcardButton.hidden &&
-    quickQuizButton.hidden;
+    quickQuizButton.hidden &&
+    document.querySelector("#trainingHubButton").hidden;
 }
 
 function openRestaurantMenu(menuId) {
@@ -7613,6 +7638,16 @@ function renderMenu({ preserveScroll = false, anchorItemId = "", scrollSnapshot 
     gallery.classList.toggle("single", itemImages.length === 1);
     renderItemPhotoGallery(gallery, itemImages, item.name, item.id);
     itemDetails.querySelector(".detail-copy").textContent = item.details;
+    if (item.pairings?.length || item.recommendation) {
+      const pairingNotes = document.createElement("div");
+      pairingNotes.className = "training-pairing-notes";
+      const heading = document.createElement("strong");
+      heading.textContent = "Pairings & recommendations";
+      const copy = document.createElement("p");
+      copy.textContent = [MenuTraining.pairings(item.pairings).join("; "), item.recommendation].filter(Boolean).join(". ");
+      pairingNotes.append(heading, copy);
+      itemDetails.append(pairingNotes);
+    }
 
     menuGrid.append(row);
     observeMenuRowReveal(row);
@@ -8257,6 +8292,8 @@ function openItemDialog(id) {
   itemPrice.value = currentItem.price;
   itemAllergens.value = currentItem.allergens.join(", ");
   itemIngredients.value = getItemIngredientTerms(currentItem).join(", ");
+  document.querySelector("#itemPairings").value = MenuTraining.pairings(currentItem.pairings).join("\n");
+  document.querySelector("#itemRecommendation").value = currentItem.recommendation || "";
   deleteItemButton.hidden = isNew;
   itemDialog.showModal();
 }
@@ -8844,6 +8881,7 @@ function showDashboardTab(tabName) {
 }
 
 function canAccessDashboardTab(tabName) {
+  if (tabName === "training") return Boolean(getActiveUser());
   if (tabName === "users") return canManageUsers();
   if (tabName === "customization") return isAdmin() || canCustomizeActiveMenu();
   return isAdmin() || tabName === "account" || tabName === "stats";
@@ -8861,6 +8899,7 @@ function renderDashboard() {
 
   renderAccountDashboard();
   renderDashboardStats();
+  MenuTraining.render();
   if (canManageUsers()) {
     renderDashboardAuthSummary();
     renderUserList();
@@ -10577,7 +10616,8 @@ function getQuizQuestionModeLabel(value) {
   return {
     all: "All",
     ingredients: "Ingredients only",
-    allergies: "Allergies only"
+    allergies: "Allergies only",
+    pairings: "Pairings"
   }[mode];
 }
 
@@ -10710,6 +10750,7 @@ function getActiveStudyItems() {
     .map(normalizeMenuItem)
     .filter((item) => {
       if (!item.id || seenIds.has(item.id) || isDeletedMenuItem(item) || isLocallyDeletedMenuItem(item)) return false;
+      if (state.quizSession?.categoryFilter && state.quizSession.categoryFilter !== "all" && state.screen === "quiz" && item.category !== state.quizSession.categoryFilter) return false;
       seenIds.add(item.id);
       return true;
     });
@@ -10897,8 +10938,9 @@ function renderFlashcard() {
   flashcardFlipButton.textContent = state.flashcard.revealed ? "Hide answer" : "Show answer";
 }
 
-function openQuizPage() {
+function openQuizPage(options = {}) {
   if (!canStudyActiveMenu()) return;
+  if (!options.trainingLaunch) MenuTraining.clearLaunch();
 
   closeDrawer();
   const activeUser = getActiveUser();
@@ -10913,6 +10955,7 @@ function openQuizPage() {
   setQuizNameWarning("");
   showScreen("quiz");
   renderQuiz();
+  MenuTraining.renderQuizSetup();
 }
 
 function closeQuizPage() {
@@ -11182,8 +11225,10 @@ function startQuizSession(event) {
   const takerName = nameValidation.name;
   quizTakerName.value = takerName;
 
-  const questionLimit = getSelectedQuizQuestionCount();
-  const questionMode = getSelectedQuizQuestionMode();
+  const launch = MenuTraining.prepareQuizStart(activeMenu);
+  if (launch?.error) { setQuizNameWarning(launch.error); return; }
+  const questionLimit = launch?.questionLimit || getSelectedQuizQuestionCount();
+  const questionMode = launch?.questionMode || getSelectedQuizQuestionMode();
   state.quizScore = {
     correct: 0,
     total: 0
@@ -11204,6 +11249,7 @@ function startQuizSession(event) {
     saved: false,
     saveMessage: ""
   };
+  Object.assign(state.quizSession, MenuTraining.sessionFields(launch));
   state.quiz = null;
   nextQuizQuestion();
 }
@@ -11219,9 +11265,10 @@ function getQuizQuestionBuilders(mode = "all") {
     createItemByIngredientQuestion
   ];
   const normalizedMode = normalizeQuizQuestionMode(mode);
+  if (normalizedMode === "pairings") return [MenuTraining.createPairingQuestion];
   if (normalizedMode === "allergies") return allergyBuilders;
   if (normalizedMode === "ingredients") return ingredientBuilders;
-  return [...allergyBuilders, ...ingredientBuilders];
+  return [...allergyBuilders, ...ingredientBuilders, MenuTraining.createPairingQuestion];
 }
 
 function createQuizQuestion(mode = "all") {
@@ -11417,7 +11464,7 @@ function nextQuizQuestion() {
     return;
   }
 
-  state.quiz = createQuizQuestion(state.quizSession.questionMode);
+  state.quiz = state.quizSession.questionQueue?.[state.quizScore.total] || createQuizQuestion(state.quizSession.questionMode);
   if (state.quiz) {
     state.quiz.questionNumber = state.quizScore.total + 1;
   }
@@ -11449,6 +11496,7 @@ function renderQuiz() {
   quizOptions.replaceChildren();
 
   if (!hasSession) {
+    MenuTraining.renderQuizSetup();
     quizType.textContent = "Ready";
     quizQuestion.textContent = "Enter your name to start.";
     setQuizFeedback("");
@@ -11527,6 +11575,7 @@ function checkQuizAnswer() {
   state.quiz.selected = selected;
   state.quiz.message = isCorrect ? `Correct. ${state.quiz.explanation}` : `Not quite. ${state.quiz.explanation}`;
   state.quiz.messageTone = isCorrect ? "success" : "error";
+  MenuTraining.recordAnswer(state.quiz, selected, isCorrect);
   state.quizScore.total += 1;
   if (isCorrect) state.quizScore.correct += 1;
   if (state.quizScore.total >= state.quizSession.questionLimit) {
@@ -11548,6 +11597,7 @@ function resetQuizScore() {
   if (quizTakerName) quizTakerName.value = getQuizNamePrefill(activeUser);
   setQuizFeedback("");
   setQuizNameWarning("");
+  MenuTraining.clearLaunch();
   renderQuiz();
 }
 
@@ -11568,7 +11618,8 @@ function getCurrentQuizResult() {
     questionMode: state.quizSession.questionMode,
     score: state.quizScore.correct,
     total: state.quizScore.total,
-    source: state.sharedMenu ? "shared-code" : "logged-in"
+    source: state.sharedMenu ? "shared-code" : "logged-in",
+    ...MenuTraining.resultFields(state.quizSession)
   });
 }
 
@@ -11597,15 +11648,16 @@ function renderQuizResult() {
     createDashboardMetric("Taken", formatQuizDate(result.takenAt), result.finishedAt ? `Finished ${formatQuizDate(result.finishedAt)}` : ""),
     createDashboardMetric("Saved", state.quizSession.saveMessage || "Result ready", "Visible in the admin dashboard")
   );
+  MenuTraining.renderAnswerReview(document.querySelector("#quizAnswerReview"), result);
 }
 
 function addQuizResultToMenu(result) {
-  if (!result || state.sharedMenu) return false;
+  if (!result || state.sharedMenu || !getActiveUser()) return false;
 
-  const menu = restaurantMenus.find((candidate) => candidate.id === result.menuId) || getActiveRestaurantMenu();
-  if (!menu) return false;
+  const menu = restaurantMenus.find((candidate) => candidate.id === result.menuId);
+  if (!menu || getMenuOwner(menu) !== result.owner) return false;
 
-  menu.quizResults = mergeQuizResults(menu.quizResults || [], [result]);
+  menu.quizResults = mergeQuizResults(menu.quizResults || [], [MenuTraining.compactResult(result)]);
   saveRestaurantMenus();
   renderDashboard();
   return true;
@@ -11613,8 +11665,10 @@ function addQuizResultToMenu(result) {
 
 async function saveQuizResult(result) {
   if (!result || !state.quizSession) return;
+  const session = state.quizSession;
 
   try {
+    const detailsSaved = await MenuTraining.saveAttempt(result);
     const savedToMenu = addQuizResultToMenu(result);
     let savedToShare = false;
     if (result.shareCode) {
@@ -11627,16 +11681,16 @@ async function saveQuizResult(result) {
     if (result.shareCode && state.sharedMenu && !savedToShare) {
       throw new Error("Shared quiz result did not sync.");
     }
-    state.quizSession.saved = true;
-    state.quizSession.saveMessage = savedToMenu || savedToShare
-      ? "Quiz complete. Result saved."
+    session.saved = true;
+    session.saveMessage = savedToMenu || savedToShare
+      ? detailsSaved ? "Quiz complete. Result and detailed review saved." : "Score saved. Detailed review is on this device, waiting for cloud sync."
       : "Quiz complete. Result saved on this device.";
   } catch {
     if (result.shareCode) {
       savePendingSharedQuizResult(result.shareCode, result);
-      state.quizSession.saveMessage = "Quiz complete. Saved on this device; it will sync when Firebase is reachable.";
+      session.saveMessage = "Quiz complete. Saved on this device; it will sync when Firebase is reachable.";
     } else {
-      state.quizSession.saveMessage = "Quiz complete. Result could not sync yet.";
+      session.saveMessage = "Quiz complete. Result could not sync yet.";
     }
   }
 
@@ -11768,6 +11822,7 @@ function renderAdminState() {
   renderFlashcard();
   renderQuiz();
   window.requestAnimationFrame(updateBackToTopButton);
+  MenuTraining.render();
 }
 
 function getUsernameFromEmail(email) {
@@ -14245,6 +14300,8 @@ function getItemChangeLabels(previousItem, item) {
   if (normalizeChangeValue(previousItem.name) !== normalizeChangeValue(item.name)) changes.push("name");
   if (normalizeChangeValue(previousItem.description) !== normalizeChangeValue(item.description)) changes.push("description");
   if (normalizeChangeValue(previousItem.details) !== normalizeChangeValue(item.details)) changes.push("dish history and facts");
+  if (JSON.stringify(previousItem.pairings || []) !== JSON.stringify(item.pairings || [])) changes.push("pairings");
+  if (normalizeChangeValue(previousItem.recommendation) !== normalizeChangeValue(item.recommendation)) changes.push("guest recommendation");
   if (normalizeCategoryValue(previousItem.category) !== normalizeCategoryValue(item.category)) changes.push("category");
   if (Number(previousItem.price) !== Number(item.price)) changes.push("price");
   if (normalizeChangeValue(previousItem.diet) !== normalizeChangeValue(item.diet)) changes.push("diet tag");
@@ -14309,6 +14366,8 @@ function getFormItem() {
     heat,
     allergens,
     ingredients,
+    pairings: MenuTraining.pairings(document.querySelector("#itemPairings").value),
+    recommendation: document.querySelector("#itemRecommendation").value.trim(),
     price: Math.max(0, Number(itemPrice.value))
   };
 }

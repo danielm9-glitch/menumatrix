@@ -5,11 +5,11 @@
   "main": "app.js",
   "scripts": {
     "cap:add:android": "cap add android",
-    "cap:sync": "cap sync android",
+    "cap:sync": "node scripts/prepare-app.js && cap sync android",
     "cap:open": "cap open android",
-    "site:build": "node scripts/prepare-site.js",
-    "firebase:deploy": "npm run site:build && firebase deploy --only hosting,firestore:rules",
-    "firebase:deploy:all": "npm run site:build && firebase deploy --only hosting,firestore:rules,storage",
+    "site:build": "node scripts/prepare-app.js && node scripts/prepare-site.js",
+    "firebase:deploy": "npm run site:build && firebase deploy --only hosting,firestore:rules,firestore:indexes",
+    "firebase:deploy:all": "npm run site:build && firebase deploy --only hosting,firestore:rules,firestore:indexes,storage",
     "firebase:deploy:hosting": "npm run site:build && firebase deploy --only hosting"
   },
   "keywords": [],

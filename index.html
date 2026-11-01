@@ -7,7 +7,8 @@
     <meta name="robots" content="noindex, follow" />
     <link rel="icon" type="image/svg+xml" href="assets/app-icon.svg" />
     <link rel="apple-touch-icon" href="assets/app-icon-launcher-preview.png" />
-    <link rel="stylesheet" href="styles.css?v=arrange-items-v47" />
+    <link rel="stylesheet" href="styles.css?v=training-v48" />
+    <link rel="stylesheet" href="training.css?v=training-v48" />
   </head>
   <body>
     <main id="authPage" class="auth-page" aria-label="Log in">
@@ -237,6 +238,7 @@
           <button id="quickShareMenuButton" class="quick-action-button" type="button" hidden>Share</button>
           <button id="quickFlashcardButton" class="quick-action-button" type="button" hidden>Flash cards</button>
           <button id="quickQuizButton" class="quick-action-button" type="button" hidden>Quiz</button>
+          <button id="trainingHubButton" class="quick-action-button" type="button" hidden>Training</button>
         </section>
 
         <section class="controls" aria-label="Menu filters">
@@ -331,6 +333,7 @@
           <h2>Start a menu quiz</h2>
         </div>
         <form id="quizSetupForm" class="user-form" novalidate>
+          <p id="quizLaunchContext" class="training-launch-context" hidden></p>
           <label>
             First and last name
             <input id="quizTakerName" autocomplete="name" placeholder="First Last" minlength="5" aria-describedby="quizNameWarning" required />
@@ -348,6 +351,7 @@
             <label><input type="radio" name="quizQuestionMode" value="all" checked /> All</label>
             <label><input type="radio" name="quizQuestionMode" value="ingredients" /> Ingredients</label>
             <label><input type="radio" name="quizQuestionMode" value="allergies" /> Allergies</label>
+            <label><input type="radio" name="quizQuestionMode" value="pairings" /> Pairings</label>
           </fieldset>
           <button class="save-button" type="submit">Start quiz</button>
         </form>
@@ -378,9 +382,19 @@
           <h2 id="quizResultTitle">Quiz complete</h2>
         </div>
         <div id="quizResultSummary" class="dashboard-metric-grid"></div>
+        <div id="quizAnswerReview" class="training-answer-review"></div>
         <button id="quizStartOverButton" class="save-button" type="button">Start another quiz</button>
       </section>
     </main>
+
+    <dialog id="trainingHubDialog" class="item-dialog training-hub-dialog" aria-labelledby="trainingHubTitle">
+      <div class="training-hub-head"><h2 id="trainingHubTitle">Team training</h2><form method="dialog"><button class="icon-button" aria-label="Close training">x</button></form></div>
+      <div id="trainingMenuRoot" class="training-root"></div>
+    </dialog>
+    <dialog id="trainingReviewDialog" class="item-dialog training-hub-dialog" aria-labelledby="trainingReviewTitle">
+      <div class="training-hub-head"><h2 id="trainingReviewTitle">Quiz review</h2><form method="dialog"><button class="icon-button" aria-label="Close quiz review">x</button></form></div>
+      <div id="trainingReviewRoot" class="training-root"></div>
+    </dialog>
 
     <dialog id="arrangeItemsDialog" class="item-dialog arrange-dialog" aria-labelledby="arrangeItemsTitle">
       <form id="arrangeItemsForm" class="arrange-form">
@@ -502,9 +516,11 @@
         <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="restaurants">Restaurants</button>
         <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="menus">Menus</button>
         <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="stats">Stats</button>
+        <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="training">Training</button>
         <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-tab="customization">Customization</button>
       </nav>
 
+      <section class="dashboard-panel" data-dashboard-panel="training" hidden><div id="trainingDashboardRoot" class="training-root"></div></section>
       <section class="dashboard-panel account-dashboard" data-dashboard-panel="account">
         <section class="account-summary-card">
           <div class="section-heading">
@@ -956,6 +972,8 @@
           Allergens
           <input id="itemAllergens" placeholder="Soy, Wheat, Dairy" />
         </label>
+        <label>Approved pairings<textarea id="itemPairings" rows="3" placeholder="One approved drink or dish pairing per line"></textarea></label>
+        <label>Guest recommendation<textarea id="itemRecommendation" rows="3" placeholder="How your team should describe or recommend this item"></textarea></label>
 
         <div class="form-actions">
           <button id="deleteItemButton" class="danger-button" type="button">Delete</button>
@@ -1412,6 +1430,7 @@
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
     <script src="assets/vendor/Sortable.min.js"></script>
-    <script src="app.js?v=arrange-items-v47"></script>
+    <script src="training.js?v=training-v48"></script>
+    <script src="app.js?v=training-v48"></script>
   </body>
 </html>

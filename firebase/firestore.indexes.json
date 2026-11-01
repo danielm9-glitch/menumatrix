@@ -1,6 +1,14 @@
 {
   "indexes": [
     {
+      "collectionGroup": "trainingAttempts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "menuId", "order": "ASCENDING" },
+        { "fieldPath": "takenAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "menuItems",
       "queryScope": "COLLECTION",
       "fields": [
@@ -10,5 +18,7 @@
       ]
     }
   ],
-  "fieldOverrides": []
+  "fieldOverrides": [
+    { "collectionGroup": "trainingAttempts", "fieldPath": "questions", "indexes": [] }
+  ]
 }
