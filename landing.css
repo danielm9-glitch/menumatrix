@@ -32,7 +32,7 @@ nav a:hover,.login-link:hover { color:#a64e39; }
 .button-light { background:white; color:var(--green); }
 .button-light:hover { background:#e7f1eb; }
 .hero { position:relative; isolation:isolate; display:flex; flex-direction:column; justify-content:center; min-height:650px; height:calc(100svh - 152px); max-height:800px; background:#182a22; color:white; overflow:hidden; }
-.hero-image { position:absolute; z-index:-3; width:100%; height:100%; object-fit:cover; object-position:center 24%; filter:blur(1px); transform:scale(1.012); }
+.hero-image { position:absolute; z-index:-3; width:100%; height:100%; object-fit:cover; object-position:center; }
 .hero-shade { position:absolute; z-index:-2; inset:0; background:linear-gradient(90deg,rgba(9,25,18,.91),rgba(9,25,18,.68) 55%,rgba(9,25,18,.16)); }
 .hero-copy { padding-block:60px 86px; }
 .hero .eyebrow { display:flex; gap:10px; align-items:center; color:#e4ece7; }
@@ -155,7 +155,7 @@ h3 { font-size:18px; font-weight:700; line-height:1.4; }
   .login-link { font-size:12px; }
   .hero { min-height:0; height:auto; max-height:none; }
   .hero-copy { padding-block:40px 70px; }
-  .hero-image { object-position:58% center; }
+  .hero-image { object-position:75% center; }
   .hero-shade { background:linear-gradient(90deg,#0b2419ed,#0b2419a8); }
   .hero .eyebrow { font-size:8px; gap:7px; }
   h1 { font-size:43px; margin-top:18px; }

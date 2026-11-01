@@ -44,7 +44,8 @@ automatically verify ownership or guarantee indexing or rankings.
 - `assets/website/menu-desktop.jpg`: screenshot of the actual public demo menu.
 - `assets/website/quiz-phone.jpg`: screenshot of demo quiz setup.
 - `assets/website/flashcards-phone.jpg`: screenshot of demo flashcards.
-- `assets/website/hero-photo.webp`: user-supplied black-and-white photo, used as the current homepage hero. The original is preserved; a 1px CSS blur and responsive cropping are applied at display time.
+- `assets/website/kitchen-pass.jpg`: current homepage hero, generated with the built-in image generation tool and optimized as JPEG. Hands plating food on a kitchen pass, with no faces. Responsive cropping is applied without added blur.
+- `assets/website/hero-photo.webp`: previously supplied black-and-white photo, retained but no longer displayed.
 - `assets/website/kitchen.jpg`: previous generated kitchen hero, retained but no longer displayed.
 
 The previous kitchen image was generated using the built-in image generation tool.
@@ -55,6 +56,10 @@ Final generation prompt:
 > Use case: photorealistic-natural. Asset type: wide website hero background for restaurant staff menu training software. Create a realistic editorial photograph inside a bright modern professional restaurant kitchen at service: a chef and front-of-house server collaboratively discussing a plated dish at a stainless steel pass, clear ingredients and fresh herbs, brushed metal, soft daylight mixed with practical kitchen lighting. The people and plated dish occupy the right half; the left half has a quieter natural kitchen workspace with usable space for white website copy overlay. Landscape 16:9 framing, premium but believable hospitality photography, natural skin texture, crisp details, moderate depth of field. Neutral whites, stainless silver, restrained green herbs, small red food accents. No text, no logos, no watermark, no dramatic darkness or artificial decorative blur.
 
 ## Verification
+
+Current kitchen-pass generation prompt:
+
+> Use case: photorealistic-natural. Asset type: wide landscape 16:9 homepage hero background for Menu Matrix restaurant staff training software. A refined realistic editorial photograph at a working professional restaurant kitchen pass. ONLY hands and forearms of two chefs visible, one carefully placing a fresh herb garnish with plating tweezers and the other finishing a sauce, assembling a beautiful contemporary plated dish on a white ceramic plate on a brushed stainless steel pass. Frame entirely below shoulder level or from an oblique overhead angle; ABSOLUTELY NO faces, heads, portraits, or reflections of faces anywhere. Main plate and hands on the right half of the composition, clear visible appetizing food: seared fish, bright seasonal vegetables, small dots of herb sauce. Left third is quieter stainless steel work surface for headline overlay, but retain realistic kitchen detail. In the background a few orderly prep containers and folded towels, clean professional service environment. Natural warm-neutral practical kitchen light, crisp and believable culinary detail, no orange color cast, no excessive blur, restrained muted greens and stainless silver. Premium hospitality photography, authentic and composed. No text, no logos, no watermarks.
 
 Run `node scripts/preview-site.js` after preparing the site. The local preview
 uses port 4186. Then run `node --test tests/public-site.test.js`.
